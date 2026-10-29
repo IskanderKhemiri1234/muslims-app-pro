@@ -46,7 +46,10 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
   double _longitude = -7.5898;
   String _city = 'الدار البيضاء';
 
-  CalculationMethod _method = CalculationMethod.muslimWorldLeague;
+  // Correct enum names for the adhan package.
+  CalculationMethod _method =
+      CalculationMethod.muslim_world_league;
+
   Madhab _madhab = Madhab.shafi;
 
   DateTime _now = DateTime.now();
@@ -58,11 +61,11 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
     super.initState();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          _now = DateTime.now();
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _now = DateTime.now();
+      });
     });
   }
 
@@ -82,7 +85,8 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
     return PrayerTimes(coordinates, date, params);
   }
 
-  String _twoDigits(int value) => value.toString().padLeft(2, '0');
+  String _twoDigits(int value) =>
+      value.toString().padLeft(2, '0');
 
   String _formatTime(DateTime time) {
     return '${_twoDigits(time.hour)}:${_twoDigits(time.minute)}';
@@ -117,11 +121,32 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
       case Prayer.isha:
         return 'العشاء';
       case Prayer.none:
-        return 'الفجر';
+        return 'لا توجد صلاة تالية';
+    }
+  }
+
+  IconData _prayerIcon(Prayer prayer) {
+    switch (prayer) {
+      case Prayer.fajr:
+        return Icons.nightlight_round;
+      case Prayer.sunrise:
+        return Icons.wb_twilight;
+      case Prayer.dhuhr:
+        return Icons.wb_sunny_outlined;
+      case Prayer.asr:
+        return Icons.wb_cloudy_outlined;
+      case Prayer.maghrib:
+        return Icons.wb_twilight;
+      case Prayer.isha:
+        return Icons.nights_stay_outlined;
+      case Prayer.none:
+        return Icons.access_time;
     }
   }
 
   Future<void> _useCurrentLocation() async {
+    if (_loadingLocation) return;
+
     setState(() {
       _loadingLocation = true;
       _message = null;
@@ -165,13 +190,15 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
         _latitude = position.latitude;
         _longitude = position.longitude;
         _city = 'موقعي الحالي';
-        _message = 'تم تحديث الإحداثيات بنجاح.';
+        _message = 'تم تحديث الموقع بنجاح.';
       });
     } catch (error) {
       if (!mounted) return;
 
       setState(() {
-        _message = error.toString().replaceFirst('Exception: ', '');
+        _message = error
+            .toString()
+            .replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -183,10 +210,11 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
   }
 
   Future<void> _chooseCalculationMethod() async {
-    final selected = await showModalBottomSheet<CalculationMethod>(
+    final selected =
+        await showModalBottomSheet<CalculationMethod>(
       context: context,
       showDragHandle: true,
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -205,9 +233,14 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                     textDirection: TextDirection.rtl,
                   ),
                   trailing: method == _method
-                      ? const Icon(Icons.check_circle, color: Color(0xFF087F5B))
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF087F5B),
+                        )
                       : null,
-                  onTap: () => Navigator.pop(context, method),
+                  onTap: () {
+                    Navigator.pop(sheetContext, method);
+                  },
                 );
               }),
             ],
@@ -225,19 +258,19 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
 
   String _methodName(CalculationMethod method) {
     switch (method) {
-      case CalculationMethod.muslimWorldLeague:
+      case CalculationMethod.muslim_world_league:
         return 'رابطة العالم الإسلامي';
       case CalculationMethod.egyptian:
         return 'الهيئة المصرية العامة للمساحة';
       case CalculationMethod.karachi:
         return 'جامعة العلوم الإسلامية بكراتشي';
-      case CalculationMethod.ummAlQura:
+      case CalculationMethod.umm_al_qura:
         return 'أم القرى';
       case CalculationMethod.dubai:
         return 'دبي';
-      case CalculationMethod.moonsightingCommittee:
+      case CalculationMethod.moonsighting_committee:
         return 'لجنة رؤية الهلال';
-      case CalculationMethod.northAmerica:
+      case CalculationMethod.north_america:
         return 'أمريكا الشمالية';
       case CalculationMethod.kuwait:
         return 'الكويت';
@@ -268,7 +301,9 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
     };
 
     final nextPrayer = prayerTimes.nextPrayer();
-    final nextPrayerTime = prayerTimes.timeForPrayer(nextPrayer);
+    final nextPrayerTime = nextPrayer == Prayer.none
+        ? null
+        : prayerTimes.timeForPrayer(nextPrayer);
 
     final countdown = nextPrayerTime == null
         ? Duration.zero
@@ -315,7 +350,10 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.location_on, color: Colors.white70),
+                          Icon(
+                            Icons.location_on,
+                            color: Colors.white70,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'موقعك',
@@ -334,8 +372,12 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${_now.year}/${_twoDigits(_now.month)}/${_twoDigits(_now.day)}',
-                        style: const TextStyle(color: Colors.white70),
+                        '${_now.year}/'
+                        '${_twoDigits(_now.month)}/'
+                        '${_twoDigits(_now.day)}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       const Text(
@@ -376,7 +418,6 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                           color: Colors.white,
                           fontSize: 30,
                           fontWeight: FontWeight.w600,
-                          fontFeatures: [],
                         ),
                       ),
                     ],
@@ -397,7 +438,9 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 9),
                     decoration: BoxDecoration(
-                      color: isNext ? const Color(0xFFE0F2E9) : Colors.white,
+                      color: isNext
+                          ? const Color(0xFFE0F2E9)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isNext
@@ -412,12 +455,16 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                             : const Color(0xFFF0F4F1),
                         child: Icon(
                           _prayerIcon(entry.key),
-                          color: isNext ? Colors.white : Colors.black54,
+                          color: isNext
+                              ? Colors.white
+                              : Colors.black54,
                         ),
                       ),
                       title: Text(
                         _prayerName(entry.key),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       trailing: Text(
                         _formatTime(entry.value),
@@ -435,12 +482,16 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                 }),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: _loadingLocation ? null : _useCurrentLocation,
+                  onPressed: _loadingLocation
+                      ? null
+                      : _useCurrentLocation,
                   icon: _loadingLocation
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Icon(Icons.my_location),
                   label: Text(
@@ -453,11 +504,13 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                 OutlinedButton.icon(
                   onPressed: _chooseCalculationMethod,
                   icon: const Icon(Icons.settings),
-                  label: Text('طريقة الحساب: ${_methodName(_method)}'),
+                  label: Text(
+                    'طريقة الحساب: ${_methodName(_method)}',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<Madhab>(
-                  value: _madhab,
+                  initialValue: _madhab,
                   decoration: const InputDecoration(
                     labelText: 'طريقة حساب العصر',
                     border: OutlineInputBorder(),
@@ -473,11 +526,11 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                     ),
                   ],
                   onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _madhab = value;
-                      });
-                    }
+                    if (value == null) return;
+
+                    setState(() {
+                      _madhab = value;
+                    });
                   },
                 ),
                 if (_message != null) ...[
@@ -489,10 +542,14 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
                 ],
                 const SizedBox(height: 20),
                 const Text(
-                  'ملاحظة: قد تختلف المواقيت عن الجهة المحلية المعتمدة. '
-                  'اختر طريقة الحساب الصحيحة لمدينتك وقارن النتائج قبل الاعتماد.',
+                  'ملاحظة: قد تختلف المواقيت عن الجهة المحلية '
+                  'المعتمدة. اختر طريقة الحساب المناسبة لمدينتك '
+                  'وقارن النتائج قبل الاعتماد.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -501,24 +558,5 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
         ),
       ),
     );
-  }
-
-  IconData _prayerIcon(Prayer prayer) {
-    switch (prayer) {
-      case Prayer.fajr:
-        return Icons.nightlight_round;
-      case Prayer.sunrise:
-        return Icons.wb_twilight;
-      case Prayer.dhuhr:
-        return Icons.wb_sunny_outlined;
-      case Prayer.asr:
-        return Icons.wb_cloudy_outlined;
-      case Prayer.maghrib:
-        return Icons.wb_twilight;
-      case Prayer.isha:
-        return Icons.nights_stay_outlined;
-      case Prayer.none:
-        return Icons.access_time;
-    }
   }
 }
