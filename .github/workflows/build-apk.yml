@@ -30,17 +30,26 @@ jobs:
           channel: stable
           cache: true
 
-      
-      - name: Inspect Flutter project files
+      - name: Inspect project
         run: |
-          pwd
+          echo "Project files:"
           ls -la
-          echo "Checking pubspec.yaml"
+          echo "Android files:"
+          find android -maxdepth 4 -type f -print || true
           test -f pubspec.yaml
-          echo "Checking lib/main.dart"
           test -f lib/main.dart
-          echo "Checking Android project"
-          ls -la android || true
+
+      - name: Generate missing Android platform files
+        run: |
+          if [ ! -f android/gradlew ] || \
+             [ ! -f android/build.gradle ] && \
+             [ ! -f android/build.gradle.kts ] || \
+             [ ! -f android/gradle/wrapper/gradle-wrapper.properties ] || \
+             [ ! -f android/app/src/main/kotlin/com/example/muslims_app/MainActivity.kt ] && \
+             [ ! -f android/app/src/main/java/com/example/muslims_app/MainActivity.java ]; then
+            flutter create --platforms=android --project-name muslims_app --org com.example /tmp/muslims_scaffold
+            cp -a /tmp/muslims_scaffold/android/. android/
+          fi
 
       - name: Install dependencies
         run: flutter pub get
