@@ -255,37 +255,37 @@ class _PrayerHomePageState extends State<PrayerHomePage> {
       });
     }
   }
-
-  String _methodName(CalculationMethod method) {
-    switch (method) {
-      case CalculationMethod.muslim_world_league:
-        return 'رابطة العالم الإسلامي';
-      case CalculationMethod.egyptian:
-        return 'الهيئة المصرية العامة للمساحة';
-      case CalculationMethod.karachi:
-        return 'جامعة العلوم الإسلامية بكراتشي';
-      case CalculationMethod.umm_al_qura:
-        return 'أم القرى';
-      case CalculationMethod.dubai:
-        return 'دبي';
-      case CalculationMethod.moonsighting_committee:
-        return 'لجنة رؤية الهلال';
-      case CalculationMethod.north_america:
-        return 'أمريكا الشمالية';
-      case CalculationMethod.kuwait:
-        return 'الكويت';
-      case CalculationMethod.qatar:
-        return 'قطر';
-      case CalculationMethod.singapore:
-        return 'سنغافورة';
-      case CalculationMethod.turkey:
-        return 'تركيا';
-      case CalculationMethod.tehran:
-        return 'طهران';
-      case CalculationMethod.other:
-        return 'إعدادات مخصصة';
-    }
+  
+String _methodName(CalculationMethod method) {
+  switch (method) {
+    case CalculationMethod.muslim_world_league:
+      return 'رابطة العالم الإسلامي';
+    case CalculationMethod.egyptian:
+      return 'الهيئة المصرية العامة للمساحة';
+    case CalculationMethod.karachi:
+      return 'جامعة العلوم الإسلامية بكراتشي';
+    case CalculationMethod.umm_al_qura:
+      return 'أم القرى';
+    case CalculationMethod.dubai:
+      return 'دبي';
+    case CalculationMethod.north_america:
+      return 'أمريكا الشمالية';
+    case CalculationMethod.kuwait:
+      return 'الكويت';
+    case CalculationMethod.qatar:
+      return 'قطر';
+    case CalculationMethod.singapore:
+      return 'سنغافورة';
+    case CalculationMethod.turkey:
+      return 'تركيا';
+    case CalculationMethod.tehran:
+      return 'طهران';
+    case CalculationMethod.other:
+      return 'إعدادات مخصصة';
+    default:
+      return method.toString().split('.').last;
   }
+}
 
   @override
   Widget build(BuildContext context) {
