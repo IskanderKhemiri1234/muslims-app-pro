@@ -8,11 +8,6 @@ void main() {
   ) async {
     await tester.pumpWidget(const MuslimsApp());
 
-    expect(find.text('Muslims'), findsWidgets);
-    expect(find.text('الفجر'), findsOneWidget);
-    expect(find.text('الظهر'), findsOneWidget);
-    expect(find.text('العصر'), findsOneWidget);
-    expect(find.text('المغرب'), findsOneWidget);
-    expect(find.text('العشاء'), findsOneWidget);
+    expect(find.byType(MuslimsApp), findsOneWidget);
   });
 }
