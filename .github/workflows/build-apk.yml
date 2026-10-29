@@ -30,6 +30,18 @@ jobs:
           channel: stable
           cache: true
 
+      
+      - name: Inspect Flutter project files
+        run: |
+          pwd
+          ls -la
+          echo "Checking pubspec.yaml"
+          test -f pubspec.yaml
+          echo "Checking lib/main.dart"
+          test -f lib/main.dart
+          echo "Checking Android project"
+          ls -la android || true
+
       - name: Install dependencies
         run: flutter pub get
 
