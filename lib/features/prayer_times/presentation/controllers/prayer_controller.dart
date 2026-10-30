@@ -6,25 +6,74 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../data/datasources/location_datasource.dart';
 
-class PrayerController extends ChangeNotifier {
+class PrayerController extends ChangeNotifier
+    with WidgetsBindingObserver {
+  WidgetsBinding.instance.addObserver(this);
   PrayerController({
+    void _startClock() {
+  _timer?.cancel();
+
+  _timer = Timer.periodic(
+    const Duration(seconds: 1),
+    (_) {
+      if (_disposed) return;
+
+      final now = DateTime.now();
+
+      clock.value = now;
+
+      if (_scheduleDate == null ||
+          !_isSameDate(now, _scheduleDate!)) {
+        _calculateSchedule();
+        notifyListeners();
+      }
+    },
+  );
+}
+
+void _stopClock() {
+  _timer?.cancel();
+  _timer = null;
+}
+
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (_disposed) return;
+
+  switch (state) {
+    case AppLifecycleState.resumed:
+      final now = DateTime.now();
+      clock.value = now;
+
+      if (_scheduleDate == null ||
+          !_isSameDate(now, _scheduleDate!)) {
+        _calculateSchedule();
+        notifyListeners();
+      }
+
+      _startClock();
+      break;
+
+    case AppLifecycleState.inactive:
+    case AppLifecycleState.paused:
+    case AppLifecycleState.detached:
+    case AppLifecycleState.hidden:
+      _stopClock();
+      break;
+  }
+}
     LocationDataSource? locationSource,
   }) : _locationSource = locationSource ?? LocationDataSource() {
     _initialize();
   }
 
-  final LocationDataSource _locationSource;
+  void _initialize() {
+  WidgetsBinding.instance.addObserver(this);
 
-  // Default location: Casablanca.
-  double latitude = 33.5731;
-  double longitude = -7.5898;
+  _calculateSchedule();
 
-  String city = 'الدار البيضاء';
-
-  CalculationMethod method =
-      CalculationMethod.muslim_world_league;
-
-  Madhab madhab = Madhab.shafi;
+  _startClock();
+}
 
   PrayerTimes? _prayerTimes;
 
@@ -168,15 +217,15 @@ class PrayerController extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
-    _disposed = true;
+void dispose() {
+  _disposed = true;
 
-    // إغلاق جميع الموارد.
-    _timer?.cancel();
-    _timer = null;
+  WidgetsBinding.instance.removeObserver(this);
 
-    clock.dispose();
+  _stopClock();
 
-    super.dispose();
-  }
+  clock.dispose();
+
+  super.dispose();
+}
 }
