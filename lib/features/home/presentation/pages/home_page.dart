@@ -106,6 +106,14 @@ QuickActions(
       );
       return;
     }
+    if (action == 'quran') {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => const QuranPage(),
+    ),
+  );
+  return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
