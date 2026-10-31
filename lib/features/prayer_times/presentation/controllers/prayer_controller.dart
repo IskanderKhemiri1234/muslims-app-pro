@@ -1,81 +1,36 @@
+
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../data/datasources/location_datasource.dart';
 
 class PrayerController extends ChangeNotifier
     with WidgetsBindingObserver {
-  WidgetsBinding.instance.addObserver(this);
   PrayerController({
-    void _startClock() {
-  _timer?.cancel();
-
-  _timer = Timer.periodic(
-    const Duration(seconds: 1),
-    (_) {
-      if (_disposed) return;
-
-      final now = DateTime.now();
-
-      clock.value = now;
-
-      if (_scheduleDate == null ||
-          !_isSameDate(now, _scheduleDate!)) {
-        _calculateSchedule();
-        notifyListeners();
-      }
-    },
-  );
-}
-
-void _stopClock() {
-  _timer?.cancel();
-  _timer = null;
-}
-
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  if (_disposed) return;
-
-  switch (state) {
-    case AppLifecycleState.resumed:
-      final now = DateTime.now();
-      clock.value = now;
-
-      if (_scheduleDate == null ||
-          !_isSameDate(now, _scheduleDate!)) {
-        _calculateSchedule();
-        notifyListeners();
-      }
-
-      _startClock();
-      break;
-
-    case AppLifecycleState.inactive:
-    case AppLifecycleState.paused:
-    case AppLifecycleState.detached:
-    case AppLifecycleState.hidden:
-      _stopClock();
-      break;
-  }
-}
     LocationDataSource? locationSource,
-  }) : _locationSource = locationSource ?? LocationDataSource() {
+  }) : _locationSource =
+            locationSource ?? LocationDataSource() {
+    WidgetsBinding.instance.addObserver(this);
     _initialize();
   }
 
-  void _initialize() {
-  WidgetsBinding.instance.addObserver(this);
+  final LocationDataSource _locationSource;
 
-  _calculateSchedule();
+  // الموقع الافتراضي: الدار البيضاء
+  double latitude = 33.5731;
+  double longitude = -7.5898;
+  String city = 'Casablanca';
 
-  _startClock();
-}
+  // إعدادات حساب الصلاة
+  CalculationMethod method = CalculationMethod.muslimWorldLeague;
+  Madhab madhab = Madhab.shafi;
 
   PrayerTimes? _prayerTimes;
+  DateTime? _scheduleDate;
 
   final ValueNotifier<DateTime> clock =
       ValueNotifier<DateTime>(DateTime.now());
@@ -84,35 +39,14 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
   bool isLoadingLocation = false;
   String? message;
-
   bool _disposed = false;
 
   PrayerTimes? get prayerTimes => _prayerTimes;
 
   void _initialize() {
     _calculateSchedule();
-
-    // تحديث الساعة فقط، دون إعادة حساب المواقيت.
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        if (_disposed) return;
-
-        final now = DateTime.now();
-
-        clock.value = now;
-
-        // إعادة حساب الجدول عند تغير اليوم.
-        if (_scheduleDate != null &&
-            !_isSameDate(now, _scheduleDate!)) {
-          _calculateSchedule();
-          notifyListeners();
-        }
-      },
-    );
+    _startClock();
   }
-
-  DateTime? _scheduleDate;
 
   bool _isSameDate(DateTime a, DateTime b) {
     return a.year == b.year &&
@@ -126,7 +60,6 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     final now = DateTime.now();
 
     final coordinates = Coordinates(latitude, longitude);
-
     final date = DateComponents.from(now);
 
     final parameters = method.getParameters();
@@ -139,6 +72,58 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     );
 
     _scheduleDate = now;
+  }
+
+  void _startClock() {
+    _timer?.cancel();
+
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        if (_disposed) return;
+
+        final now = DateTime.now();
+        clock.value = now;
+
+        if (_scheduleDate == null ||
+            !_isSameDate(now, _scheduleDate!)) {
+          _calculateSchedule();
+          notifyListeners();
+        }
+      },
+    );
+  }
+
+  void _stopClock() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_disposed) return;
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        final now = DateTime.now();
+        clock.value = now;
+
+        if (_scheduleDate == null ||
+            !_isSameDate(now, _scheduleDate!)) {
+          _calculateSchedule();
+          notifyListeners();
+        }
+
+        _startClock();
+        break;
+
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _stopClock();
+        break;
+    }
   }
 
   Future<void> updateLocation() async {
@@ -156,7 +141,6 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
       latitude = position.latitude;
       longitude = position.longitude;
-
       city = 'موقعي الحالي';
 
       _calculateSchedule();
@@ -217,15 +201,14 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   }
 
   @override
-void dispose() {
-  _disposed = true;
+  void dispose() {
+    _disposed = true;
 
-  WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
 
-  _stopClock();
+    _stopClock();
+    clock.dispose();
 
-  clock.dispose();
-
-  super.dispose();
-}
+    super.dispose();
+  }
 }
