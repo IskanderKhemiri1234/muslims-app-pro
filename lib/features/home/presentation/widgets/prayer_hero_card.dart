@@ -23,118 +23,164 @@ class PrayerHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nextPrayer = controller.nextPrayer;
-    final nextTime = controller.nextPrayerTime;
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.97, end: 1),
-      duration: const Duration(milliseconds: 550),
-      curve: Curves.easeOutCubic,
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final nextPrayer = controller.nextPrayer;
+        final nextTime = controller.nextPrayerTime;
+
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.97, end: 1),
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 550),
+          curve: Curves.easeOutCubic,
+          builder: (context, scale, child) {
+            return Transform.scale(
+              scale: scale,
+              child: child,
+            );
+          },
+          child: _HeroSurface(
+            nextPrayer: nextPrayer,
+            nextTime: nextTime,
+            isArabic: isArabic,
+            prayerName: prayerName,
+            formatTime: formatTime,
+            controller: controller,
+            reduceMotion: reduceMotion,
+          ),
         );
       },
-      child: Container(
-        padding: const EdgeInsets.all(23),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [
-              Color(0xFF0B6149),
-              Color(0xFF064333),
-              Color(0xFF032B25),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.28),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.emerald.withValues(alpha: 0.20),
-              blurRadius: 35,
-              offset: const Offset(0, 15),
-            ),
+    );
+  }
+}
+
+class _HeroSurface extends StatelessWidget {
+  const _HeroSurface({
+    required this.nextPrayer,
+    required this.nextTime,
+    required this.isArabic,
+    required this.prayerName,
+    required this.formatTime,
+    required this.controller,
+    required this.reduceMotion,
+  });
+
+  final Prayer nextPrayer;
+  final DateTime? nextTime;
+  final bool isArabic;
+  final String Function(Prayer) prayerName;
+  final String Function(DateTime) formatTime;
+  final PrayerController controller;
+  final bool reduceMotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final prayerLabel = nextTime == null
+        ? (isArabic ? 'غير متاح' : 'Unavailable')
+        : prayerName(nextPrayer);
+
+    return Container(
+      padding: const EdgeInsets.all(23),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            Color(0xFF0B6149),
+            Color(0xFF064333),
+            Color(0xFF032B25),
           ],
         ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const _HeroDecoration(),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HeroHeader(isArabic: isArabic),
-                const SizedBox(height: 23),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 350),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.10),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      nextTime == null
-                          ? (isArabic ? 'غير متاح' : 'Unavailable')
-                          : prayerName(nextPrayer),
-                      key: ValueKey(nextPrayer),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 37,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.2,
-                      ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.emerald.withValues(alpha: 0.20),
+            blurRadius: 35,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const _HeroDecoration(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _HeroHeader(isArabic: isArabic),
+              const SizedBox(height: 23),
+              AnimatedSwitcher(
+                duration: reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 350),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.10),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: SizedBox(
+                  key: ValueKey('${nextPrayer.name}_${nextTime?.millisecondsSinceEpoch}'),
+                  width: double.infinity,
+                  child: Text(
+                    prayerLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 37,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
-                const SizedBox(height: 7),
-                if (nextTime != null)
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.schedule_rounded,
-                        size: 17,
+              ),
+              const SizedBox(height: 7),
+              if (nextTime != null)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 17,
+                      color: AppColors.goldLight,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      formatTime(nextTime),
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(
                         color: AppColors.goldLight,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 7),
-                      Text(
-                        formatTime(nextTime),
-                        textDirection: TextDirection.ltr,
-                        style: const TextStyle(
-                          color: AppColors.goldLight,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 24),
-                _CountdownPanel(
-                  controller: controller,
-                  isArabic: isArabic,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _HeroFooter(isArabic: isArabic),
-              ],
-            ),
-          ],
-        ),
+              const SizedBox(height: 24),
+              _CountdownPanel(
+                controller: controller,
+                isArabic: isArabic,
+              ),
+              const SizedBox(height: 16),
+              _HeroFooter(isArabic: isArabic),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -238,9 +284,9 @@ class _CountdownPanel extends StatelessWidget {
           ),
           const SizedBox(height: 13),
           CountdownWidget(
-  controller: controller,
-  isArabic: isArabic,
-)
+            controller: controller,
+            isArabic: isArabic,
+          ),
         ],
       ),
     );
