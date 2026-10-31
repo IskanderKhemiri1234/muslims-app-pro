@@ -623,11 +623,11 @@ class _InfoCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            icon,
-            color: AppColors.gold,
-            size: 30,
-          ),
+          Icon(
+  icon,
+  color: AppColors.gold,
+  size: 30,
+),
           const SizedBox(width: 13),
           Expanded(
             child: Column(
