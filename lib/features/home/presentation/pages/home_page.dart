@@ -52,11 +52,10 @@ class PrayerHomePage extends StatelessWidget {
         '${time.minute.toString().padLeft(2, '0')}';
   }
 
-  String get dateText {
-    final now = DateTime.now();
-    return '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year}';
+  String formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 
   void _openPage(BuildContext context, Widget page) {
@@ -78,29 +77,39 @@ class PrayerHomePage extends StatelessWidget {
         break;
 
       case 'adhan':
-        _showMessage(context, t(
-          'خدمة الأذان قيد التطوير',
-          'Adhan service is under development',
-        ));
+        _showMessage(
+          context,
+          t(
+            'خدمة الأذان قيد التطوير',
+            'Adhan service is under development',
+          ),
+        );
         break;
 
       case 'adhkar':
-        _showMessage(context, t(
-          'قسم الأذكار قيد التطوير',
-          'Adhkar section is under development',
-        ));
+        _showMessage(
+          context,
+          t(
+            'قسم الأذكار قيد التطوير',
+            'Adhkar section is under development',
+          ),
+        );
         break;
 
       default:
-        _showMessage(context, t(
-          'هذه الميزة ستتوفر قريباً',
-          'This feature will be available soon',
-        ));
+        _showMessage(
+          context,
+          t(
+            'هذه الميزة ستتوفر قريباً',
+            'This feature will be available soon',
+          ),
+        );
     }
   }
 
   void _showMessage(BuildContext context, String message) {
     final messenger = ScaffoldMessenger.of(context);
+
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -115,24 +124,23 @@ class PrayerHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection:
-          isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Selector<PrayerController, _HomeSnapshot>(
         selector: (_, controller) => _HomeSnapshot(
           prayerTimes: controller.prayerTimes,
           nextPrayer: controller.nextPrayer,
+          nextPrayerTime: controller.nextPrayerTime,
           city: controller.city,
           isLoadingLocation: controller.isLoadingLocation,
           message: controller.message,
         ),
-        builder: (context, snapshot, child) {
+        builder: (context, snapshot, _) {
           if (snapshot.prayerTimes == null) {
             return _LoadingView(
               isArabic: isArabic,
               message: snapshot.message,
               onRetry: () {
-                context.read<PrayerController>()
-                    .retryInitialization();
+                context.read<PrayerController>().retryInitialization();
               },
             );
           }
@@ -148,9 +156,7 @@ class PrayerHomePage extends StatelessWidget {
                           constraints.maxWidth > 700 ? 40.0 : 19.0;
 
                       final contentWidth =
-                          constraints.maxWidth > 900
-                              ? 820.0
-                              : double.infinity;
+                          constraints.maxWidth > 900 ? 820.0 : double.infinity;
 
                       return Center(
                         child: ConstrainedBox(
@@ -169,17 +175,14 @@ class PrayerHomePage extends StatelessWidget {
                                 isArabic: isArabic,
                                 isDark: isDark,
                                 city: snapshot.city,
-                                date: dateText,
-                                onLanguageToggle:
-                                    onLanguageToggle,
+                                date: formatDate(DateTime.now()),
+                                onLanguageToggle: onLanguageToggle,
                                 onThemeToggle: onThemeToggle,
                               ),
-
                               const SizedBox(height: 23),
 
                               PrayerHeroCard(
-                                controller:
-                                    context.read<PrayerController>(),
+                                controller: context.read<PrayerController>(),
                                 isArabic: isArabic,
                                 prayerName: prayerName,
                                 formatTime: formatTime,
@@ -188,25 +191,18 @@ class PrayerHomePage extends StatelessWidget {
                               const SizedBox(height: 30),
 
                               _SectionTitle(
-                                title: t(
-                                  'الوصول السريع',
-                                  'Quick access',
-                                ),
+                                title: t('الوصول السريع', 'Quick access'),
                                 subtitle: t(
                                   'كل ما تحتاجه في مكان واحد',
                                   'Your daily essentials',
                                 ),
                               ),
-
                               const SizedBox(height: 14),
 
                               QuickActions(
                                 isArabic: isArabic,
                                 onAction: (action) =>
-                                    _handleQuickAction(
-                                  context,
-                                  action,
-                                ),
+                                    _handleQuickAction(context, action),
                               ),
 
                               const SizedBox(height: 30),
@@ -223,8 +219,7 @@ class PrayerHomePage extends StatelessWidget {
 
                               _LocationButton(
                                 isArabic: isArabic,
-                                isLoading:
-                                    snapshot.isLoadingLocation,
+                                isLoading: snapshot.isLoadingLocation,
                                 onPressed: () {
                                   context
                                       .read<PrayerController>()
@@ -234,13 +229,10 @@ class PrayerHomePage extends StatelessWidget {
 
                               if (snapshot.message != null) ...[
                                 const SizedBox(height: 12),
-                                _MessageCard(
-                                  message: snapshot.message!,
-                                ),
+                                _MessageCard(message: snapshot.message!),
                               ],
 
                               const SizedBox(height: 24),
-
                               _Footer(isArabic: isArabic),
                             ],
                           ),
@@ -258,13 +250,11 @@ class PrayerHomePage extends StatelessWidget {
   }
 }
 
-// Only changes to these fields rebuild the main page.
-// A notification from the controller every second does not,
-// by itself, cause a rebuild if these values remain unchanged.
 class _HomeSnapshot {
   const _HomeSnapshot({
     required this.prayerTimes,
     required this.nextPrayer,
+    required this.nextPrayerTime,
     required this.city,
     required this.isLoadingLocation,
     required this.message,
@@ -272,6 +262,7 @@ class _HomeSnapshot {
 
   final PrayerTimes? prayerTimes;
   final Prayer? nextPrayer;
+  final DateTime? nextPrayerTime;
   final String city;
   final bool isLoadingLocation;
   final String? message;
@@ -281,6 +272,7 @@ class _HomeSnapshot {
     return other is _HomeSnapshot &&
         identical(prayerTimes, other.prayerTimes) &&
         nextPrayer == other.nextPrayer &&
+        nextPrayerTime == other.nextPrayerTime &&
         city == other.city &&
         isLoadingLocation == other.isLoadingLocation &&
         message == other.message;
@@ -290,6 +282,7 @@ class _HomeSnapshot {
   int get hashCode => Object.hash(
         identityHashCode(prayerTimes),
         nextPrayer,
+        nextPrayerTime,
         city,
         isLoadingLocation,
         message,
@@ -521,16 +514,12 @@ class _LocationButton extends StatelessWidget {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.my_location_rounded),
         label: Text(
           isLoading
-              ? (isArabic
-                  ? 'جارٍ تحديد الموقع...'
-                  : 'Getting location...')
+              ? (isArabic ? 'جارٍ تحديد الموقع...' : 'Getting location...')
               : (isArabic
                   ? 'تحديث موقعي الحالي'
                   : 'Update my location'),
