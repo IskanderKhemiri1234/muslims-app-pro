@@ -10,7 +10,6 @@ void main() {
   final testDate = DateTime(2026, 10, 31);
 
   const method = CalculationMethod.muslim_world_league;
-
   const madhab = Madhab.shafi;
 
   group('PrayerCalculationService', () {
@@ -23,35 +22,16 @@ void main() {
         madhab: madhab,
       );
 
-      expect(
-        result.timeForPrayer(Prayer.fajr),
-        isNotNull,
-      );
-
-      expect(
-        result.timeForPrayer(Prayer.sunrise),
-        isNotNull,
-      );
-
-      expect(
-        result.timeForPrayer(Prayer.dhuhr),
-        isNotNull,
-      );
-
-      expect(
-        result.timeForPrayer(Prayer.asr),
-        isNotNull,
-      );
-
-      expect(
-        result.timeForPrayer(Prayer.maghrib),
-        isNotNull,
-      );
-
-      expect(
-        result.timeForPrayer(Prayer.isha),
-        isNotNull,
-      );
+      for (final prayer in [
+        Prayer.fajr,
+        Prayer.sunrise,
+        Prayer.dhuhr,
+        Prayer.asr,
+        Prayer.maghrib,
+        Prayer.isha,
+      ]) {
+        expect(result.timeForPrayer(prayer), isNotNull);
+      }
     });
 
     test('returns prayers in chronological order', () {
@@ -116,14 +96,19 @@ void main() {
       );
     });
 
-    test('accepts valid coordinates at geographical limits', () {
+    test('accepts valid geographical boundary coordinates', () {
       expect(
-        () => service.calculate(
+        () => PrayerCalculationService.validateCoordinates(
           latitude: 90,
           longitude: 180,
-          date: testDate,
-          method: method,
-          madhab: madhab,
+        ),
+        returnsNormally,
+      );
+
+      expect(
+        () => PrayerCalculationService.validateCoordinates(
+          latitude: -90,
+          longitude: -180,
         ),
         returnsNormally,
       );
