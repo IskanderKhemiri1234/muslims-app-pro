@@ -22,28 +22,36 @@ class QuickActions extends StatelessWidget {
         _ActionData(
           id: 'qibla',
           title: isArabic ? 'القبلة' : 'Qibla',
-          semanticLabel: isArabic ? 'فتح اتجاه القبلة' : 'Open Qibla direction',
+          semanticLabel: isArabic
+              ? 'فتح اتجاه القبلة'
+              : 'Open Qibla direction',
           icon: Icons.explore_rounded,
           color: const Color(0xFF58C9A1),
         ),
         _ActionData(
           id: 'quran',
           title: isArabic ? 'القرآن' : 'Quran',
-          semanticLabel: isArabic ? 'فتح القرآن الكريم' : 'Open Quran',
+          semanticLabel: isArabic
+              ? 'فتح القرآن الكريم'
+              : 'Open Quran',
           icon: Icons.menu_book_rounded,
           color: AppColors.goldLight,
         ),
         _ActionData(
           id: 'adhan',
           title: isArabic ? 'الأذان' : 'Adhan',
-          semanticLabel: isArabic ? 'إعدادات الأذان' : 'Adhan settings',
+          semanticLabel: isArabic
+              ? 'إعدادات الأذان'
+              : 'Adhan settings',
           icon: Icons.notifications_active_rounded,
           color: const Color(0xFF8DB8F1),
         ),
         _ActionData(
           id: 'adhkar',
           title: isArabic ? 'الأذكار' : 'Adhkar',
-          semanticLabel: isArabic ? 'فتح الأذكار' : 'Open Adhkar',
+          semanticLabel: isArabic
+              ? 'فتح الأذكار'
+              : 'Open Adhkar',
           icon: Icons.auto_awesome_rounded,
           color: const Color(0xFFCB9AE8),
         ),
@@ -52,7 +60,8 @@ class QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = _actions;
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final isRtl =
+        Directionality.of(context) == TextDirection.rtl;
 
     return SizedBox(
       height: _itemHeight,
@@ -70,6 +79,7 @@ class QuickActions extends StatelessWidget {
           return SizedBox(
             width: _itemWidth,
             child: _QuickActionTile(
+              key: ValueKey(action.id),
               action: action,
               onTap: () => onAction(action.id),
               animationDelay: index * 70,
@@ -83,6 +93,7 @@ class QuickActions extends StatelessWidget {
 
 class _QuickActionTile extends StatelessWidget {
   const _QuickActionTile({
+    super.key,
     required this.action,
     required this.onTap,
     required this.animationDelay,
@@ -94,20 +105,35 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final foreground = theme.colorScheme.onSurface;
+
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context);
+
+    final duration = reduceMotion
+        ? Duration.zero
+        : Duration(milliseconds: 300 + animationDelay);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.92, end: 1),
-      duration: Duration(milliseconds: 300 + animationDelay),
+      tween: Tween<double>(
+        begin: reduceMotion ? 1 : 0.92,
+        end: 1,
+      ),
+      duration: duration,
       curve: Curves.easeOutCubic,
       child: Semantics(
         button: true,
         label: action.semanticLabel,
         child: Material(
           color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(22),
+            splashColor: action.color.withValues(alpha: 0.12),
+            highlightColor: action.color.withValues(alpha: 0.06),
             child: GlassContainer(
               radius: 22,
               padding: const EdgeInsets.symmetric(vertical: 13),
