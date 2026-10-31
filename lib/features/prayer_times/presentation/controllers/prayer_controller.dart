@@ -72,6 +72,7 @@ class PrayerController extends ChangeNotifier
 
   final ValueNotifier<DateTime> clock =
       ValueNotifier<DateTime>(DateTime.now());
+    ValueListenable<DateTime> get clockListenable => clock;
 
   Timer? _timer;
 
@@ -488,11 +489,7 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
   // CLOCK ENGINE
   // --------------------------------------------------
-   
-    final ValueNotifier<DateTime> clock =
-    ValueNotifier<DateTime>(DateTime.now());
 
-ValueListenable<DateTime> get clockListenable => clock;
   void _startClock() {
     if (_disposed) return;
 
