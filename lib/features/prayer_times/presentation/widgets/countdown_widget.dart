@@ -1,4 +1,6 @@
 
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -8,15 +10,36 @@ class CountdownWidget extends StatelessWidget {
   const CountdownWidget({
     super.key,
     required this.controller,
+    this.isArabic = false,
   });
 
   final PrayerController controller;
+  final bool isArabic;
 
   static const Duration _animationDuration =
       Duration(milliseconds: 220);
 
-  String _twoDigits(int value) =>
-      value.toString().padLeft(2, '0');
+  String _twoDigits(int value) {
+    return value.toString().padLeft(2, '0');
+  }
+
+  String _semanticLabel(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    if (isArabic) {
+      return 'الوقت المتبقي: '
+          '$hours ساعة و'
+          '$minutes دقيقة و'
+          '$seconds ثانية';
+    }
+
+    return 'Time remaining: '
+        '$hours hours, '
+        '$minutes minutes, '
+        '$seconds seconds';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,43 +48,54 @@ class CountdownWidget extends StatelessWidget {
         valueListenable: controller.clockListenable,
         builder: (context, now, child) {
           final target = controller.nextPrayerTime;
+
           final difference = target?.difference(now);
 
-          final duration =
-              difference == null || difference.isNegative
-                  ? Duration.zero
-                  : difference;
+          final duration = difference == null ||
+                  difference.isNegative
+              ? Duration.zero
+              : difference;
+
+          final hasTarget = target != null;
 
           final hours = duration.inHours;
-          final minutes =
-              duration.inMinutes.remainder(60);
-          final seconds =
-              duration.inSeconds.remainder(60);
+          final minutes = duration.inMinutes.remainder(60);
+          final seconds = duration.inSeconds.remainder(60);
+
+          final hourValue =
+              hasTarget ? _twoDigits(hours) : '--';
+          final minuteValue =
+              hasTarget ? _twoDigits(minutes) : '--';
+          final secondValue =
+              hasTarget ? _twoDigits(seconds) : '--';
 
           return Semantics(
-            label: 'Time remaining: '
-                '$hours hours, $minutes minutes, '
-                '$seconds seconds',
+            liveRegion: false,
+            label: hasTarget
+                ? _semanticLabel(duration)
+                : isArabic
+                    ? 'لا يوجد موعد صلاة قادم متاح'
+                    : 'No upcoming prayer time available',
             child: ExcludeSemantics(
               child: Row(
                 textDirection: TextDirection.ltr,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _TimeUnit(
-                    value: _twoDigits(hours),
-                    label: 'HRS',
+                    value: hourValue,
+                    label: isArabic ? 'س' : 'HRS',
                     duration: _animationDuration,
                   ),
                   const _TimeSeparator(),
                   _TimeUnit(
-                    value: _twoDigits(minutes),
-                    label: 'MIN',
+                    value: minuteValue,
+                    label: isArabic ? 'د' : 'MIN',
                     duration: _animationDuration,
                   ),
                   const _TimeSeparator(),
                   _TimeUnit(
-                    value: _twoDigits(seconds),
-                    label: 'SEC',
+                    value: secondValue,
+                    label: isArabic ? 'ث' : 'SEC',
                     highlighted: true,
                     duration: _animationDuration,
                   ),
