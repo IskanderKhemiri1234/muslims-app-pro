@@ -6,7 +6,8 @@ plugins {
 }
 
 android {
-    namespace 'com.example.muslims_app'
+    namespace 'com.iskander.muslimspro'
+
     compileSdk flutter.compileSdkVersion
 
     compileOptions {
@@ -20,15 +21,28 @@ android {
 
     defaultConfig {
         applicationId 'com.iskander.muslimspro'
+
         minSdk flutter.minSdkVersion
         targetSdk flutter.targetSdkVersion
+
         versionCode 2
         versionName '1.1.0'
+
+        multiDexEnabled true
     }
 
     buildTypes {
+        debug {
+            debuggable true
+        }
+
         release {
+            // Temporary signing configuration for local development.
+            // Replace with a dedicated release keystore before publishing.
             signingConfig signingConfigs.debug
+
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
