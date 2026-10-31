@@ -1,6 +1,6 @@
-import 'dart:ui' show FontFeature;
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
