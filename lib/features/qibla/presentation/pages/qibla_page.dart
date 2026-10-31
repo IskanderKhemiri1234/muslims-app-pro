@@ -1,5 +1,5 @@
-
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
@@ -7,7 +7,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../domain/services/qibla_service.dart';
 
 class QiblaPage extends StatefulWidget {
@@ -17,26 +16,59 @@ class QiblaPage extends StatefulWidget {
   State<QiblaPage> createState() => _QiblaPageState();
 }
 
-class _QiblaPageState extends State<QiblaPage> {
+class _QiblaPageState extends State<QiblaPage>
+    with WidgetsBindingObserver {
+  static const Color _primaryGreen = Color(0xFF075B46);
+  static const Color _darkGreen = Color(0xFF064536);
+  static const Color _gold = Color(0xFFD8B66A);
+  static const Color _background = Color(0xFFF5F7F3);
+
   Position? _position;
+
   double? _qiblaBearing;
   double? _distanceKm;
   double? _declination;
 
-  bool _loading = true;
-  String? _error;
+  bool _isLoading = true;
+  bool _isRefreshing = false;
+  String? _locationError;
+
+  Stream<CompassEvent>? _compassStream;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _compassStream = FlutterCompass.events;
     _loadLocation();
   }
 
-  Future<void> _loadLocation() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _compassStream = FlutterCompass.events;
+      _loadLocation(silent: true);
+    }
+  }
+
+  Future<void> _loadLocation({bool silent = false}) async {
+    if (_isRefreshing) return;
+
+    _isRefreshing = true;
+
     if (mounted) {
       setState(() {
-        _loading = true;
-        _error = null;
+        if (!silent) {
+          _isLoading = true;
+        }
+        _locationError = null;
       });
     }
 
@@ -45,7 +77,9 @@ class _QiblaPageState extends State<QiblaPage> {
           await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
-        throw Exception('Location services are disabled.');
+        throw const _LocationException(
+          'خدمة الموقع GPS غير مفعّلة. فعّل الموقع من إعدادات الهاتف.',
+        );
       }
 
       var permission = await Geolocator.checkPermission();
@@ -55,13 +89,20 @@ class _QiblaPageState extends State<QiblaPage> {
       }
 
       if (permission == LocationPermission.denied) {
-        throw Exception('Location permission was denied.');
+        throw const _LocationException(
+          'لم يتم منح إذن الوصول إلى الموقع.',
+        );
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Location permission is permanently denied. '
-          'Enable it from app settings.',
+        throw const _LocationException(
+          'إذن الموقع مرفوض نهائياً. افتح إعدادات التطبيق واسمح بالوصول للموقع.',
+        );
+      }
+
+      if (permission == LocationPermission.unableToDetermine) {
+        throw const _LocationException(
+          'تعذر تحديد حالة إذن الموقع على هذا الجهاز.',
         );
       }
 
@@ -82,11 +123,17 @@ class _QiblaPageState extends State<QiblaPage> {
         longitude: position.longitude,
       );
 
-      final declination =
-          QiblaService.calculateMagneticDeclination(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      double? declination;
+
+      try {
+        declination = QiblaService.calculateMagneticDeclination(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      } catch (_) {
+        // لا نوقف حساب القبلة إذا تعذر حساب الانحراف المغناطيسي.
+        declination = null;
+      }
 
       if (!mounted) return;
 
@@ -95,71 +142,219 @@ class _QiblaPageState extends State<QiblaPage> {
         _qiblaBearing = bearing;
         _distanceKm = distance;
         _declination = declination;
-        _loading = false;
+        _locationError = null;
+        _isLoading = false;
+      });
+    } on _LocationException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _locationError = error.message;
+        _isLoading = false;
+      });
+    } on TimeoutException {
+      if (!mounted) return;
+
+      setState(() {
+        _locationError =
+            'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.';
+        _isLoading = false;
       });
     } catch (error) {
       if (!mounted) return;
 
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
-        _loading = false;
+        _locationError =
+            'تعذر تحديد موقعك حالياً. تحقق من إعدادات الموقع وحاول مجدداً.';
+        _isLoading = false;
       });
+    } finally {
+      _isRefreshing = false;
     }
+  }
+
+  Future<void> _openLocationSettings() async {
+    await Geolocator.openLocationSettings();
+  }
+
+  Future<void> _openAppSettings() async {
+    await Geolocator.openAppSettings();
+  }
+
+  String _formatBearing(double bearing) {
+    return '${bearing.toStringAsFixed(1)}°';
+  }
+
+  String _formatDistance(double distance) {
+    if (distance >= 1000) {
+      return '${(distance / 1000).toStringAsFixed(2)} ألف كم';
+    }
+
+    return '${distance.toStringAsFixed(1)} كم';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final backgroundColor =
+        isDark ? const Color(0xFF101C18) : _background;
+
+    final cardColor =
+        isDark ? const Color(0xFF1A2B24) : Colors.white;
+
+    final textColor =
+        isDark ? Colors.white : const Color(0xFF19382E);
+
+    final secondaryColor =
+        isDark ? Colors.white70 : Colors.black54;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text('اتجاه القبلة'),
+        backgroundColor: _primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'اتجاه القبلة',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 19,
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'تحديث الموقع',
-            onPressed: _loading ? null : _loadLocation,
-            icon: const Icon(Icons.my_location_rounded),
+            onPressed: _isRefreshing ? null : () => _loadLocation(),
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
+        child: _isLoading && _position == null
+            ? _buildLoading()
+            : _locationError != null && _position == null
                 ? _buildError()
-                : _buildContent(isDark),
+                : RefreshIndicator(
+                    color: _primaryGreen,
+                    onRefresh: _loadLocation,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+                      children: [
+                        _buildIntro(textColor, secondaryColor),
+                        const SizedBox(height: 22),
+                        _buildCompassCard(
+                          cardColor: cardColor,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                        ),
+                        const SizedBox(height: 18),
+                        _buildInformationCards(
+                          cardColor: cardColor,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                        ),
+                        const SizedBox(height: 20),
+                        _buildMapCard(
+                          cardColor: cardColor,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                        ),
+                        const SizedBox(height: 18),
+                        _buildAccuracyNote(secondaryColor),
+                      ],
+                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildLoading() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(
+            color: _gold,
+            strokeWidth: 3,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'جارٍ تحديد موقعك وحساب اتجاه القبلة...',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildError() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(26),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.location_off_rounded,
-              size: 48,
-              color: Colors.orange,
+            Container(
+              width: 86,
+              height: 86,
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_rounded,
+                color: Colors.orange,
+                size: 42,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 22),
+            const Text(
+              'تعذر تحديد موقعك',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
-              _error ?? 'تعذر تحديد موقعك.',
+              _locationError ?? 'حدث خطأ غير متوقع.',
               textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
             ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: _loadLocation,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('إعادة المحاولة'),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isRefreshing ? null : () => _loadLocation(),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
-            TextButton(
-              onPressed: Geolocator.openAppSettings,
-              child: const Text('إعدادات صلاحيات الموقع'),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _openLocationSettings,
+              icon: const Icon(Icons.location_searching_rounded),
+              label: const Text('إعدادات الموقع'),
+            ),
+            TextButton.icon(
+              onPressed: _openAppSettings,
+              icon: const Icon(Icons.settings_rounded),
+              label: const Text('إعدادات التطبيق والصلاحيات'),
             ),
           ],
         ),
@@ -167,241 +362,391 @@ class _QiblaPageState extends State<QiblaPage> {
     );
   }
 
-  Widget _buildContent(bool isDark) {
-    final position = _position!;
-    final bearing = _qiblaBearing!;
-    final declination = _declination!;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
-      children: [
-        _buildIntro(),
-        const SizedBox(height: 20),
-
-        StreamBuilder<CompassEvent>(
-          stream: FlutterCompass.events,
-          builder: (context, snapshot) {
-            final magneticHeading = snapshot.data?.heading;
-            final sensorAccuracy = snapshot.data?.accuracy;
-
-            if (magneticHeading == null ||
-                !magneticHeading.isFinite) {
-              return _buildSensorUnavailable();
-            }
-
-            final trueHeading =
-                QiblaService.magneticToTrueHeading(
-              magneticHeading: magneticHeading,
-              declination: declination,
-            );
-
-            final relativeAngle =
-                QiblaService.shortestAngleDifference(
-              bearing,
-              trueHeading,
-            );
-
-            return Column(
-              children: [
-                _buildCompass(
-                  relativeAngle,
-                  isDark,
-                ),
-                const SizedBox(height: 16),
-                _buildBearingInfo(
-                  bearing,
-                  relativeAngle,
-                  sensorAccuracy,
-                ),
-              ],
-            );
-          },
-        ),
-
-        const SizedBox(height: 24),
-        _buildDistanceCard(),
-        const SizedBox(height: 24),
-        _buildMap(position),
-        const SizedBox(height: 12),
-        _buildAccuracyNote(),
-      ],
-    );
-  }
-
-  Widget _buildIntro() {
+  Widget _buildIntro(Color textColor, Color secondaryColor) {
     return Column(
       children: [
-        const Text(
-          'اتجه بقلبك نحو بيت الله الحرام',
-          textAlign: TextAlign.center,
+        const Icon(
+          Icons.mosque_rounded,
+          color: _gold,
+          size: 38,
+        ),
+        const SizedBox(height: 9),
+        Text(
+          'توجّه نحو بيت الله الحرام',
           style: TextStyle(
+            color: textColor,
             fontSize: 19,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 6),
         Text(
-          'حرّك هاتفك ببطء حتى يشير السهم إلى القبلة',
+          'حرّك هاتفك ببطء حتى يستقر المؤشر على اتجاه القبلة',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.color
-                ?.withValues(alpha: 0.65),
+            color: secondaryColor,
+            fontSize: 12,
+            height: 1.5,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCompass(double relativeAngle, bool isDark) {
+  Widget _buildCompassCard({
+    required Color cardColor,
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
     return Container(
-      width: 290,
-      height: 290,
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: isDark
-              ? const [
-                  Color(0xFF173D31),
-                  Color(0xFF071713),
-                ]
-              : const [
-                  Color(0xFFE4F1E9),
-                  Color(0xFFF3F7F4),
-                ],
-        ),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.55),
-          width: 2,
-        ),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.emerald.withValues(alpha: 0.18),
-            blurRadius: 30,
-            spreadRadius: 4,
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Column(
         children: [
-          const Positioned(
-            top: 8,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.explore_rounded,
+                color: _gold,
+                size: 19,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'البوصلة الحية',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          if (_qiblaBearing != null)
+            StreamBuilder<CompassEvent>(
+              stream: _compassStream,
+              builder: (context, snapshot) {
+                final magneticHeading = snapshot.data?.heading;
+
+                if (snapshot.hasError ||
+                    magneticHeading == null ||
+                    !magneticHeading.isFinite) {
+                  return _buildCompassUnavailable(
+                    textColor,
+                    secondaryColor,
+                  );
+                }
+
+                final trueHeading = _declination == null
+                    ? QiblaService.normalize(magneticHeading)
+                    : QiblaService.magneticToTrueHeading(
+                        magneticHeading: magneticHeading,
+                        declination: _declination!,
+                      );
+
+                final relativeAngle =
+                    QiblaService.shortestAngleDifference(
+                  _qiblaBearing!,
+                  trueHeading,
+                );
+
+                return Column(
+                  children: [
+                    SizedBox(
+                      width: 270,
+                      height: 270,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 260,
+                            height: 260,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF0B7055),
+                                  Color(0xFF063E31),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: _gold.withValues(alpha: 0.8),
+                                width: 3,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _primaryGreen.withValues(alpha: 0.2),
+                                  blurRadius: 22,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                          _buildCompassTicks(),
+                          Positioned(
+                            top: 20,
+                            child: _compassLabel('شمال'),
+                          ),
+                          Positioned(
+                            bottom: 20,
+                            child: _compassLabel('جنوب'),
+                          ),
+                          Positioned(
+                            right: 20,
+                            child: _compassLabel('شرق'),
+                          ),
+                          Positioned(
+                            left: 20,
+                            child: _compassLabel('غرب'),
+                          ),
+                          AnimatedRotation(
+                            turns: relativeAngle / 360.0,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            child: const Icon(
+                              Icons.navigation_rounded,
+                              color: _gold,
+                              size: 82,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black45,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 15,
+                            height: 15,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(
+                                color: _gold,
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'اتجاه القبلة بالنسبة لهاتفك',
+                      style: TextStyle(
+                        color: secondaryColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '${relativeAngle.toStringAsFixed(1)}°',
+                      style: const TextStyle(
+                        color: _primaryGreen,
+                        fontSize: 29,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'الاتجاه الحقيقي: ${_formatBearing(_qiblaBearing!)}',
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            )
+          else
+            _buildCompassUnavailable(textColor, secondaryColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompassTicks() {
+    return SizedBox(
+      width: 244,
+      height: 244,
+      child: CustomPaint(
+        painter: _CompassTicksPainter(),
+      ),
+    );
+  }
+
+  Widget _compassLabel(String value) {
+    return Text(
+      value,
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 11,
+      ),
+    );
+  }
+
+  Widget _buildCompassUnavailable(
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    return Column(
+      children: [
+        const Icon(
+          Icons.sensors_off_rounded,
+          color: Colors.orange,
+          size: 45,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'حساس البوصلة غير متاح',
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          'يمكنك معرفة اتجاه القبلة المحسوب والخريطة، '
+          'لكن التوجيه المباشر يحتاج إلى جهاز يدعم حساس البوصلة.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: secondaryColor,
+            fontSize: 12,
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _compassStream = FlutterCompass.events;
+            });
+          },
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('إعادة الاتصال بالحساس'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInformationCards({
+    required Color cardColor,
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: _infoCard(
+            cardColor: cardColor,
+            textColor: textColor,
+            secondaryColor: secondaryColor,
+            icon: Icons.explore_rounded,
+            title: 'اتجاه القبلة',
+            value: _qiblaBearing == null
+                ? '--'
+                : _formatBearing(_qiblaBearing!),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _infoCard(
+            cardColor: cardColor,
+            textColor: textColor,
+            secondaryColor: secondaryColor,
+            icon: Icons.straighten_rounded,
+            title: 'المسافة إلى الكعبة',
+            value: _distanceKm == null
+                ? '--'
+                : _formatDistance(_distanceKm!),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoCard({
+    required Color cardColor,
+    required Color textColor,
+    required Color secondaryColor,
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 17,
+      ),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: _gold, size: 25),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 7),
+          FittedBox(
+            fit: BoxFit.scaleDown,
             child: Text(
-              'N',
+              value,
               style: TextStyle(
-                color: AppColors.gold,
+                color: textColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 17,
               ),
             ),
           ),
-          const Positioned(
-            bottom: 8,
-            child: Text('S'),
-          ),
-          const Positioned(
-            left: 8,
-            child: Text('W'),
-          ),
-          const Positioned(
-            right: 8,
-            child: Text('E'),
-          ),
-          Container(
-            width: 225,
-            height: 225,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.30),
-                width: 1,
-              ),
-            ),
-          ),
-
-          // The prayer rug rotates relative to the phone's
-          // corrected true-north heading.
-          AnimatedRotation(
-            turns: relativeAngle / 360,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            child: _PrayerRug(),
-          ),
-
-          Positioned(
-            top: 44,
-            child: Container(
-              width: 4,
-              height: 35,
-              decoration: BoxDecoration(
-                color: AppColors.gold,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildBearingInfo(
-    double bearing,
-    double relativeAngle,
-    double? sensorAccuracy,
-  ) {
-    final direction = relativeAngle.abs() < 3
-        ? 'أنت تواجه القبلة تقريبًا'
-        : relativeAngle > 0
-            ? 'حرّك الهاتف إلى اليمين'
-            : 'حرّك الهاتف إلى اليسار';
+  Widget _buildMapCard({
+    required Color cardColor,
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    final position = _position;
 
-    return Column(
-      children: [
-        Text(
-          '${bearing.toStringAsFixed(1)}°',
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w800,
-            color: AppColors.gold,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          direction,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          sensorAccuracy == null
-              ? 'دقة المستشعر غير متاحة'
-              : 'انحراف المستشعر المقدر: ±${sensorAccuracy.toStringAsFixed(1)}°',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
+    if (position == null) {
+      return const SizedBox.shrink();
+    }
 
-  Widget _buildDistanceCard() {
-    return _InfoCard(
-      icon: Icons.mosque_rounded,
-      title: 'المسافة إلى الكعبة المشرفة',
-      value: '${_distanceKm!.toStringAsFixed(1)} كم',
-    );
-  }
-
-  Widget _buildMap(Position position) {
-    final start = LatLng(
+    final userLocation = LatLng(
       position.latitude,
       position.longitude,
     );
 
-    const kaaba = LatLng(
+    final kaabaLocation = LatLng(
       QiblaService.kaabaLatitude,
       QiblaService.kaabaLongitude,
     );
@@ -409,244 +754,217 @@ class _QiblaPageState extends State<QiblaPage> {
     final route = QiblaService.greatCircleRoute(
       startLatitude: position.latitude,
       startLongitude: position.longitude,
-      endLatitude: QiblaService.kaabaLatitude,
-      endLongitude: QiblaService.kaabaLongitude,
     );
 
     final routePoints = route
-        .map((point) => LatLng(
-              point.latitude,
-              point.longitude,
-            ))
-        .toList();
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
 
-    final fitPoints = <LatLng>[start, kaaba];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'المسار المباشر إلى مكة المكرمة',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: SizedBox(
-            height: 260,
-            child: FlutterMap(
-              options: MapOptions(
-                initialCameraFit: CameraFit.coordinates(
-                  coordinates: fitPoints,
-                  padding: const EdgeInsets.all(42),
-                ),
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all,
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.map_rounded,
+                color: _gold,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'المسار إلى الكعبة',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.iskander.muslims_app',
-                ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: routePoints,
-                      strokeWidth: 4,
-                      color: AppColors.gold,
-                    ),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: start,
-                      width: 42,
-                      height: 42,
-                      child: const Icon(
-                        Icons.my_location_rounded,
-                        color: Colors.blue,
-                        size: 30,
-                      ),
-                    ),
-                    Marker(
-                      point: kaaba,
-                      width: 46,
-                      height: 46,
-                      child: const Icon(
-                        Icons.mosque_rounded,
-                        color: AppColors.gold,
-                        size: 34,
-                      ),
-                    ),
-                  ],
-                ),
-                RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution(
-                      '© OpenStreetMap contributors',
-                    ),
-                  ],
-                ),
-              ],
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'عرض جغرافي لموقعك واتجاه الكعبة المشرفة',
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 11,
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSensorUnavailable() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.emerald.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Column(
-        children: [
-          Icon(
-            Icons.explore_off_rounded,
-            size: 38,
-            color: AppColors.gold,
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: SizedBox(
+              height: 230,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: userLocation,
+                  initialZoom: 3,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.iskander.muslims_app',
+                  ),
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: routePoints,
+                        strokeWidth: 3.5,
+                        color: _primaryGreen,
+                      ),
+                    ],
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: userLocation,
+                        width: 42,
+                        height: 42,
+                        child: const Icon(
+                          Icons.my_location_rounded,
+                          color: Colors.blue,
+                          size: 31,
+                        ),
+                      ),
+                      Marker(
+                        point: kaabaLocation,
+                        width: 46,
+                        height: 46,
+                        child: const Icon(
+                          Icons.mosque_rounded,
+                          color: _primaryGreen,
+                          size: 35,
+                        ),
+                      ),
+                    ],
+                  ),
+                  RichAttributionWidget(
+                    attributions: [
+                      TextSourceAttribution(
+                        'OpenStreetMap contributors',
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          SizedBox(height: 10),
-          Text(
-            'تعذر قراءة البوصلة',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'قد لا يحتوي هاتفك على مستشعر مغناطيسي، '
-            'أو قد تكون قراءته غير متاحة.',
-            textAlign: TextAlign.center,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: _gold,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'الخريطة تحتاج إلى الإنترنت. البوصلة وحساب الاتجاه '
+                  'يعملان بصورة مستقلة عنها.',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 10,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAccuracyNote() {
-    return Text(
-      'ملاحظة: اتجاه القبلة محسوب جغرافيًا، '
-      'أما دقة التوجيه الحي فتعتمد على معايرة البوصلة '
-      'والتداخل المغناطيسي وجودة مستشعر الهاتف.',
-      textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodySmall,
-    );
-  }
-}
-
-class _PrayerRug extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildAccuracyNote(Color secondaryColor) {
     return Container(
-      width: 112,
-      height: 155,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF087F5B),
-        borderRadius: BorderRadius.circular(13),
+        color: _gold.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.gold,
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.85),
-            width: 1.2,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.change_history_rounded,
-              color: AppColors.gold,
-              size: 25,
-            ),
-            SizedBox(height: 7),
-            Icon(
-              Icons.mosque_rounded,
-              color: Colors.white,
-              size: 42,
-            ),
-            SizedBox(height: 7),
-            Icon(
-              Icons.star_rounded,
-              color: AppColors.gold,
-              size: 19,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.emerald.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.25),
+          color: _gold.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-  icon,
-  color: AppColors.gold,
-  size: 30,
-),
-          const SizedBox(width: 13),
+          const Icon(
+            Icons.tips_and_updates_outlined,
+            color: _gold,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: Text(
+              'للحصول على قراءة أدق، أبعد الهاتف عن المعادن '
+              'والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 '
+              'لمعايرة الحساس عند الحاجة.',
+              style: TextStyle(
+                color: secondaryColor,
+                fontSize: 11,
+                height: 1.7,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _CompassTicksPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final tickPaint = Paint()
+      ..color = const Color(0xFFD8B66A)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    for (var i = 0; i < 60; i++) {
+      final angle = (i * 6 - 90) * math.pi / 180;
+      final isMajor = i % 5 == 0;
+
+      final outerRadius = radius - 4;
+      final innerRadius = outerRadius - (isMajor ? 12 : 6);
+
+      final start = Offset(
+        center.dx + innerRadius * math.cos(angle),
+        center.dy + innerRadius * math.sin(angle),
+      );
+
+      final end = Offset(
+        center.dx + outerRadius * math.cos(angle),
+        center.dy + outerRadius * math.sin(angle),
+      );
+
+      tickPaint.strokeWidth = isMajor ? 2.2 : 1.1;
+
+      canvas.drawLine(start, end, tickPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CompassTicksPainter oldDelegate) {
+    return false;
+  }
+}
+
+class _LocationException implements Exception {
+  final String message;
+
+  const _LocationException(this.message);
 }
