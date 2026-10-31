@@ -12,58 +12,65 @@ class CountdownWidget extends StatelessWidget {
 
   final PrayerController controller;
 
-  String _twoDigits(int value) {
-    return value.toString().padLeft(2, '0');
-  }
+  static const Duration _animationDuration =
+      Duration(milliseconds: 220);
+
+  String _twoDigits(int value) =>
+      value.toString().padLeft(2, '0');
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<DateTime>(
-      valueListenable: controller.clockListenable,
-      builder: (context, now, child) {
-        final target = controller.nextPrayerTime;
+    return RepaintBoundary(
+      child: ValueListenableBuilder<DateTime>(
+        valueListenable: controller.clockListenable,
+        builder: (context, now, child) {
+          final target = controller.nextPrayerTime;
+          final difference = target?.difference(now);
 
-        final difference = target?.difference(now);
+          final duration =
+              difference == null || difference.isNegative
+                  ? Duration.zero
+                  : difference;
 
-        final duration = difference == null ||
-                difference.isNegative
-            ? Duration.zero
-            : difference;
+          final hours = duration.inHours;
+          final minutes =
+              duration.inMinutes.remainder(60);
+          final seconds =
+              duration.inSeconds.remainder(60);
 
-        final hours = duration.inHours;
-        final minutes = duration.inMinutes.remainder(60);
-        final seconds = duration.inSeconds.remainder(60);
-
-        return Semantics(
-          liveRegion: true,
-          label: 'Time remaining: '
-              '$hours hours, $minutes minutes, '
-              '$seconds seconds',
-          child: ExcludeSemantics(
-            child: Row(
-              textDirection: TextDirection.ltr,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                _TimeUnit(
-                  value: _twoDigits(hours),
-                  label: 'HRS',
-                ),
-                const _TimeSeparator(),
-                _TimeUnit(
-                  value: _twoDigits(minutes),
-                  label: 'MIN',
-                ),
-                const _TimeSeparator(),
-                _TimeUnit(
-                  value: _twoDigits(seconds),
-                  label: 'SEC',
-                  highlighted: true,
-                ),
-              ],
+          return Semantics(
+            label: 'Time remaining: '
+                '$hours hours, $minutes minutes, '
+                '$seconds seconds',
+            child: ExcludeSemantics(
+              child: Row(
+                textDirection: TextDirection.ltr,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TimeUnit(
+                    value: _twoDigits(hours),
+                    label: 'HRS',
+                    duration: _animationDuration,
+                  ),
+                  const _TimeSeparator(),
+                  _TimeUnit(
+                    value: _twoDigits(minutes),
+                    label: 'MIN',
+                    duration: _animationDuration,
+                  ),
+                  const _TimeSeparator(),
+                  _TimeUnit(
+                    value: _twoDigits(seconds),
+                    label: 'SEC',
+                    highlighted: true,
+                    duration: _animationDuration,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -72,11 +79,13 @@ class _TimeUnit extends StatelessWidget {
   const _TimeUnit({
     required this.value,
     required this.label,
+    required this.duration,
     this.highlighted = false,
   });
 
   final String value;
   final String label;
+  final Duration duration;
   final bool highlighted;
 
   @override
@@ -84,9 +93,10 @@ class _TimeUnit extends StatelessWidget {
     return SizedBox(
       width: 48,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: duration,
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
             transitionBuilder: (child, animation) {
@@ -94,7 +104,7 @@ class _TimeUnit extends StatelessWidget {
                 opacity: animation,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                    begin: const Offset(0, 0.18),
+                    begin: const Offset(0, 0.15),
                     end: Offset.zero,
                   ).animate(animation),
                   child: child,
@@ -111,7 +121,9 @@ class _TimeUnit extends StatelessWidget {
                     : Colors.white,
                 fontSize: 29,
                 fontWeight: FontWeight.w800,
-                fontFeatures: const [],
+                fontFeatures: const [
+                  FontFeature.tabularFigures(),
+                ],
               ),
             ),
           ),
