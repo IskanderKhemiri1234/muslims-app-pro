@@ -1,11 +1,12 @@
-import '../../../quran/presentation/pages/quran_page.dart';
-import '../../../qibla/presentation/pages/qibla_page.dart';
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
+import '../../../qibla/presentation/pages/qibla_page.dart';
+import '../../../quran/presentation/pages/quran_page.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
@@ -56,25 +57,75 @@ class PrayerHomePage extends StatelessWidget {
 
   String _dateText() {
     final now = DateTime.now();
+
     return '${now.day.toString().padLeft(2, '0')}/'
         '${now.month.toString().padLeft(2, '0')}/'
         '${now.year}';
   }
 
-  void _showActionMessage(BuildContext context, String action) {
-    final labels = {
-      'qibla': t('ميزة القبلة قيد التجهيز', 'Qibla feature is coming soon'),
-      'quran': t('قسم القرآن قيد التجهيز', 'Quran section is coming soon'),
-      'adhan': t('خدمة الأذان قيد التجهيز', 'Adhan service is coming soon'),
-      'adhkar': t('قسم الأذكار قيد التجهيز', 'Adhkar section is coming soon'),
-    };
+  void _handleQuickAction(BuildContext context, String action) {
+    switch (action) {
+      case 'qibla':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const QiblaPage(),
+          ),
+        );
+        return;
+
+      case 'quran':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const QuranPage(),
+          ),
+        );
+        return;
+
+      case 'adhan':
+        _showComingSoon(context, 'adhan');
+        return;
+
+      case 'adhkar':
+        _showComingSoon(context, 'adhkar');
+        return;
+
+      default:
+        _showComingSoon(context, action);
+    }
+  }
+
+  void _showComingSoon(BuildContext context, String action) {
+    final String message;
+
+    switch (action) {
+      case 'adhan':
+        message = t(
+          'خدمة الأذان قيد التطوير',
+          'Adhan service is under development',
+        );
+        break;
+
+      case 'adhkar':
+        message = t(
+          'قسم الأذكار قيد التطوير',
+          'Adhkar section is under development',
+        );
+        break;
+
+      default:
+        message = t(
+          'هذه الميزة ستتوفر قريبًا',
+          'This feature will be available soon',
+        );
+    }
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(labels[action] ?? t('قريبًا', 'Coming soon')),
+          content: Text(message),
           duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
   }
@@ -88,71 +139,7 @@ class PrayerHomePage extends StatelessWidget {
           final prayerTimes = controller.prayerTimes;
 
           if (prayerTimes == null) {
-            return Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 18),
-
-QuickActions(
-  isArabic: isArabic,
-  onAction: (action) {
-    if (action == 'qibla') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const QiblaPage(),
-        ),
-      );
-      return;
-    }
-    if (action == 'quran') {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const QuranPage(),
-    ),
-  );
-  return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isArabic
-              ? 'هذه الميزة ستتوفر قريبًا'
-              : 'This feature is coming soon',
-        ),
-      ),
-    );
-  },
-),
-
-const SizedBox(height: 18),
-                    const CircularProgressIndicator(
-                      color: AppColors.emeraldLight,
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      t(
-                        'جارٍ تجهيز مواقيت الصلاة...',
-                        'Preparing prayer times...',
-                      ),
-                    ),
-                    if (controller.message != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        controller.message!,
-                        textAlign: TextAlign.center,
-                      ),
-                      TextButton(
-                        onPressed: controller.retryInitialization,
-                        child: Text(t('إعادة المحاولة', 'Retry')),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
+            return _buildLoadingScreen(context, controller);
           }
 
           return Scaffold(
@@ -176,7 +163,12 @@ const SizedBox(height: 18),
                 ),
                 SafeArea(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(19, 10, 19, 30),
+                    padding: const EdgeInsets.fromLTRB(
+                      19,
+                      10,
+                      19,
+                      30,
+                    ),
                     children: [
                       _TopBar(
                         isArabic: isArabic,
@@ -185,31 +177,43 @@ const SizedBox(height: 18),
                         date: _dateText(),
                         onLanguageToggle: onLanguageToggle,
                         onThemeToggle: onThemeToggle,
-                        isLoadingLocation: controller.isLoadingLocation,
+                        isLoadingLocation:
+                            controller.isLoadingLocation,
                       ),
+
                       const SizedBox(height: 23),
+
                       PrayerHeroCard(
                         controller: controller,
                         isArabic: isArabic,
                         prayerName: prayerName,
                         formatTime: formatTime,
                       ),
+
                       const SizedBox(height: 30),
+
                       _SectionTitle(
-                        title: t('الوصول السريع', 'Quick access'),
+                        title: t(
+                          'الوصول السريع',
+                          'Quick access',
+                        ),
                         subtitle: t(
                           'كل ما تحتاجه في مكان واحد',
                           'Your daily essentials',
                         ),
                       ),
+
                       const SizedBox(height: 14),
+
                       QuickActions(
                         isArabic: isArabic,
                         onAction: (action) {
-                          _showActionMessage(context, action);
+                          _handleQuickAction(context, action);
                         },
                       ),
+
                       const SizedBox(height: 30),
+
                       PrayerScheduleSection(
                         prayerTimes: prayerTimes,
                         nextPrayer: controller.nextPrayer,
@@ -217,7 +221,9 @@ const SizedBox(height: 18),
                         prayerName: prayerName,
                         formatTime: formatTime,
                       ),
+
                       const SizedBox(height: 18),
+
                       SizedBox(
                         height: 55,
                         child: OutlinedButton.icon(
@@ -232,23 +238,36 @@ const SizedBox(height: 18),
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.my_location_rounded),
+                              : const Icon(
+                                  Icons.my_location_rounded,
+                                ),
                           label: Text(
                             controller.isLoadingLocation
-                                ? t('جارٍ تحديد الموقع...', 'Getting location...')
-                                : t('تحديث موقعي الحالي', 'Update my location'),
+                                ? t(
+                                    'جارٍ تحديد الموقع...',
+                                    'Getting location...',
+                                  )
+                                : t(
+                                    'تحديث موقعي الحالي',
+                                    'Update my location',
+                                  ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.emeraldLight,
+                            foregroundColor:
+                                AppColors.emeraldLight,
                             side: BorderSide(
-                              color: AppColors.emerald.withValues(alpha: 0.45),
+                              color: AppColors.emerald.withValues(
+                                alpha: 0.45,
+                              ),
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(17),
+                              borderRadius:
+                                  BorderRadius.circular(17),
                             ),
                           ),
                         ),
                       ),
+
                       if (controller.message != null) ...[
                         const SizedBox(height: 12),
                         GlassContainer(
@@ -256,13 +275,17 @@ const SizedBox(height: 18),
                           child: Text(
                             controller.message!,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface,
                               fontSize: 12,
                             ),
                           ),
                         ),
                       ],
+
                       const SizedBox(height: 24),
+
                       Center(
                         child: Column(
                           children: [
@@ -299,6 +322,57 @@ const SizedBox(height: 18),
       ),
     );
   }
+
+  Widget _buildLoadingScreen(
+    BuildContext context,
+    PrayerController controller,
+  ) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(25),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.mosque_rounded,
+                  color: AppColors.gold,
+                  size: 38,
+                ),
+                const SizedBox(height: 22),
+                const CircularProgressIndicator(
+                  color: AppColors.emeraldLight,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  t(
+                    'جارٍ تجهيز مواقيت الصلاة...',
+                    'Preparing prayer times...',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (controller.message != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    controller.message!,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: controller.retryInitialization,
+                    child: Text(
+                      t('إعادة المحاولة', 'Retry'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TopBar extends StatelessWidget {
@@ -322,6 +396,8 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
     return Row(
       children: [
         Container(
@@ -345,7 +421,9 @@ class _TopBar extends StatelessWidget {
             size: 25,
           ),
         ),
+
         const SizedBox(width: 11),
+
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +431,7 @@ class _TopBar extends StatelessWidget {
               Text(
                 'Muslims Pro',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: textColor,
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.2,
@@ -362,7 +440,7 @@ class _TopBar extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_on_rounded,
                     size: 12,
                     color: AppColors.gold,
@@ -373,10 +451,7 @@ class _TopBar extends StatelessWidget {
                       '$city  •  $date',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.55),
+                        color: textColor.withValues(alpha: 0.55),
                         fontSize: 10,
                       ),
                     ),
@@ -386,15 +461,19 @@ class _TopBar extends StatelessWidget {
             ],
           ),
         ),
+
         IconButton(
           tooltip: isDark ? 'Light mode' : 'Dark mode',
           onPressed: onThemeToggle,
           icon: Icon(
-            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            isDark
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded,
             color: AppColors.gold,
             size: 21,
           ),
         ),
+
         TextButton(
           onPressed: onLanguageToggle,
           child: Text(
@@ -421,13 +500,15 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
+            color: textColor,
             fontSize: 19,
             fontWeight: FontWeight.w800,
           ),
@@ -436,10 +517,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           subtitle,
           style: TextStyle(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.52),
+            color: textColor.withValues(alpha: 0.52),
             fontSize: 11,
           ),
         ),
