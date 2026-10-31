@@ -5,6 +5,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/location_datasource.dart';
 
@@ -20,22 +21,27 @@ class PrayerController extends ChangeNotifier
 
   final LocationDataSource _locationSource;
 
+  static const String _latitudeKey = 'prayer_latitude';
+  static const String _longitudeKey = 'prayer_longitude';
+  static const String _methodKey = 'prayer_method';
+  static const String _madhabKey = 'prayer_madhab';
+
   // الموقع الافتراضي: الدار البيضاء
   double latitude = 33.5731;
   double longitude = -7.5898;
   String city = 'Casablanca';
 
-  // إعدادات حساب الصلاة
-  CalculationMethod method = CalculationMethod.muslimWorldLeague;
+  CalculationMethod method =
+      CalculationMethod.muslimWorldLeague;
+
   Madhab madhab = Madhab.shafi;
 
   PrayerTimes? _prayerTimes;
   DateTime? _scheduleDate;
+  Timer? _timer;
 
   final ValueNotifier<DateTime> clock =
       ValueNotifier<DateTime>(DateTime.now());
-
-  Timer? _timer;
 
   bool isLoadingLocation = false;
   String? message;
@@ -43,9 +49,63 @@ class PrayerController extends ChangeNotifier
 
   PrayerTimes? get prayerTimes => _prayerTimes;
 
-  void _initialize() {
+  Future<void> _initialize() async {
+    await _loadSettings();
+
+    if (_disposed) return;
+
     _calculateSchedule();
     _startClock();
+
+    notifyListeners();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      if (_disposed) return;
+
+      latitude = prefs.getDouble(_latitudeKey) ?? latitude;
+      longitude = prefs.getDouble(_longitudeKey) ?? longitude;
+
+      final savedMethod = prefs.getString(_methodKey);
+
+      if (savedMethod != null) {
+        for (final value in CalculationMethod.values) {
+          if (value.name == savedMethod) {
+            method = value;
+            break;
+          }
+        }
+      }
+
+      final savedMadhab = prefs.getString(_madhabKey);
+
+      if (savedMadhab == 'hanafi') {
+        madhab = Madhab.hanafi;
+      } else if (savedMadhab == 'shafi') {
+        madhab = Madhab.shafi;
+      }
+    } catch (_) {
+      // الاستمرار بالموقع والإعدادات الافتراضية.
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setDouble(_latitudeKey, latitude);
+      await prefs.setDouble(_longitudeKey, longitude);
+      await prefs.setString(_methodKey, method.name);
+      await prefs.setString(
+        _madhabKey,
+        madhab == Madhab.hanafi ? 'hanafi' : 'shafi',
+      );
+    } catch (_) {
+      // فشل الحفظ لا يمنع حساب المواقيت.
+    }
   }
 
   bool _isSameDate(DateTime a, DateTime b) {
@@ -144,8 +204,11 @@ class PrayerController extends ChangeNotifier
       city = 'موقعي الحالي';
 
       _calculateSchedule();
+      await _saveSettings();
 
-      message = 'تم تحديث الموقع بنجاح.';
+      if (_disposed) return;
+
+      message = 'تم تحديث الموقع وحفظه بنجاح.';
     } catch (error) {
       if (_disposed) return;
 
@@ -165,6 +228,7 @@ class PrayerController extends ChangeNotifier
 
     method = value;
     _calculateSchedule();
+    _saveSettings();
     notifyListeners();
   }
 
@@ -173,6 +237,7 @@ class PrayerController extends ChangeNotifier
 
     madhab = value;
     _calculateSchedule();
+    _saveSettings();
     notifyListeners();
   }
 
