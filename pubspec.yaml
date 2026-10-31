@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  quran_madina_flutter: ^2.2.2
   cupertino_icons: ^1.0.8
   adhan: ^2.0.0
   geolocator: ^13.0.2
