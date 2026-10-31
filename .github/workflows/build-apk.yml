@@ -54,6 +54,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Bundle Madina Quran assets
+        run: dart run quran_madina_flutter:bundle
+
       - name: Check Dart code
         run: flutter analyze
 
