@@ -237,7 +237,10 @@ class _CountdownPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 13),
-          CountdownWidget(controller: controller),
+          CountdownWidget(
+  controller: controller,
+  isArabic: isArabic,
+)
         ],
       ),
     );
