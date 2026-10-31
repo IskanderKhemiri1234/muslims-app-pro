@@ -28,6 +28,10 @@ class _QuranPageState extends State<QuranPage> {
   static const String _completedKhatmasKey = 'quran_completed_khatmas';
   static const String _bookmarksKey = 'quran_bookmarks';
 
+  static const Color _green = Color(0xFF075B46);
+  static const Color _deepGreen = Color(0xFF063E31);
+  static const Color _gold = Color(0xFFD8B66A);
+
   static const List<_SurahInfo> _surahs = [
     _SurahInfo('الفاتحة', 1),
     _SurahInfo('البقرة', 2),
@@ -162,12 +166,15 @@ class _QuranPageState extends State<QuranPage> {
   Set<int> _bookmarks = {};
 
   bool _isLoading = true;
+  bool _isSaving = false;
+
+  Timer? _saveDebounce;
+  Future<void> _writeQueue = Future<void>.value();
 
   String get _todayStorageKey {
     final now = DateTime.now();
     final date =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-
     return 'quran_daily_pages_$date';
   }
 
@@ -180,18 +187,45 @@ class _QuranPageState extends State<QuranPage> {
   bool get _currentPageCompleted =>
       _completedPages.contains(_currentPage);
 
+  bool get _currentPageBookmarked =>
+      _bookmarks.contains(_currentPage);
+
   @override
   void initState() {
     super.initState();
     _restoreData();
   }
 
+  @override
+  void dispose() {
+    _saveDebounce?.cancel();
+    super.dispose();
+  }
+
+  String _dateKeyFor(DateTime date) {
+    return 'quran_daily_pages_${date.year}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
   Set<int> _parsePages(List<String> values) {
     return values
-        .map((value) => int.tryParse(value))
+        .map(int.tryParse)
         .whereType<int>()
         .where((page) => page >= 1 && page <= _totalPages)
         .toSet();
+  }
+
+  List<String> _serializePages(Set<int> pages) {
+    final sorted = pages.toList()..sort();
+    return sorted.map((page) => page.toString()).toList();
+  }
+
+  Future<void> _queueWrite(Future<void> Function() operation) {
+    _writeQueue = _writeQueue
+        .catchError((_) {})
+        .then((_) => operation());
+    return _writeQueue;
   }
 
   Future<void> _restoreData() async {
@@ -226,276 +260,337 @@ class _QuranPageState extends State<QuranPage> {
     } catch (_) {
       if (!mounted) return;
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر تحميل بيانات القراءة المحفوظة'),
-        ),
-      );
+      setState(() => _isLoading = false);
+      _showMessage('تعذر تحميل بيانات القراءة المحفوظة');
     }
   }
 
-  Future<void> _savePage(int page) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setInt(_savedPageKey, page);
-  }
-
-  void _selectPage(int page) {
-    if (page < 1 || page > _totalPages) return;
-
-    setState(() {
-      _currentPage = page;
-    });
-
-    unawaited(_savePage(page));
-  }
-
-  void _changePage(int amount) {
-    final newPage = (_currentPage + amount)
-        .clamp(1, _totalPages)
-        .toInt();
-
-    _selectPage(newPage);
-  }
-
-  Future<void> _markCurrentPageRead() async {
-    if (_currentPageCompleted) return;
-
-    final preferences = await SharedPreferences.getInstance();
-
-    final completed = Set<int>.from(_completedPages);
-    final today = Set<int>.from(_todayPages);
-
-    completed.add(_currentPage);
-    today.add(_currentPage);
-
-    final khatmaFinished = completed.length == _totalPages;
-    final newKhatmaCount =
-        _completedKhatmas + (khatmaFinished ? 1 : 0);
-
-    if (khatmaFinished) {
-      completed.clear();
-    }
-
-    await preferences.setStringList(
-      _completedPagesKey,
-      completed.map((page) => page.toString()).toList(),
-    );
-
-    await preferences.setStringList(
-      _todayStorageKey,
-      today.map((page) => page.toString()).toList(),
-    );
-
-    if (khatmaFinished) {
-      await preferences.setInt(
-        _completedKhatmasKey,
-        newKhatmaCount,
-      );
-    }
-
+  void _showMessage(String message) {
     if (!mounted) return;
 
-    setState(() {
-      _completedPages = completed;
-      _todayPages = today;
-      _completedKhatmas = newKhatmaCount;
-    });
-
-    if (khatmaFinished) {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            icon: const Icon(
-              Icons.emoji_events_outlined,
-              size: 44,
-              color: Color(0xFFD6B66D),
-            ),
-            title: const Text('مبارك! أتممت ختمة القرآن'),
-            content: Text(
-              'أتممت قراءة الصفحات الـ604 وسُجلت ختمتك رقم $newKhatmaCount.',
-              textAlign: TextAlign.center,
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('الحمد لله'),
-              ),
-            ],
-          );
-        },
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
         SnackBar(
-          content: Text(
-            'تم تسجيل قراءة الصفحة $_currentPage',
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _deepGreen,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       );
+  }
+
+  Future<void> _savePage(int page) async {
+    try {
+      await _queueWrite(() async {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setInt(_savedPageKey, page);
+      });
+    } catch (_) {
+      _showMessage('تعذر حفظ موضع القراءة');
     }
+  }
+
+  void _selectPage(int page, {bool saveImmediately = false}) {
+    if (page < 1 || page > _totalPages) return;
+    if (page == _currentPage) return;
+
+    setState(() => _currentPage = page);
+
+    _saveDebounce?.cancel();
+
+    if (saveImmediately) {
+      unawaited(_savePage(page));
+    } else {
+      _saveDebounce = Timer(
+        const Duration(milliseconds: 450),
+        () => unawaited(_savePage(page)),
+      );
+    }
+  }
+
+  void _changePage(int amount) {
+    final newPage =
+        (_currentPage + amount).clamp(1, _totalPages).toInt();
+
+    _selectPage(newPage, saveImmediately: true);
+  }
+
+  Future<void> _markCurrentPageRead() async {
+    if (_currentPageCompleted || _isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    final pageToMark = _currentPage;
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      final completed = Set<int>.from(_completedPages)
+        ..add(pageToMark);
+
+      final today = Set<int>.from(_todayPages)
+        ..add(pageToMark);
+
+      final khatmaFinished = completed.length >= _totalPages;
+      final newKhatmaCount =
+          _completedKhatmas + (khatmaFinished ? 1 : 0);
+
+      if (khatmaFinished) {
+        completed.clear();
+      }
+
+      await _queueWrite(() async {
+        await preferences.setStringList(
+          _completedPagesKey,
+          _serializePages(completed),
+        );
+
+        await preferences.setStringList(
+          _dateKeyFor(DateTime.now()),
+          _serializePages(today),
+        );
+
+        if (khatmaFinished) {
+          await preferences.setInt(
+            _completedKhatmasKey,
+            newKhatmaCount,
+          );
+        }
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _completedPages = completed;
+        _todayPages = today;
+        _completedKhatmas = newKhatmaCount;
+      });
+
+      if (khatmaFinished) {
+        await _showKhatmaDialog(newKhatmaCount);
+      } else {
+        _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
+      }
+    } catch (_) {
+      _showMessage('تعذر حفظ تقدم القراءة. حاول مرة أخرى.');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _showKhatmaDialog(int count) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Theme.of(dialogContext).brightness ==
+                  Brightness.dark
+              ? const Color(0xFF1B2821)
+              : const Color(0xFFFFFCF3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          icon: const Icon(
+            Icons.emoji_events_rounded,
+            size: 48,
+            color: _gold,
+          ),
+          title: const Text(
+            'مبارك! أتممت ختمة القرآن',
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            'الحمد لله، أتممت قراءة صفحات المصحف الـ604. '
+            'هذه ختمتك رقم $count.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _green,
+              ),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('الحمد لله'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _undoCurrentPageRead() async {
-    if (!_currentPageCompleted) return;
+    if (!_currentPageCompleted || _isSaving) return;
 
-    final preferences = await SharedPreferences.getInstance();
-    final completed = Set<int>.from(_completedPages);
+    final pageToUndo = _currentPage;
+    setState(() => _isSaving = true);
 
-    completed.remove(_currentPage);
+    try {
+      final preferences = await SharedPreferences.getInstance();
 
-    await preferences.setStringList(
-      _completedPagesKey,
-      completed.map((page) => page.toString()).toList(),
-    );
+      final completed = Set<int>.from(_completedPages)
+        ..remove(pageToUndo);
 
-    if (!mounted) return;
+      final today = Set<int>.from(_todayPages)
+        ..remove(pageToUndo);
 
-    setState(() {
-      _completedPages = completed;
-    });
+      await _queueWrite(() async {
+        await preferences.setStringList(
+          _completedPagesKey,
+          _serializePages(completed),
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم إلغاء تسجيل قراءة هذه الصفحة'),
-      ),
-    );
+        await preferences.setStringList(
+          _dateKeyFor(DateTime.now()),
+          _serializePages(today),
+        );
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _completedPages = completed;
+        _todayPages = today;
+      });
+
+      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
+    } catch (_) {
+      _showMessage('تعذر تحديث سجل القراءة');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
-  Future<void> _addBookmark() async {
-    if (_bookmarks.contains(_currentPage)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('هذه الصفحة محفوظة بالفعل'),
-        ),
-      );
-      return;
+  Future<void> _toggleBookmark() async {
+    if (_isSaving) return;
+
+    final page = _currentPage;
+    final updated = Set<int>.from(_bookmarks);
+
+    if (updated.contains(page)) {
+      updated.remove(page);
+    } else {
+      updated.add(page);
     }
 
-    final preferences = await SharedPreferences.getInstance();
-    final updated = Set<int>.from(_bookmarks)..add(_currentPage);
+    try {
+      final preferences = await SharedPreferences.getInstance();
 
-    await preferences.setStringList(
-      _bookmarksKey,
-      updated.map((page) => page.toString()).toList(),
-    );
+      await _queueWrite(() async {
+        await preferences.setStringList(
+          _bookmarksKey,
+          _serializePages(updated),
+        );
+      });
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _bookmarks = updated;
-    });
+      setState(() => _bookmarks = updated);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم حفظ العلامة المرجعية'),
-      ),
-    );
+      _showMessage(
+        updated.contains(page)
+            ? 'تم حفظ الصفحة في العلامات المرجعية'
+            : 'تم حذف العلامة المرجعية',
+      );
+    } catch (_) {
+      _showMessage('تعذر حفظ العلامة المرجعية');
+    }
+  }
+
+  Future<void> _removeBookmark(int page) async {
+    final updated = Set<int>.from(_bookmarks)..remove(page);
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      await _queueWrite(() async {
+        await preferences.setStringList(
+          _bookmarksKey,
+          _serializePages(updated),
+        );
+      });
+
+      if (!mounted) return;
+
+      setState(() => _bookmarks = updated);
+    } catch (_) {
+      _showMessage('تعذر حذف العلامة المرجعية');
+    }
   }
 
   Future<void> _openBookmarks() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pages = _bookmarks.toList()..sort();
+
     final selectedPage = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final isDark =
-            Theme.of(sheetContext).brightness == Brightness.dark;
+        return _BottomSheetShell(
+          title: 'علاماتي المرجعية',
+          isDark: isDark,
+          child: pages.isEmpty
+              ? const _EmptyState(
+                  icon: Icons.bookmark_border_rounded,
+                  title: 'لا توجد علامات مرجعية',
+                  subtitle: 'احفظ الصفحات المهمة للعودة إليها لاحقاً',
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: pages.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final page = pages[index];
 
-        final pages = _bookmarks.toList()..sort();
-
-        return Container(
-          height: MediaQuery.of(sheetContext).size.height * 0.65,
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1B2821)
-                : const Color(0xFFFFFCF3),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(24),
-            ),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 18),
-              const Text(
-                'علاماتي المرجعية',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: pages.isEmpty
-                    ? const Center(
-                        child: Text('لم تحفظ أي صفحة بعد'),
-                      )
-                    : ListView.builder(
-                        itemCount: pages.length,
-                        itemBuilder: (context, index) {
-                          final page = pages[index];
-
-                          return ListTile(
-                            leading: const Icon(
-                              Icons.bookmark,
-                              color: Color(0xFFD6B66D),
-                            ),
-                            title: Text('صفحة $page'),
-                            subtitle: Text(
-                              page == _currentPage
-                                  ? 'الصفحة الحالية'
-                                  : 'الانتقال إلى الصفحة',
-                            ),
-                            onTap: () {
-                              Navigator.pop(sheetContext, page);
-                            },
-                            trailing: IconButton(
-                              tooltip: 'حذف العلامة',
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.redAccent,
-                              ),
-                              onPressed: () async {
-                                final preferences =
-                                    await SharedPreferences.getInstance();
-
-                                final updated =
-                                    Set<int>.from(_bookmarks)
-                                      ..remove(page);
-
-                                await preferences.setStringList(
-                                  _bookmarksKey,
-                                  updated
-                                      .map((value) => value.toString())
-                                      .toList(),
-                                );
-
-                                if (!mounted) return;
-
-                                setState(() {
-                                  _bookmarks = updated;
-                                });
-
-                                Navigator.pop(sheetContext);
-                                _openBookmarks();
-                              },
-                            ),
-                          );
+                    return ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0x1FD8B66A),
+                        child: Icon(
+                          Icons.bookmark_rounded,
+                          color: _gold,
+                        ),
+                      ),
+                      title: Text('صفحة $page'),
+                      subtitle: Text(
+                        page == _currentPage
+                            ? 'الصفحة الحالية'
+                            : 'الانتقال إلى الصفحة',
+                      ),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, page),
+                      trailing: IconButton(
+                        tooltip: 'حذف العلامة',
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () async {
+                          await _removeBookmark(page);
+                          if (sheetContext.mounted) {
+                            Navigator.pop(sheetContext);
+                          }
+                          if (mounted) {
+                            _openBookmarks();
+                          }
                         },
                       ),
-              ),
-            ],
-          ),
+                    );
+                  },
+                ),
         );
       },
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage);
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
@@ -524,9 +619,11 @@ class _QuranPageState extends State<QuranPage> {
               child: const Text('إلغاء'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _green,
+              ),
               onPressed: () {
-                final page =
-                    int.tryParse(controller.text.trim());
+                final page = int.tryParse(controller.text.trim());
 
                 if (page == null ||
                     page < 1 ||
@@ -551,54 +648,31 @@ class _QuranPageState extends State<QuranPage> {
     controller.dispose();
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage);
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
   Future<void> _openIndex() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final selectedPage = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final isDark =
-            Theme.of(sheetContext).brightness == Brightness.dark;
-
-        final color = isDark
-            ? const Color(0xFF1B2821)
-            : const Color(0xFFFFFCF3);
-
         return DefaultTabController(
           length: 2,
-          child: Container(
-            height: MediaQuery.of(sheetContext).size.height * 0.78,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-            ),
+          child: _BottomSheetShell(
+            title: 'فهرس المصحف',
+            isDark: isDark,
             child: Column(
               children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'فهرس المصحف',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const TabBar(
-                  tabs: [
+                TabBar(
+                  labelColor: isDark ? _gold : _green,
+                  unselectedLabelColor:
+                      isDark ? Colors.white60 : Colors.black54,
+                  indicatorColor: _gold,
+                  tabs: const [
                     Tab(text: 'السور'),
                     Tab(text: 'الأجزاء'),
                   ],
@@ -606,14 +680,24 @@ class _QuranPageState extends State<QuranPage> {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      ListView.builder(
+                      ListView.separated(
                         itemCount: _surahs.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final surah = _surahs[index];
 
                           return ListTile(
                             leading: CircleAvatar(
-                              child: Text('${index + 1}'),
+                              backgroundColor:
+                                  const Color(0x1FD8B66A),
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  color: _gold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                             title: Text(
                               surah.name,
@@ -623,32 +707,38 @@ class _QuranPageState extends State<QuranPage> {
                               ),
                             ),
                             trailing: Text('صفحة ${surah.page}'),
-                            onTap: () {
-                              Navigator.pop(
-                                sheetContext,
-                                surah.page,
-                              );
-                            },
+                            onTap: () => Navigator.pop(
+                              sheetContext,
+                              surah.page,
+                            ),
                           );
                         },
                       ),
-                      ListView.builder(
+                      ListView.separated(
                         itemCount: _juzPages.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1),
                         itemBuilder: (context, index) {
                           return ListTile(
                             leading: CircleAvatar(
-                              child: Text('${index + 1}'),
+                              backgroundColor:
+                                  const Color(0x1FD8B66A),
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  color: _gold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                             title: Text('الجزء ${index + 1}'),
                             trailing: Text(
                               'صفحة ${_juzPages[index]}',
                             ),
-                            onTap: () {
-                              Navigator.pop(
-                                sheetContext,
-                                _juzPages[index],
-                              );
-                            },
+                            onTap: () => Navigator.pop(
+                              sheetContext,
+                              _juzPages[index],
+                            ),
                           );
                         },
                       ),
@@ -663,29 +753,348 @@ class _QuranPageState extends State<QuranPage> {
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage);
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
-  Widget _buildProgressCard(
-    Color textColor,
-    Color accentColor,
-    Color cardColor,
-  ) {
-    final khatmaPercent =
-        (_khatmaProgress * 100).toStringAsFixed(1);
+  Widget _buildHeader(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_green, _deepGreen],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: _green.withOpacity(0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  color: _gold.withOpacity(0.17),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: _gold.withOpacity(0.5),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.menu_book_rounded,
+                  color: _gold,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'رحلتك مع القرآن',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'مصحف المدينة المنورة',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: _gold.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '604 صفحة',
+                  style: TextStyle(
+                    color: _gold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'إنجاز الختمة الحالية',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                '${(_khatmaProgress * 100).toStringAsFixed(1)}%',
+                style: const TextStyle(
+                  color: _gold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: _khatmaProgress,
+              minHeight: 8,
+              backgroundColor: Colors.white.withOpacity(0.16),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(_gold),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_stories_rounded,
+                color: _gold,
+                size: 17,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                '${_completedPages.length} صفحة مكتملة',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$_completedKhatmas ختمة مكتملة',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-    final dailyPercent =
-        (_dailyProgress * 100).toStringAsFixed(0);
+  Widget _buildDailyCard(bool isDark) {
+    final cardColor = isDark
+        ? const Color(0xFF1B2A23)
+        : Colors.white;
+
+    final textColor = isDark
+        ? const Color(0xFFE8DFC9)
+        : const Color(0xFF26382C);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(21),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.18),
+          color: _gold.withOpacity(0.22),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: _gold.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.today_rounded,
+              color: _gold,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'وردك اليومي',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_todayPages.length} من $_dailyTarget صفحات',
+                  style: TextStyle(
+                    color: textColor.withOpacity(0.65),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 42,
+            height: 42,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CircularProgressIndicator(
+                  value: _dailyProgress,
+                  strokeWidth: 4,
+                  backgroundColor: _gold.withOpacity(0.16),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(_gold),
+                ),
+                Center(
+                  child: Text(
+                    '${(_dailyProgress * 100).round()}%',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReader(bool isDark) {
+    final pageColor = isDark
+        ? const Color(0xFF202A23)
+        : const Color(0xFFFFFCF3);
+
+    final textColor = isDark
+        ? const Color(0xFFE8DFC9)
+        : const Color(0xFF26382C);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: pageColor,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(
+          color: _gold.withOpacity(0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 11,
+            ),
+            decoration: BoxDecoration(
+              color: _green.withOpacity(isDark ? 0.35 : 0.07),
+              border: Border(
+                bottom: BorderSide(
+                  color: _gold.withOpacity(0.3),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.bookmark_outline_rounded,
+                  color: _gold,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'الصفحة $_currentPage',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'مصحف المدينة',
+                  style: TextStyle(
+                    color: textColor.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              key: PageStorageKey<int>(_currentPage),
+              padding: const EdgeInsets.all(10),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: QuranMadinaFlutter(
+                  key: ValueKey(_currentPage),
+                  page: _currentPage,
+                  bundled: true,
+                  headless: true,
+                  fontSize: 22,
+                  textColor: isDark ? '#E8DFC9' : '#26382C',
+                  backgroundColor: isDark ? '#202A23' : '#FFFCF3',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReaderControls(bool isDark) {
+    final textColor = isDark ? Colors.white : _deepGreen;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B2A23) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: _gold.withOpacity(0.2),
         ),
       ),
       child: Column(
@@ -693,98 +1102,156 @@ class _QuranPageState extends State<QuranPage> {
           Row(
             children: [
               Icon(
-                Icons.menu_book_rounded,
-                color: accentColor,
+                _currentPageCompleted
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: _currentPageCompleted ? _green : _gold,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'الختمة الحالية',
+                  _currentPageCompleted
+                      ? 'تم تسجيل قراءة هذه الصفحة'
+                      : 'هل أتممت قراءة هذه الصفحة؟',
                   style: TextStyle(
                     color: textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _isSaving
+                    ? null
+                    : _currentPageCompleted
+                        ? _undoCurrentPageRead
+                        : _markCurrentPageRead,
+                child: Text(
+                  _currentPageCompleted ? 'تراجع' : 'تسجيل',
+                  style: const TextStyle(
+                    color: _green,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              Text(
-                '$khatmaPercent%',
-                style: TextStyle(
-                  color: accentColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: _khatmaProgress,
-              minHeight: 7,
-              backgroundColor:
-                  accentColor.withValues(alpha: 0.13),
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(accentColor),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: _green,
+              inactiveTrackColor: _green.withOpacity(0.15),
+              thumbColor: _gold,
+              overlayColor: _gold.withOpacity(0.15),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: _currentPage.toDouble(),
+              min: 1,
+              max: _totalPages.toDouble(),
+              divisions: _totalPages - 1,
+              onChanged: (value) {
+                _selectPage(value.round());
+              },
+              onChangeEnd: (value) {
+                _selectPage(
+                  value.round(),
+                  saveImmediately: true,
+                );
+              },
             ),
           ),
-          const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: _ProgressStat(
-                  icon: Icons.check_circle_outline,
-                  title: 'صفحات مكتملة',
-                  value: '${_completedPages.length}/604',
-                  color: accentColor,
+              Text(
+                '1',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.6),
+                  fontSize: 11,
                 ),
               ),
-              Expanded(
-                child: _ProgressStat(
-                  icon: Icons.emoji_events_outlined,
-                  title: 'الختمات المكتملة',
-                  value: '$_completedKhatmas',
-                  color: accentColor,
+              const Spacer(),
+              Text(
+                '$_currentPage / $_totalPages',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '604',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.6),
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          const Divider(height: 22),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Icon(
-                Icons.today_outlined,
-                color: accentColor,
-              ),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'هدف اليوم: ${_todayPages.length}/$_dailyTarget صفحات',
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.w600,
+                child: OutlinedButton.icon(
+                  onPressed: _currentPage > 1
+                      ? () => _changePage(-1)
+                      : null,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('السابقة'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _green,
+                    side: BorderSide(
+                      color: _green.withOpacity(0.3),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
-              Text(
-                '$dailyPercent%',
-                style: TextStyle(
-                  color: accentColor,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _currentPage < _totalPages
+                      ? () => _changePage(1)
+                      : null,
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('التالية'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: _dailyProgress,
-              minHeight: 6,
-              backgroundColor:
-                  accentColor.withValues(alpha: 0.13),
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(accentColor),
-            ),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallAction(
+                  icon: _currentPageBookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_add_outlined,
+                  label: _currentPageBookmarked
+                      ? 'إزالة العلامة'
+                      : 'حفظ الصفحة',
+                  onTap: _toggleBookmark,
+                ),
+              ),
+              Expanded(
+                child: _SmallAction(
+                  icon: Icons.menu_book_rounded,
+                  label: 'الفهرس',
+                  onTap: _openIndex,
+                ),
+              ),
+              Expanded(
+                child: _SmallAction(
+                  icon: Icons.find_in_page_outlined,
+                  label: 'رقم الصفحة',
+                  onTap: _goToPage,
+                ),
+            ],
           ),
         ],
       ),
@@ -796,260 +1263,195 @@ class _QuranPageState extends State<QuranPage> {
     final isDark =
         Theme.of(context).brightness == Brightness.dark;
 
-    final backgroundColor = isDark
-        ? const Color(0xFF111A16)
-        : const Color(0xFFF1E9D5);
+    final background = isDark
+        ? const Color(0xFF101B16)
+        : const Color(0xFFF3F5F0);
 
-    final pageColor = isDark
-        ? const Color(0xFF202A23)
-        : const Color(0xFFFFFCF3);
-
-    final textColor = isDark
+    final foreground = isDark
         ? const Color(0xFFE8DFC9)
-        : const Color(0xFF26382C);
-
-    final accentColor = isDark
-        ? const Color(0xFFD6B66D)
-        : const Color(0xFF16734B);
+        : _deepGreen;
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: background,
       appBar: AppBar(
-        title: const Text(
-          'المصحف الشريف',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: backgroundColor,
-        foregroundColor: textColor,
+        backgroundColor: background,
+        foregroundColor: foreground,
         elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'القرآن الكريم',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
         actions: [
           IconButton(
-            tooltip: 'حفظ الصفحة الحالية',
-            onPressed: _addBookmark,
-            icon: const Icon(Icons.bookmark_add_outlined),
-          ),
-          IconButton(
-            tooltip: 'علاماتي المرجعية',
+            tooltip: 'العلامات المرجعية',
             onPressed: _openBookmarks,
             icon: const Icon(Icons.bookmarks_outlined),
           ),
           IconButton(
-            tooltip: 'فهرس السور والأجزاء',
+            tooltip: 'فهرس المصحف',
             onPressed: _openIndex,
-            icon: const Icon(Icons.menu_book_outlined),
-          ),
-          IconButton(
-            tooltip: 'الانتقال إلى صفحة',
-            onPressed: _goToPage,
-            icon: const Icon(Icons.find_in_page_outlined),
+            icon: const Icon(Icons.toc_rounded),
           ),
         ],
       ),
-      body: SafeArea(
-        child: _isLoading
-            ? Center(
-                child: CircularProgressIndicator(
-                  color: accentColor,
-                ),
-              )
-            : Column(
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: _gold,
+              ),
+            )
+          : SafeArea(
+              child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      16, 8, 16, 4,
-                    ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'مصحف المدينة المنورة',
-                          style: TextStyle(
-                            color: textColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          'صفحة $_currentPage من $_totalPages',
-                          style: TextStyle(
-                            color: accentColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  _buildProgressCard(
-                    textColor,
-                    accentColor,
-                    pageColor,
-                  ),
-
+                  _buildHeader(isDark),
+                  _buildDailyCard(isDark),
                   Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: pageColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: accentColor.withValues(
-                            alpha: 0.25,
-                          ),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: 0.08,
-                            ),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(8),
-                        child: Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: QuranMadinaFlutter(
-                            key: ValueKey(_currentPage),
-                            page: _currentPage,
-                            bundled: true,
-                            headless: true,
-                            fontSize: 22,
-                            textColor:
-                                isDark ? '#E8DFC9' : '#26382C',
-                            backgroundColor:
-                                isDark ? '#202A23' : '#FFFCF3',
-                          ),
-                        ),
-                      ),
-                    ),
+                    child: _buildReader(isDark),
                   ),
-
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      16, 8, 16, 12,
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _currentPageCompleted
-                                    ? _undoCurrentPageRead
-                                    : _markCurrentPageRead,
-                                icon: Icon(
-                                  _currentPageCompleted
-                                      ? Icons.undo
-                                      : Icons.check_circle_outline,
-                                ),
-                                label: Text(
-                                  _currentPageCompleted
-                                      ? 'إلغاء الإتمام'
-                                      : 'تمت القراءة',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Slider(
-                          value: _currentPage.toDouble(),
-                          min: 1,
-                          max: _totalPages.toDouble(),
-                          divisions: _totalPages - 1,
-                          activeColor: accentColor,
-                          inactiveColor:
-                              accentColor.withValues(alpha: 0.2),
-                          onChanged: (value) {
-                            _selectPage(value.round());
-                          },
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _currentPage > 1
-                                    ? () => _changePage(-1)
-                                    : null,
-                                icon: const Icon(
-                                  Icons.arrow_forward,
-                                ),
-                                label: const Text('السابقة'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: accentColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed:
-                                    _currentPage < _totalPages
-                                        ? () => _changePage(1)
-                                        : null,
-                                icon: const Icon(
-                                  Icons.arrow_back,
-                                ),
-                                label: const Text('التالية'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildReaderControls(isDark),
                 ],
               ),
+            ),
+    );
+  }
+}
+
+class _SmallAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SmallAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: const Color(0xFFD8B66A),
+              size: 21,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ProgressStat extends StatelessWidget {
-  final IconData icon;
+class _BottomSheetShell extends StatelessWidget {
   final String title;
-  final String value;
-  final Color color;
+  final bool isDark;
+  final Widget child;
 
-  const _ProgressStat({
-    required this.icon,
+  const _BottomSheetShell({
     required this.title,
-    required this.value,
-    required this.color,
+    required this.isDark,
+    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 19),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(fontSize: 11),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.76,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1B2821)
+            : const Color(0xFFFFFCF3),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(27),
         ),
-      ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: const Color(0xFFD8B66A),
+              size: 48,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
