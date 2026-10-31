@@ -57,6 +57,20 @@ class PrayerScheduleSection extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final entries = prayers
+        .map((prayer) {
+          final time = prayerTimes.timeForPrayer(prayer);
+
+          if (time == null) return null;
+
+          return _PrayerEntry(
+            prayer: prayer,
+            time: time,
+          );
+        })
+        .whereType<_PrayerEntry>()
+        .toList(growable: false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -81,30 +95,74 @@ class PrayerScheduleSection extends StatelessWidget {
         ),
         const SizedBox(height: 15),
 
-        ...prayers.map((prayer) {
-          final time = prayerTimes.timeForPrayer(prayer);
+        if (entries.isEmpty)
+          _EmptyScheduleState(isArabic: isArabic)
+        else
+          ...entries.map((entry) {
+            final isNext =
+                entry.prayer == nextPrayer &&
+                entry.prayer != Prayer.none &&
+                entry.prayer != Prayer.sunrise;
 
-          if (time == null) {
-            return const SizedBox.shrink();
-          }
-
-          final isNext = prayer == nextPrayer &&
-              prayer != Prayer.none &&
-              prayer != Prayer.sunrise;
-
-          return _PrayerScheduleTile(
-            key: ValueKey(prayer),
-            prayer: prayer,
-            time: time,
-            name: prayerName(prayer),
-            formattedTime: formatTime(time),
-            isNext: isNext,
-            isDark: isDark,
-            isArabic: isArabic,
-            icon: _iconFor(prayer),
-          );
-        }),
+            return _PrayerScheduleTile(
+              key: ValueKey(entry.prayer),
+              name: prayerName(entry.prayer),
+              formattedTime: formatTime(entry.time),
+              isNext: isNext,
+              isDark: isDark,
+              isArabic: isArabic,
+              icon: _iconFor(entry.prayer),
+            );
+          }),
       ],
+    );
+  }
+}
+
+class _PrayerEntry {
+  const _PrayerEntry({
+    required this.prayer,
+    required this.time,
+  });
+
+  final Prayer prayer;
+  final DateTime time;
+}
+
+class _EmptyScheduleState extends StatelessWidget {
+  const _EmptyScheduleState({
+    required this.isArabic,
+  });
+
+  final bool isArabic;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return GlassContainer(
+      radius: 19,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Icon(
+            Icons.schedule_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              isArabic
+                  ? 'تعذر تحميل مواقيت الصلاة.'
+                  : 'Prayer times are unavailable.',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -112,8 +170,6 @@ class PrayerScheduleSection extends StatelessWidget {
 class _PrayerScheduleTile extends StatelessWidget {
   const _PrayerScheduleTile({
     super.key,
-    required this.prayer,
-    required this.time,
     required this.name,
     required this.formattedTime,
     required this.isNext,
@@ -122,8 +178,6 @@ class _PrayerScheduleTile extends StatelessWidget {
     required this.icon,
   });
 
-  final Prayer prayer;
-  final DateTime time;
   final String name;
   final String formattedTime;
   final bool isNext;
@@ -135,108 +189,123 @@ class _PrayerScheduleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final tile = AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: GlassContainer(
-        radius: 19,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 15,
-          vertical: 13,
-        ),
-        color: isNext
-            ? AppColors.emerald.withValues(
-                alpha: isDark ? 0.22 : 0.09,
-              )
-            : null,
-        borderColor: isNext
-            ? AppColors.gold.withValues(alpha: 0.42)
-            : null,
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: _PrayerScheduleSectionAnimation.duration,
-              width: 43,
-              height: 43,
-              decoration: BoxDecoration(
-                color: isNext
-                    ? AppColors.emerald
-                    : (isDark
-                        ? Colors.white.withValues(alpha: 0.07)
-                        : AppColors.emerald.withValues(alpha: 0.08)),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                icon,
-                color: isNext ? Colors.white : AppColors.gold,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurface,
-                      fontSize: 15,
-                      fontWeight:
-                          isNext ? FontWeight.w800 : FontWeight.w600,
-                    ),
-                  ),
-                  if (isNext) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      isArabic ? 'الصلاة القادمة' : 'Next prayer',
-                      style: const TextStyle(
-                        color: AppColors.emeraldLight,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (isNext)
-              const Padding(
-                padding: EdgeInsetsDirectional.only(end: 9),
-                child: Icon(
-                  Icons.radio_button_checked_rounded,
-                  size: 14,
-                  color: AppColors.gold,
-                ),
-              ),
-            Text(
-              formattedTime,
-              textDirection: TextDirection.ltr,
-              style: TextStyle(
-                color: isNext
-                    ? AppColors.gold
-                    : theme.colorScheme.onSurface,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceText = theme.colorScheme.onSurface;
+
+    final backgroundColor = isNext
+        ? primaryColor.withValues(
+            alpha: isDark ? 0.22 : 0.09,
+          )
+        : null;
+
+    final borderColor = isNext
+        ? AppColors.gold.withValues(alpha: 0.42)
+        : null;
 
     return Semantics(
+      container: true,
       label: isNext
           ? (isArabic
               ? '$name، الصلاة القادمة، $formattedTime'
               : '$name, next prayer, $formattedTime')
-          : '$name، $formattedTime',
-      child: ExcludeSemantics(child: tile),
+          : (isArabic
+              ? '$name، $formattedTime'
+              : '$name, $formattedTime'),
+      child: ExcludeSemantics(
+        child: AnimatedContainer(
+          duration: _animationDuration,
+          curve: Curves.easeInOut,
+          margin: const EdgeInsets.only(bottom: 10),
+          child: GlassContainer(
+            radius: 19,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 13,
+            ),
+            color: backgroundColor,
+            borderColor: borderColor,
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: _animationDuration,
+                  curve: Curves.easeInOut,
+                  width: 43,
+                  height: 43,
+                  decoration: BoxDecoration(
+                    color: isNext
+                        ? primaryColor
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : primaryColor.withValues(alpha: 0.08)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isNext
+                        ? theme.colorScheme.onPrimary
+                        : AppColors.gold,
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: surfaceText,
+                          fontSize: 15,
+                          fontWeight: isNext
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      if (isNext) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          isArabic
+                              ? 'الصلاة القادمة'
+                              : 'Next prayer',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (isNext)
+                  const Padding(
+                    padding: EdgeInsetsDirectional.only(end: 9),
+                    child: Icon(
+                      Icons.radio_button_checked_rounded,
+                      size: 14,
+                      color: AppColors.gold,
+                    ),
+                  ),
+                Text(
+                  formattedTime,
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                    color: isNext
+                        ? AppColors.gold
+                        : surfaceText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
-}
-
-class _PrayerScheduleSectionAnimation {
-  static const Duration duration = Duration(milliseconds: 250);
 }
