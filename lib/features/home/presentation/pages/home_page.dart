@@ -92,6 +92,33 @@ class PrayerHomePage extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const SizedBox(height: 18),
+
+QuickActions(
+  isArabic: isArabic,
+  onAction: (action) {
+    if (action == 'qibla') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const QiblaPage(),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isArabic
+              ? 'هذه الميزة ستتوفر قريبًا'
+              : 'This feature is coming soon',
+        ),
+      ),
+    );
+  },
+),
+
+const SizedBox(height: 18),
                     const CircularProgressIndicator(
                       color: AppColors.emeraldLight,
                     ),
