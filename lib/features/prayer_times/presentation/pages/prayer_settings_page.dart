@@ -277,7 +277,6 @@ class _SettingsIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.onSurface;
 
     return Container(
       padding: const EdgeInsets.all(21),
