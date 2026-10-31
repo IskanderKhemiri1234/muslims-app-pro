@@ -1,12 +1,11 @@
-
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone_finder/timezone_finder.dart';
 
 /// Resolves GPS coordinates to an IANA timezone.
 ///
-/// This implementation works locally on Android and iOS.
-/// It does not transmit coordinates to an external service.
+/// Works locally on supported mobile platforms.
+/// Coordinates are not sent to an external service.
 class TimezoneDiscoveryService {
   static Future<void>? _initialization;
 
@@ -31,10 +30,14 @@ class TimezoneDiscoveryService {
     required double latitude,
     required double longitude,
   }) async {
-    _validateCoordinates(latitude, longitude);
+    _validateCoordinates(
+      latitude: latitude,
+      longitude: longitude,
+    );
+
     await initialize();
 
-    // The package uses GeoJSON order: longitude, latitude.
+    // timezone_finder expects longitude first, then latitude.
     return findLocation(longitude, latitude);
   }
 
