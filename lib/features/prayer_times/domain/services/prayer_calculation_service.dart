@@ -2,19 +2,10 @@
 import 'package:adhan/adhan.dart';
 
 /// Pure prayer-time calculation service.
-///
-/// This service does not access GPS, storage, notifications,
-/// application state, or the device clock.
-///
-/// The caller must supply the intended calendar date.
 class PrayerCalculationService {
   const PrayerCalculationService();
 
   /// Calculate prayer times for a specific location and date.
-  ///
-  /// [date] supplies the calendar date used for calculation.
-  /// When using a timezone-aware date, pass its local calendar
-  /// components through this DateTime-compatible parameter.
   PrayerTimes calculate({
     required double latitude,
     required double longitude,
@@ -22,7 +13,11 @@ class PrayerCalculationService {
     required CalculationMethod method,
     required Madhab madhab,
   }) {
-    _validateCoordinates(latitude, longitude);
+    validateCoordinates(
+      latitude: latitude,
+      longitude: longitude,
+    );
+
     _validateDate(date);
 
     final coordinates = Coordinates(
@@ -31,9 +26,6 @@ class PrayerCalculationService {
     );
 
     final dateComponents = DateComponents.from(date);
-
-    // Create fresh parameters for every calculation.
-    // This prevents one calculation from changing another.
     final parameters = method.getParameters();
 
     parameters.madhab = madhab;
@@ -45,13 +37,15 @@ class PrayerCalculationService {
     );
   }
 
-  /// Validate geographical coordinates.
-  static void _validateCoordinates(
-    double latitude,
-    double longitude,
-  ) {
-    if (!latitude.isFinite ||
-        !longitude.isFinite) {
+  /// Validates geographical coordinate boundaries.
+  ///
+  /// Valid coordinates do not guarantee that astronomical
+  /// prayer times can be calculated at every location and date.
+  static void validateCoordinates({
+    required double latitude,
+    required double longitude,
+  }) {
+    if (!latitude.isFinite || !longitude.isFinite) {
       throw ArgumentError(
         'Coordinates must be finite numbers.',
       );
@@ -74,7 +68,6 @@ class PrayerCalculationService {
     }
   }
 
-  /// Validate the calendar date.
   static void _validateDate(DateTime date) {
     if (date.year < 1 || date.year > 9999) {
       throw ArgumentError.value(
