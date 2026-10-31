@@ -20,7 +20,8 @@ class QuranPage extends StatefulWidget {
 class _QuranPageState extends State<QuranPage> {
   static const int _totalPages = 604;
   static const String _savedPageKey = 'quran_last_read_page';
-
+  static const String _bookmarksKey = 'quran_bookmarks';
+  
   static const List<_SurahInfo> _surahs = [
     _SurahInfo('الفاتحة', 1),
     _SurahInfo('البقرة', 2),
@@ -150,6 +151,7 @@ class _QuranPageState extends State<QuranPage> {
   int _currentPage = 1;
   bool _isLoading = true;
 
+  
   @override
   void initState() {
     super.initState();
@@ -169,6 +171,127 @@ class _QuranPageState extends State<QuranPage> {
   }
 
   Future<void> _savePage(int page) async {
+    Future<void> _addBookmark() async {
+  final preferences = await SharedPreferences.getInstance();
+  final bookmarks = preferences.getStringList(_bookmarksKey) ?? [];
+
+  final page = _currentPage.toString();
+
+  if (bookmarks.contains(page)) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('هذه الصفحة محفوظة بالفعل')),
+    );
+    return;
+  }
+
+  bookmarks.add(page);
+  bookmarks.sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+
+  await preferences.setStringList(_bookmarksKey, bookmarks);
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('تم حفظ العلامة المرجعية')),
+  );
+}
+
+Future<void> _openBookmarks() async {
+  final preferences = await SharedPreferences.getInstance();
+  final bookmarks = preferences.getStringList(_bookmarksKey) ?? [];
+
+  if (!mounted) return;
+
+  final selectedPage = await showModalBottomSheet<int>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      final isDark =
+          Theme.of(sheetContext).brightness == Brightness.dark;
+
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.65,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF1B2821)
+                  : const Color(0xFFFFFCF3),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                const Text(
+                  'علاماتي المرجعية',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: bookmarks.isEmpty
+                      ? const Center(
+                          child: Text('لم تحفظ أي صفحة بعد'),
+                        )
+                      : ListView.builder(
+                          itemCount: bookmarks.length,
+                          itemBuilder: (context, index) {
+                            final page = int.parse(bookmarks[index]);
+
+                            return ListTile(
+                              leading: const Icon(
+                                Icons.bookmark,
+                                color: Color(0xFFD6B66D),
+                              ),
+                              title: Text('صفحة $page'),
+                              subtitle: Text(
+                                page == _currentPage
+                                    ? 'أنت تقرأ هذه الصفحة الآن'
+                                    : 'الانتقال إلى الصفحة',
+                              ),
+                              onTap: () {
+                                Navigator.pop(sheetContext, page);
+                              },
+                              trailing: IconButton(
+                                tooltip: 'حذف العلامة',
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () async {
+                                  bookmarks.removeAt(index);
+
+                                  await preferences.setStringList(
+                                    _bookmarksKey,
+                                    bookmarks,
+                                  );
+
+                                  setModalState(() {});
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  if (selectedPage != null && mounted) {
+    _selectPage(selectedPage);
+  }
+}
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(_savedPageKey, page);
   }
@@ -213,6 +336,16 @@ class _QuranPageState extends State<QuranPage> {
             ),
           ),
           actions: [
+            IconButton(
+  tooltip: 'حفظ الصفحة الحالية',
+  onPressed: _addBookmark,
+  icon: const Icon(Icons.bookmark_add_outlined),
+),
+IconButton(
+  tooltip: 'علاماتي المرجعية',
+  onPressed: _openBookmarks,
+  icon: const Icon(Icons.bookmarks_outlined),
+),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('إلغاء'),
@@ -292,6 +425,46 @@ class _QuranPageState extends State<QuranPage> {
                     Tab(text: 'الأجزاء'),
                   ],
                 ),
+                Padding(
+  padding: const EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 6,
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'تقدم موضع القراءة',
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            '${((_currentPage / _totalPages) * 100).toStringAsFixed(1)}%',
+            style: TextStyle(
+              color: accentColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 7),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: LinearProgressIndicator(
+          value: _currentPage / _totalPages,
+          minHeight: 7,
+          backgroundColor: accentColor.withValues(alpha: 0.15),
+          valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+        ),
+      ),
+    ],
+  ),
+),
                 Expanded(
                   child: TabBarView(
                     children: [
