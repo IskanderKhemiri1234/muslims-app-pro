@@ -1,64 +1,53 @@
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
-import 'package:muslims_app/features/prayer_times/data/datasources/timezone_lookup_datasource.dart';
+import 'package:muslims_app/core/services/timezone_discovery_service.dart'
+    as core_timezone;
+
 import 'package:muslims_app/features/prayer_times/domain/services/timezone_discovery_service.dart';
 
-class FakeTimezoneDataSource
-    implements TimezoneLookupDataSource {
-  final TimezoneLookupResult result;
-  int calls = 0;
-
-  FakeTimezoneDataSource(this.result);
-
-  @override
-  Future<TimezoneLookupResult> lookup({
-    required double latitude,
-    required double longitude,
-  }) async {
-    calls++;
-
-    return result;
-  }
-}
-
 void main() {
+  setUpAll(() {
+    tz_data.initializeTimeZones();
+  });
+
   group('TimezoneDiscoveryService', () {
+    late TimezoneDiscoveryService service;
+
+    setUp(() {
+      service = TimezoneDiscoveryService();
+    });
+
     test('discovers Casablanca timezone', () async {
-      final source = FakeTimezoneDataSource(
-        const TimezoneLookupResult(
-          timezoneId: 'Africa/Casablanca',
-          countryCode: 'MA',
-        ),
-      );
-
-      final service = TimezoneDiscoveryService(
-        dataSource: source,
-      );
-
       final result = await service.discover(
         latitude: 33.5731,
         longitude: -7.5898,
       );
 
       expect(result.timezoneId, 'Africa/Casablanca');
-      expect(result.countryCode, 'MA');
       expect(result.location.name, 'Africa/Casablanca');
-      expect(source.calls, 1);
+      expect(result.countryCode, isNull);
     });
 
-    test('rejects invalid latitude before lookup', () async {
-      final source = FakeTimezoneDataSource(
-        const TimezoneLookupResult(
-          timezoneId: 'Africa/Casablanca',
-          countryCode: 'MA',
-        ),
+    test('discovers Paris timezone', () async {
+      final result = await service.discover(
+        latitude: 48.8566,
+        longitude: 2.3522,
       );
 
-      final service = TimezoneDiscoveryService(
-        dataSource: source,
+      expect(result.timezoneId, 'Europe/Paris');
+    });
+
+    test('discovers New York timezone', () async {
+      final result = await service.discover(
+        latitude: 40.7128,
+        longitude: -74.0060,
       );
 
+      expect(result.timezoneId, 'America/New_York');
+    });
+
+    test('rejects invalid latitude', () async {
       await expectLater(
         service.discover(
           latitude: 91,
@@ -66,22 +55,9 @@ void main() {
         ),
         throwsArgumentError,
       );
-
-      expect(source.calls, 0);
     });
 
-    test('rejects invalid longitude before lookup', () async {
-      final source = FakeTimezoneDataSource(
-        const TimezoneLookupResult(
-          timezoneId: 'Africa/Casablanca',
-          countryCode: 'MA',
-        ),
-      );
-
-      final service = TimezoneDiscoveryService(
-        dataSource: source,
-      );
-
+    test('rejects invalid longitude', () async {
       await expectLater(
         service.discover(
           latitude: 33.5,
@@ -89,41 +65,9 @@ void main() {
         ),
         throwsArgumentError,
       );
-
-      expect(source.calls, 0);
-    });
-
-    test('rejects unknown timezone IDs', () async {
-      final source = FakeTimezoneDataSource(
-        const TimezoneLookupResult(
-          timezoneId: 'Invalid/Unknown_Zone',
-        ),
-      );
-
-      final service = TimezoneDiscoveryService(
-        dataSource: source,
-      );
-
-      await expectLater(
-        service.discover(
-          latitude: 33.5731,
-          longitude: -7.5898,
-        ),
-        throwsFormatException,
-      );
     });
 
     test('rejects non-finite coordinates', () async {
-      final source = FakeTimezoneDataSource(
-        const TimezoneLookupResult(
-          timezoneId: 'Africa/Casablanca',
-        ),
-      );
-
-      final service = TimezoneDiscoveryService(
-        dataSource: source,
-      );
-
       await expectLater(
         service.discover(
           latitude: double.nan,
@@ -131,8 +75,17 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
 
-      expect(source.calls, 0);
+    test('core service returns null for ocean coordinates', () async {
+      final resolver = core_timezone.TimezoneDiscoveryService();
+
+      final result = await resolver.discover(
+        latitude: 0,
+        longitude: 0,
+      );
+
+      expect(result, isNull);
     });
   });
 }
