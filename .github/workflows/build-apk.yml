@@ -12,60 +12,91 @@ permissions:
 
 jobs:
   build:
+    name: Build Android Release
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Configure Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+      # 3. Configure Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
+      # 4. Inspect project
       - name: Inspect project
         run: |
           echo "Project files:"
           ls -la
+
           echo "Android files:"
           find android -maxdepth 4 -type f -print || true
+
           test -f pubspec.yaml
           test -f lib/main.dart
 
+      # 5. Generate missing Android platform files
       - name: Generate missing Android platform files
         run: |
           if [ ! -f android/gradlew ] || \
-             [ ! -f android/build.gradle ] && \
-             [ ! -f android/build.gradle.kts ] || \
+             { [ ! -f android/build.gradle ] && [ ! -f android/build.gradle.kts ]; } || \
              [ ! -f android/gradle/wrapper/gradle-wrapper.properties ] || \
-             [ ! -f android/app/src/main/kotlin/com/example/muslims_app/MainActivity.kt ] && \
-             [ ! -f android/app/src/main/java/com/example/muslims_app/MainActivity.java ]; then
-            flutter create --platforms=android --project-name muslims_app --org com.example /tmp/muslims_scaffold
+             { [ ! -f android/app/src/main/kotlin/com/iskander/muslims_app/MainActivity.kt ] && \
+               [ ! -f android/app/src/main/java/com/iskander/muslims_app/MainActivity.java ] && \
+               [ ! -f android/app/src/main/kotlin/com/example/muslims_app/MainActivity.kt ] && \
+               [ ! -f android/app/src/main/java/com/example/muslims_app/MainActivity.java ]; }; then
+
+            flutter create \
+              --platforms=android \
+              --project-name muslims_app \
+              --org com.iskander \
+              /tmp/muslims_scaffold
+
             cp -a /tmp/muslims_scaffold/android/. android/
           fi
 
+      # 6. Install Flutter dependencies
       - name: Install dependencies
         run: flutter pub get
 
+      # 7. Generate offline Madina Quran assets
       - name: Bundle Madina Quran assets
         run: dart run quran_madina_flutter:bundle
 
+      # 8. Verify generated Quran assets
+      - name: Verify Madina Quran assets
+        run: |
+          echo "Checking generated Quran assets..."
+          test -d assets/quran_madina/assets/db/v2
+          test -d assets/quran_madina/assets/img
+          test -d assets/quran_madina/dist
+
+          echo "Quran assets are available."
+
+      # 9. Analyze Dart code
       - name: Check Dart code
         run: flutter analyze
 
+      # 10. Run tests
       - name: Run tests
         run: flutter test
 
+      # 11. Build release APK
       - name: Build release APK
         run: flutter build apk --release
 
+      # 12. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
