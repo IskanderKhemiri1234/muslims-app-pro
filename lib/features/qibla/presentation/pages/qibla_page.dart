@@ -1,4 +1,4 @@
-
+import '../../../qibla/presentation/pages/qibla_page.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -624,7 +624,7 @@ class _InfoCard extends StatelessWidget {
       child: Row(
         children: [
           const Icon(
-            Icons.mosque_rounded,
+            icon,
             color: AppColors.gold,
             size: 30,
           ),
