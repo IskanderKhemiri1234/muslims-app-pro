@@ -39,7 +39,7 @@ class PrayerScheduleSection extends StatelessWidget {
       case Prayer.dhuhr:
         return Icons.light_mode_rounded;
       case Prayer.asr:
-        return Icons.sunny_snowing;
+      return Icons.wb_sunny_rounded;  
       case Prayer.maghrib:
         return Icons.wb_twilight;
       case Prayer.isha:
