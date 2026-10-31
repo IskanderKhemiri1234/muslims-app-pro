@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +44,7 @@ class PrayerController extends ChangeNotifier
   String city = 'Casablanca';
 
   CalculationMethod method =
-      CalculationMethod.muslimWorldLeague;
+    CalculationMethod.muslim_world_league;
 
   Madhab madhab = Madhab.shafi;
 
