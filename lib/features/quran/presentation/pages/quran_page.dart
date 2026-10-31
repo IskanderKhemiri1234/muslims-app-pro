@@ -20,6 +20,9 @@ class QuranPage extends StatefulWidget {
 class _QuranPageState extends State<QuranPage> {
   static const int _totalPages = 604;
   static const String _savedPageKey = 'quran_last_read_page';
+  static const String _completedPagesKey = 'quran_completed_pages';
+  static const String _completedKhatmasKey = 'quran_completed_khatmas';
+  static const String _dailyGoal = '5';
   static const String _bookmarksKey = 'quran_bookmarks';
   
   static const List<_SurahInfo> _surahs = [
@@ -149,6 +152,19 @@ class _QuranPageState extends State<QuranPage> {
   ];
 
   int _currentPage = 1;
+  Set<int> _completedPages = {};
+Set<int> _todayPages = {};
+int _completedKhatmas = 0;
+
+static const int _dailyTarget = 5;
+
+String get _todayStorageKey {
+  final now = DateTime.now();
+  final date =
+      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+  return 'quran_daily_pages_$date';
+}
   bool _isLoading = true;
 
   
