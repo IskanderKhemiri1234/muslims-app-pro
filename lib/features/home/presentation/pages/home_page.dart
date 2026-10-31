@@ -1,3 +1,4 @@
+import '../../../quran/presentation/pages/quran_page.dart';
 import '../../../qibla/presentation/pages/qibla_page.dart';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
