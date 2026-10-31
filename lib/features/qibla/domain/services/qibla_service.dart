@@ -1,68 +1,83 @@
-
 import 'dart:math' as math;
 
 import 'package:geomag/geomag.dart';
 
+/// الحسابات الجغرافية والمغناطيسية الخاصة باتجاه القبلة.
+///
+/// جميع الزوايا الناتجة بوحدة الدرجات:
+/// - الاتجاه الحقيقي: محسوب من الشمال الجغرافي.
+/// - الانحراف المغناطيسي: موجب شرقاً وسالب غرباً.
+/// - اتجاه البوصلة: يُصحح بإضافة الانحراف المغناطيسي.
 class QiblaService {
   QiblaService._();
 
   static const double kaabaLatitude = 21.422487;
   static const double kaabaLongitude = 39.826206;
-
   static const double earthRadiusKm = 6371.0088;
 
-  /// Returns the initial great-circle bearing from the user to the Kaaba.
-  /// Result is normalized to [0, 360).
+  static const double _degreesToRadians = math.pi / 180.0;
+  static const double _radiansToDegrees = 180.0 / math.pi;
+  static const double _epsilon = 1e-10;
+
+  /// حساب اتجاه القبلة من موقع المستخدم بالنسبة إلى الشمال الحقيقي.
+  ///
+  /// النتيجة بين 0 و360 درجة.
   static double calculateQiblaBearing({
     required double latitude,
     required double longitude,
   }) {
     _validateCoordinates(latitude, longitude);
 
-    final lat1 = _toRadians(latitude);
-    final lat2 = _toRadians(kaabaLatitude);
-    final deltaLongitude =
-        _toRadians(kaabaLongitude - longitude);
+    final userLat = latitude * _degreesToRadians;
+    final userLon = longitude * _degreesToRadians;
+    final kaabaLat = kaabaLatitude * _degreesToRadians;
+    final kaabaLon = kaabaLongitude * _degreesToRadians;
 
-    final y = math.sin(deltaLongitude) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) *
-            math.cos(lat2) *
-            math.cos(deltaLongitude);
+    final deltaLon = kaabaLon - userLon;
 
-    return _normalizeDegrees(
-      _toDegrees(math.atan2(y, x)),
-    );
+    final y = math.sin(deltaLon);
+    final x = math.cos(userLat) * math.tan(kaabaLat) -
+        math.sin(userLat) * math.cos(deltaLon);
+
+    final bearing = math.atan2(y, x) * _radiansToDegrees;
+
+    return normalize(bearing);
   }
 
-  /// Great-circle distance from the current position to the Kaaba.
+  /// حساب المسافة الجغرافية إلى الكعبة بالكيلومترات.
+  ///
+  /// يستخدم معادلة Haversine على سطح الأرض.
   static double calculateDistanceKm({
     required double latitude,
     required double longitude,
   }) {
     _validateCoordinates(latitude, longitude);
 
-    final lat1 = _toRadians(latitude);
-    final lat2 = _toRadians(kaabaLatitude);
-    final deltaLat = lat2 - lat1;
-    final deltaLon =
-        _toRadians(kaabaLongitude - longitude);
+    final lat1 = latitude * _degreesToRadians;
+    final lat2 = kaabaLatitude * _degreesToRadians;
+    final deltaLat = (kaabaLatitude - latitude) * _degreesToRadians;
+    final deltaLon = (kaabaLongitude - longitude) * _degreesToRadians;
 
-    final a = math.pow(math.sin(deltaLat / 2), 2) +
-        math.cos(lat1) *
-            math.cos(lat2) *
-            math.pow(math.sin(deltaLon / 2), 2);
+    final sinLat = math.sin(deltaLat / 2);
+    final sinLon = math.sin(deltaLon / 2);
 
-    final c = 2 * math.atan2(
-      math.sqrt(a),
-      math.sqrt(math.max(0.0, 1.0 - a)),
+    final a = sinLat * sinLat +
+        math.cos(lat1) * math.cos(lat2) * sinLon * sinLon;
+
+    final safeA = a.clamp(0.0, 1.0);
+    final centralAngle = 2 * math.atan2(
+      math.sqrt(safeA),
+      math.sqrt(1.0 - safeA),
     );
 
-    return earthRadiusKm * c;
+    return earthRadiusKm * centralAngle;
   }
 
-  /// WMM2025 magnetic declination in degrees.
-  /// East is positive; west is negative.
+  /// حساب الانحراف المغناطيسي من نموذج geomag المتاح في المكتبة.
+  ///
+  /// القيمة الموجبة تعني شرقاً والسالبة تعني غرباً.
+  /// لا تفترض هذه الدالة سنة نموذج مغناطيسي بعينها؛ ذلك يعتمد
+  /// على إصدار مكتبة geomag والبيانات المرفقة بها.
   static double calculateMagneticDeclination({
     required double latitude,
     required double longitude,
@@ -77,66 +92,89 @@ class QiblaService {
       date ?? DateTime.now(),
     );
 
-    final declination = result.dec;
+    final declination = result.dec.toDouble();
 
-    if (!declination.isFinite) {
-      throw StateError('Invalid magnetic declination.');
+    if (!declination.isFinite || declination.abs() > 180) {
+      throw StateError('تعذر حساب الانحراف المغناطيسي بصورة صحيحة.');
     }
 
     return declination;
   }
 
-  /// Converts magnetic sensor heading into true-north heading.
+  /// تحويل قراءة البوصلة المغناطيسية إلى اتجاه حقيقي.
+  ///
+  /// true heading = magnetic heading + declination
   static double magneticToTrueHeading({
     required double magneticHeading,
     required double declination,
   }) {
-    if (!magneticHeading.isFinite ||
-        !declination.isFinite) {
-      throw ArgumentError('Heading values must be finite.');
-    }
+    _validateFinite(magneticHeading, 'magneticHeading');
+    _validateFinite(declination, 'declination');
 
-    return _normalizeDegrees(
-      magneticHeading + declination,
-    );
+    return normalize(magneticHeading + declination);
   }
 
-  /// Smallest signed angular difference in [-180, 180].
+  /// أقصر فرق زاوي موقّع بين اتجاه الهدف والاتجاه الحالي.
+  ///
+  /// النتيجة بين -180 و+180 درجة.
+  /// القيمة الموجبة تعني الدوران باتجاه عقارب الساعة.
   static double shortestAngleDifference(
     double target,
     double current,
   ) {
-    return _normalizeSignedDegrees(target - current);
+    _validateFinite(target, 'target');
+    _validateFinite(current, 'current');
+
+    return normalizeSigned(target - current);
   }
 
-  /// Generates points along the great-circle route.
-  /// Useful for drawing the direct route on the map.
+  /// توحيد الزاوية لتكون بين 0 و360 درجة.
+  static double normalize(double degrees) {
+    _validateFinite(degrees, 'degrees');
+
+    final normalized = degrees % 360.0;
+    return normalized < 0 ? normalized + 360.0 : normalized;
+  }
+
+  /// توحيد الزاوية لتكون بين -180 و+180 درجة.
+  static double normalizeSigned(double degrees) {
+    final normalized = normalize(degrees + 180.0) - 180.0;
+    return normalized == -180.0 ? 180.0 : normalized;
+  }
+
+  /// إنشاء نقاط مسار كروي بين موقع المستخدم والكعبة.
+  ///
+  /// يمكن تمرير النقاط إلى FlutterMap لرسم خط المسار.
+  /// هذه الدالة لا تحتاج إلى اتصال بالإنترنت.
   static List<GeoPoint> greatCircleRoute({
     required double startLatitude,
     required double startLongitude,
-    required double endLatitude,
-    required double endLongitude,
+    double endLatitude = kaabaLatitude,
+    double endLongitude = kaabaLongitude,
     int segments = 64,
   }) {
     _validateCoordinates(startLatitude, startLongitude);
     _validateCoordinates(endLatitude, endLongitude);
 
-    if (segments < 2 || segments > 512) {
+    if (segments < 1 || segments > 512) {
       throw ArgumentError.value(
         segments,
         'segments',
-        'Must be between 2 and 512.',
+        'يجب أن يكون عدد المقاطع بين 1 و512.',
       );
     }
 
-    final start = _toVector(startLatitude, startLongitude);
-    final end = _toVector(endLatitude, endLongitude);
+    final start = _Vector3.fromCoordinates(
+      startLatitude,
+      startLongitude,
+    );
 
-    final dot = (start.x * end.x +
-            start.y * end.y +
-            start.z * end.z)
-        .clamp(-1.0, 1.0);
+    final end = _Vector3.fromCoordinates(
+      endLatitude,
+      endLongitude,
+    );
 
+    final dot = start.dot(end).clamp(-1.0, 1.0);
     final omega = math.acos(dot);
     final sinOmega = math.sin(omega);
 
@@ -144,45 +182,23 @@ class QiblaService {
 
     for (var i = 0; i <= segments; i++) {
       final t = i / segments;
+      late final _Vector3 point;
 
-      double x;
-      double y;
-      double z;
-
-      if (omega < 1e-10) {
-        x = start.x;
-        y = start.y;
-        z = start.z;
-      } else if (sinOmega.abs() < 1e-10) {
-        // Nearly antipodal points: use normalized linear interpolation.
-        x = start.x * (1 - t) + end.x * t;
-        y = start.y * (1 - t) + end.y * t;
-        z = start.z * (1 - t) + end.z * t;
-
-        final length = math.sqrt(x * x + y * y + z * z);
-        if (length < 1e-12) {
-          continue;
-        }
-
-        x /= length;
-        y /= length;
-        z /= length;
+      if (omega < _epsilon) {
+        // النقطتان متقاربتان جداً.
+        point = start;
+      } else if (sinOmega.abs() < _epsilon) {
+        // حالة تقارب التعامد العكسي: نستخدم استيفاءً مستقراً
+        // بدلاً من القسمة على قيمة قريبة من الصفر.
+        point = _Vector3.linearInterpolate(start, end, t);
       } else {
-        final a = math.sin((1 - t) * omega) / sinOmega;
-        final b = math.sin(t * omega) / sinOmega;
+        final startWeight = math.sin((1 - t) * omega) / sinOmega;
+        final endWeight = math.sin(t * omega) / sinOmega;
 
-        x = a * start.x + b * end.x;
-        y = a * start.y + b * end.y;
-        z = a * start.z + b * end.z;
+        point = (start * startWeight + end * endWeight).normalized();
       }
 
-      final latitude = _toDegrees(
-        math.atan2(z, math.sqrt(x * x + y * y)),
-      );
-
-      final longitude = _toDegrees(math.atan2(y, x));
-
-      points.add(GeoPoint(latitude, longitude));
+      points.add(point.toGeoPoint());
     }
 
     return points;
@@ -192,56 +208,138 @@ class QiblaService {
     double latitude,
     double longitude,
   ) {
-    if (!latitude.isFinite || !longitude.isFinite) {
-      throw ArgumentError('Coordinates must be finite.');
-    }
-
-    if (latitude < -90 || latitude > 90) {
-      throw ArgumentError.value(latitude, 'latitude');
-    }
-
-    if (longitude < -180 || longitude > 180) {
-      throw ArgumentError.value(longitude, 'longitude');
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      throw ArgumentError(
+        'إحداثيات الموقع غير صحيحة: '
+        'latitude=$latitude, longitude=$longitude',
+      );
     }
   }
 
-  static _Vector3 _toVector(double latitude, double longitude) {
-    final lat = _toRadians(latitude);
-    final lon = _toRadians(longitude);
+  static void _validateFinite(double value, String name) {
+    if (!value.isFinite) {
+      throw ArgumentError.value(value, name, 'يجب أن تكون قيمة رقمية صالحة.');
+    }
+  }
+}
+
+/// نقطة جغرافية تستخدم في رسم المسار على الخريطة.
+class GeoPoint {
+  final double latitude;
+  final double longitude;
+
+  const GeoPoint({
+    required this.latitude,
+    required this.longitude,
+  });
+}
+
+/// متجه ثلاثي الأبعاد يستخدم للحسابات الكروية.
+class _Vector3 {
+  final double x;
+  final double y;
+  final double z;
+
+  const _Vector3(this.x, this.y, this.z);
+
+  factory _Vector3.fromCoordinates(
+    double latitude,
+    double longitude,
+  ) {
+    final lat = latitude * QiblaService._degreesToRadians;
+    final lon = longitude * QiblaService._degreesToRadians;
+    final cosLat = math.cos(lat);
 
     return _Vector3(
-      math.cos(lat) * math.cos(lon),
-      math.cos(lat) * math.sin(lon),
+      cosLat * math.cos(lon),
+      cosLat * math.sin(lon),
       math.sin(lat),
     );
   }
 
-  static double _normalizeDegrees(double value) =>
-      (value % 360 + 360) % 360;
-
-  static double _normalizeSignedDegrees(double value) {
-    final normalized = _normalizeDegrees(value);
-    return normalized > 180 ? normalized - 360 : normalized;
+  double dot(_Vector3 other) {
+    return x * other.x + y * other.y + z * other.z;
   }
 
-  static double _toRadians(double degrees) =>
-      degrees * math.pi / 180;
+  double get magnitude {
+    return math.sqrt(x * x + y * y + z * z);
+  }
 
-  static double _toDegrees(double radians) =>
-      radians * 180 / math.pi;
-}
+  _Vector3 normalized() {
+    final length = magnitude;
 
-class GeoPoint {
-  const GeoPoint(this.latitude, this.longitude);
+    if (length < QiblaService._epsilon) {
+      throw StateError('تعذر تطبيع متجه المسار الجغرافي.');
+    }
 
-  final double latitude;
-  final double longitude;
-}
+    return _Vector3(
+      x / length,
+      y / length,
+      z / length,
+    );
+  }
 
-class _Vector3 {
-  const _Vector3(this.x, this.y, this.z);
+  _Vector3 toGeoPointVector() => normalized();
 
-  final double x;
-  final double y;
-  final double z;
+  GeoPoint toGeoPoint() {
+    final vector = toGeoPointVector();
+
+    final latitude = math.atan2(
+      vector.z,
+      math.sqrt(vector.x * vector.x + vector.y * vector.y),
+    );
+
+    final longitude = math.atan2(vector.y, vector.x);
+
+    return GeoPoint(
+      latitude: latitude * QiblaService._radiansToDegrees,
+      longitude: longitude * QiblaService._radiansToDegrees,
+    );
+  }
+
+  static _Vector3 linearInterpolate(
+    _Vector3 start,
+    _Vector3 end,
+    double t,
+  ) {
+    final interpolated = _Vector3(
+      start.x + (end.x - start.x) * t,
+      start.y + (end.y - start.y) * t,
+      start.z + (end.z - start.z) * t,
+    );
+
+    if (interpolated.magnitude < QiblaService._epsilon) {
+      // اختيار محور عمودي لتجنب المتجه الصفري في الحالة المضادة تماماً.
+      final perpendicular = _Vector3(
+        -start.y,
+        start.x,
+        0,
+      );
+
+      return perpendicular.normalized();
+    }
+
+    return interpolated.normalized();
+  }
+
+  _Vector3 operator +( _Vector3 other) {
+    return _Vector3(
+      x + other.x,
+      y + other.y,
+      z + other.z,
+    );
+  }
+
+  _Vector3 operator *(double scalar) {
+    return _Vector3(
+      x * scalar,
+      y * scalar,
+      z * scalar,
+    );
+  }
 }
