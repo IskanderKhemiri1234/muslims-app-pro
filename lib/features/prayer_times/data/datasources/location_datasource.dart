@@ -9,18 +9,21 @@ class LocationDataSource {
     this.maximumCachedAccuracy = 500,
     this.maximumCachedAge = const Duration(hours: 24),
     this.locationTimeout = const Duration(seconds: 20),
-  });
+  })  : assert(maximumCurrentAccuracy > 0),
+        assert(maximumCachedAccuracy > 0),
+        assert(maximumCachedAge > Duration.zero),
+        assert(locationTimeout > Duration.zero);
 
-  /// Maximum accepted GPS uncertainty for a fresh location, in meters.
+  /// Maximum accepted GPS uncertainty for a fresh location.
   final double maximumCurrentAccuracy;
 
-  /// Maximum accepted uncertainty for a cached location, in meters.
+  /// Maximum accepted uncertainty for a cached location.
   final double maximumCachedAccuracy;
 
-  /// A cached location older than this is rejected.
+  /// Maximum accepted age of a cached location.
   final Duration maximumCachedAge;
 
-  /// Maximum time allowed to obtain a fresh location.
+  /// Maximum total time allowed for location acquisition.
   final Duration locationTimeout;
 
   // --------------------------------------------------
@@ -36,7 +39,7 @@ class LocationDataSource {
   }
 
   // --------------------------------------------------
-  // PERMISSION
+  // PERMISSIONS
   // --------------------------------------------------
 
   Future<LocationPermission> _checkPermission() async {
@@ -46,59 +49,70 @@ class LocationDataSource {
       permission = await Geolocator.requestPermission();
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-        'إذن الموقع مرفوض نهائيًا. يرجى تفعيله من إعدادات التطبيق.',
-      );
-    }
+    switch (permission) {
+      case LocationPermission.denied:
+        throw Exception(
+          'لم يتم منح إذن الوصول إلى الموقع.',
+        );
 
-    if (permission == LocationPermission.denied) {
-      throw Exception('لم يتم منح إذن الوصول إلى الموقع.');
-    }
+      case LocationPermission.deniedForever:
+        throw Exception(
+          'إذن الموقع مرفوض نهائياً. '
+          'يرجى تفعيله من إعدادات التطبيق.',
+        );
 
-    if (permission != LocationPermission.whileInUse &&
-        permission != LocationPermission.always) {
-      throw Exception('صلاحية الموقع غير متاحة.');
-    }
+      case LocationPermission.whileInUse:
+      case LocationPermission.always:
+        return permission;
 
-    return permission;
+      case LocationPermission.unableToDetermine:
+        throw Exception(
+          'تعذر تحديد حالة إذن الموقع.',
+        );
+    }
   }
 
   // --------------------------------------------------
-  // COORDINATE VALIDATION
+  // VALIDATION
   // --------------------------------------------------
 
   bool _hasValidCoordinates(Position position) {
-    return position.latitude.isFinite &&
-        position.longitude.isFinite &&
-        position.latitude >= -90 &&
-        position.latitude <= 90 &&
-        position.longitude >= -180 &&
-        position.longitude <= 180;
+    final latitude = position.latitude;
+    final longitude = position.longitude;
+
+    return latitude.isFinite &&
+        longitude.isFinite &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
   }
 
   bool _hasValidAccuracy(
     Position position, {
     required double maximumAccuracy,
   }) {
-    return position.accuracy.isFinite &&
-        position.accuracy > 0 &&
-        position.accuracy <= maximumAccuracy;
+    final accuracy = position.accuracy;
+
+    return accuracy.isFinite &&
+        accuracy > 0 &&
+        accuracy <= maximumAccuracy;
   }
 
   bool _hasValidTimestamp(
     Position position, {
     required Duration maximumAge,
   }) {
-    final now = DateTime.now();
-    final age = now.difference(position.timestamp);
+    final age = DateTime.now().difference(
+      position.timestamp,
+    );
 
-    // Reject timestamps that are too far in the future.
+    // Reject timestamps more than two minutes in the future.
     if (age < const Duration(minutes: -2)) {
       return false;
     }
 
-    // Reject old or stale location fixes.
+    // Reject stale location data.
     if (age > maximumAge) {
       return false;
     }
@@ -123,45 +137,41 @@ class LocationDataSource {
   }
 
   // --------------------------------------------------
-  // LAST KNOWN LOCATION
+  // CACHED LOCATION
   // --------------------------------------------------
 
-  /// Returns a previously recorded location only when:
-  /// - Location services are enabled.
-  /// - Permission is already granted.
-  /// - Coordinates are valid.
-  /// - Accuracy is acceptable.
-  /// - The location is not too old.
+  /// Reads the last known position without requesting permission.
   ///
-  /// This method never requests permission.
+  /// Returns null if the cached position cannot be trusted.
   Future<Position?> getLastKnownLocation() async {
     try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
+      final enabled =
+          await Geolocator.isLocationServiceEnabled();
 
       if (!enabled) return null;
 
-      final permission = await Geolocator.checkPermission();
+      final permission =
+          await Geolocator.checkPermission();
 
       if (permission != LocationPermission.whileInUse &&
           permission != LocationPermission.always) {
         return null;
       }
 
-      final position = await Geolocator.getLastKnownPosition();
+      final position =
+          await Geolocator.getLastKnownPosition();
 
       if (position == null) return null;
 
-      if (!_isUsablePosition(
+      final isUsable = _isUsablePosition(
         position,
         maximumAccuracy: maximumCachedAccuracy,
         maximumAge: maximumCachedAge,
-      )) {
-        return null;
-      }
+      );
 
-      return position;
+      return isUsable ? position : null;
     } catch (_) {
-      // A cached location is optional.
+      // Cached location is optional.
       return null;
     }
   }
@@ -170,65 +180,82 @@ class LocationDataSource {
   // CURRENT LOCATION
   // --------------------------------------------------
 
-  /// Obtains a fresh location after user permission.
-  ///
-  /// Throws an exception if the location cannot be trusted.
   Future<Position> getCurrentLocation() async {
-    final enabled = await Geolocator.isLocationServiceEnabled();
-
-    if (!enabled) {
-      throw Exception(
-        'خدمة الموقع متوقفة. يرجى تفعيل GPS والمحاولة مجددًا.',
-      );
-    }
-
-    await _checkPermission();
-
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: locationTimeout,
-        ),
+      // The outer timeout covers service checks, permission
+      // requests and the GPS acquisition operation.
+      return await _acquireCurrentLocation().timeout(
+        locationTimeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'انتهت مهلة تحديد الموقع. '
+            'تحقق من GPS وحاول مرة أخرى.',
+          );
+        },
       );
-
-      if (!_hasValidCoordinates(position)) {
-        throw Exception(
-          'الإحداثيات المستلمة غير صالحة. حاول تحديد الموقع مجددًا.',
-        );
-      }
-
-      if (!_hasValidTimestamp(
-        position,
-        maximumAge: const Duration(minutes: 2),
-      )) {
-        throw Exception(
-          'بيانات الموقع قديمة أو غير متزامنة. حاول مرة أخرى.',
-        );
-      }
-
-      if (!_hasValidAccuracy(
-        position,
-        maximumAccuracy: maximumCurrentAccuracy,
-      )) {
-        throw Exception(
-          'دقة تحديد الموقع ضعيفة. انتقل إلى مكان مفتوح وحاول مجددًا.',
-        );
-      }
-
-      return position;
     } on TimeoutException {
       throw Exception(
-        'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.',
+        'انتهت مهلة تحديد الموقع. '
+        'تحقق من GPS وحاول مرة أخرى.',
       );
     } on LocationServiceDisabledException {
       throw Exception(
-        'خدمة الموقع متوقفة. يرجى تفعيلها.',
+        'خدمة الموقع متوقفة. يرجى تفعيل GPS.',
       );
     } on PermissionDeniedException {
       throw Exception(
         'تم رفض إذن الموقع. تحقق من إعدادات التطبيق.',
       );
     }
+  }
+
+  Future<Position> _acquireCurrentLocation() async {
+    final enabled =
+        await Geolocator.isLocationServiceEnabled();
+
+    if (!enabled) {
+      throw Exception(
+        'خدمة الموقع متوقفة. '
+        'يرجى تفعيل GPS والمحاولة مجدداً.',
+      );
+    }
+
+    await _checkPermission();
+
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: locationTimeout,
+      ),
+    );
+
+    if (!_hasValidCoordinates(position)) {
+      throw Exception(
+        'الإحداثيات المستلمة غير صالحة. '
+        'حاول تحديد الموقع مجدداً.',
+      );
+    }
+
+    if (!_hasValidTimestamp(
+      position,
+      maximumAge: const Duration(minutes: 2),
+    )) {
+      throw Exception(
+        'بيانات الموقع قديمة أو غير متزامنة. '
+        'حاول مرة أخرى.',
+      );
+    }
+
+    if (!_hasValidAccuracy(
+      position,
+      maximumAccuracy: maximumCurrentAccuracy,
+    )) {
+      throw Exception(
+        'دقة تحديد الموقع ضعيفة. '
+        'انتقل إلى مكان مفتوح وحاول مجدداً.',
+      );
+    }
+
+    return position;
   }
 }
