@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 
 import 'package:geomag/geomag.dart';
-import 'package:geolocator/geolocator.dart';
 
 class QiblaService {
   QiblaService._();
