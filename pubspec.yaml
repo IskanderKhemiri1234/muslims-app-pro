@@ -9,25 +9,25 @@ environment:
   sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
-  flutter_compass: ^0.8.1
-  flutter_map: ^8.3.2
-  latlong2: ^0.9.1
   flutter:
     sdk: flutter
-    flutter_compass: ^0.8.1
-  latlong2: ^0.9.1
+
   cupertino_icons: ^1.0.8
-    geomag: ^0.3.0
   adhan: ^2.0.0
   geolocator: ^13.0.2
   provider: ^6.1.2
   shared_preferences: ^2.3.2
   timezone: ^0.11.2
   timezone_finder: ^1.0.1
+
+  flutter_compass: ^0.8.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.9.1
+  geomag: ^0.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^4.0.0
 
 flutter:
