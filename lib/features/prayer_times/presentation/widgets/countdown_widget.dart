@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../controllers/prayer_controller.dart';
 
@@ -18,40 +19,49 @@ class CountdownWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<DateTime>(
-      valueListenable: controller.clock,
+      valueListenable: controller.clockListenable,
       builder: (context, now, child) {
         final target = controller.nextPrayerTime;
 
-        final duration = target == null
+        final difference = target?.difference(now);
+
+        final duration = difference == null ||
+                difference.isNegative
             ? Duration.zero
-            : target.difference(now).isNegative
-                ? Duration.zero
-                : target.difference(now);
+            : difference;
 
         final hours = duration.inHours;
         final minutes = duration.inMinutes.remainder(60);
         final seconds = duration.inSeconds.remainder(60);
 
-        return Row(
-          textDirection: TextDirection.ltr,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            _TimeUnit(
-              value: _twoDigits(hours),
-              label: 'HRS',
+        return Semantics(
+          liveRegion: true,
+          label: 'Time remaining: '
+              '$hours hours, $minutes minutes, '
+              '$seconds seconds',
+          child: ExcludeSemantics(
+            child: Row(
+              textDirection: TextDirection.ltr,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                _TimeUnit(
+                  value: _twoDigits(hours),
+                  label: 'HRS',
+                ),
+                const _TimeSeparator(),
+                _TimeUnit(
+                  value: _twoDigits(minutes),
+                  label: 'MIN',
+                ),
+                const _TimeSeparator(),
+                _TimeUnit(
+                  value: _twoDigits(seconds),
+                  label: 'SEC',
+                  highlighted: true,
+                ),
+              ],
             ),
-            const _TimeSeparator(),
-            _TimeUnit(
-              value: _twoDigits(minutes),
-              label: 'MIN',
-            ),
-            const _TimeSeparator(),
-            _TimeUnit(
-              value: _twoDigits(seconds),
-              label: 'SEC',
-              highlighted: true,
-            ),
-          ],
+          ),
         );
       },
     );
@@ -71,46 +81,52 @@ class _TimeUnit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          transitionBuilder: (child, animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.25),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
+    return SizedBox(
+      width: 48,
+      child: Column(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.18),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Text(
+              value,
+              key: ValueKey<String>(value),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: highlighted
+                    ? AppColors.goldLight
+                    : Colors.white,
+                fontSize: 29,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [],
               ),
-            );
-          },
-          child: Text(
-            value,
-            key: ValueKey(value),
-            style: TextStyle(
-              color: highlighted
-                  ? AppColors.goldLight
-                  : Colors.white,
-              fontSize: 29,
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [],
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.55),
-            fontSize: 9,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w600,
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 9,
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -122,14 +138,14 @@ class _TimeSeparator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(
-        left: 12,
-        right: 12,
+        left: 8,
+        right: 8,
         bottom: 13,
       ),
       child: Text(
         ':',
         style: TextStyle(
-          color: AppColors.gold.withValues(alpha: 0.8),
+          color: AppColors.gold,
           fontSize: 25,
           fontWeight: FontWeight.bold,
         ),
