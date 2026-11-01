@@ -2,10 +2,14 @@
 import 'package:adhan/adhan.dart';
 
 /// Pure prayer-time calculation service.
+///
+/// Uses the date components supplied by the caller.
+/// For timezone-aware global calculations, use
+/// GlobalPrayerCalculationService instead.
 class PrayerCalculationService {
   const PrayerCalculationService();
 
-  /// Calculate prayer times for a specific location and date.
+  /// Calculates prayer times for a location and calendar date.
   PrayerTimes calculate({
     required double latitude,
     required double longitude,
@@ -23,12 +27,17 @@ class PrayerCalculationService {
     final coordinates = Coordinates(
       latitude,
       longitude,
+      validate: true,
     );
 
-    final dateComponents = DateComponents.from(date);
-    final parameters = method.getParameters();
+    final dateComponents = DateComponents(
+      date.year,
+      date.month,
+      date.day,
+    );
 
-    parameters.madhab = madhab;
+    final parameters = method.getParameters()
+      ..madhab = madhab;
 
     return PrayerTimes(
       coordinates,
@@ -38,9 +47,6 @@ class PrayerCalculationService {
   }
 
   /// Validates geographical coordinate boundaries.
-  ///
-  /// Valid coordinates do not guarantee that astronomical
-  /// prayer times can be calculated at every location and date.
   static void validateCoordinates({
     required double latitude,
     required double longitude,
@@ -68,28 +74,49 @@ class PrayerCalculationService {
     }
   }
 
+  /// Validates that the supplied date is a real calendar date.
   static void _validateDate(DateTime date) {
-    if (date.year < 1 || date.year > 9999) {
+    final year = date.year;
+    final month = date.month;
+    final day = date.day;
+
+    if (year < 1 || year > 9999) {
       throw ArgumentError.value(
-        date.year,
+        year,
         'year',
         'Year is outside the supported range.',
       );
     }
 
-    if (date.month < 1 || date.month > 12) {
+    if (month < 1 || month > 12) {
       throw ArgumentError.value(
-        date.month,
+        month,
         'month',
         'Invalid month.',
       );
     }
 
-    if (date.day < 1 || date.day > 31) {
+    if (day < 1 || day > 31) {
       throw ArgumentError.value(
-        date.day,
+        day,
         'day',
         'Invalid day.',
+      );
+    }
+
+    final normalized = DateTime.utc(
+      year,
+      month,
+      day,
+    );
+
+    if (normalized.year != year ||
+        normalized.month != month ||
+        normalized.day != day) {
+      throw ArgumentError.value(
+        date,
+        'date',
+        'A valid calendar date is required.',
       );
     }
   }
