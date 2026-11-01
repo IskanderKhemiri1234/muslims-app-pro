@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
@@ -8,6 +9,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../data/datasources/qibla_landmark_local_data_source.dart';
+import '../../data/repositories/qibla_landmark_repository_impl.dart';
+import '../../domain/models/qibla_landmark.dart';
 import '../../domain/services/qibla_service.dart';
 
 class QiblaPage extends StatefulWidget {
@@ -24,6 +28,10 @@ class _QiblaPageState extends State<QiblaPage>
   static const Color _gold = Color(0xFFD8B66A);
   static const Color _background = Color(0xFFF5F7F3);
 
+  final MapController _mapController = MapController();
+
+  late final QiblaLandmarkRepositoryImpl _landmarkRepository;
+
   Position? _position;
 
   double? _qiblaBearing;
@@ -32,22 +40,35 @@ class _QiblaPageState extends State<QiblaPage>
 
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _isLoadingLandmarks = true;
+
   String? _locationError;
+  String? _landmarkError;
+
+  List<QiblaLandmark> _landmarks = [];
 
   Stream<CompassEvent>? _compassStream;
 
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
 
+    _landmarkRepository = QiblaLandmarkRepositoryImpl(
+      dataSource: QiblaLandmarkLocalDataSource(),
+    );
+
     _compassStream = FlutterCompass.events;
+
+    _loadLandmarks();
     _loadLocation();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -59,6 +80,33 @@ class _QiblaPageState extends State<QiblaPage>
     }
   }
 
+  Future<void> _loadLandmarks() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingLandmarks = true;
+        _landmarkError = null;
+      });
+    }
+
+    try {
+      final results = await _landmarkRepository.getAll();
+
+      if (!mounted) return;
+
+      setState(() {
+        _landmarks = results;
+        _isLoadingLandmarks = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _landmarkError = 'تعذر تحميل بيانات المعالم المحلية.';
+        _isLoadingLandmarks = false;
+      });
+    }
+  }
+
   Future<void> _loadLocation({bool silent = false}) async {
     if (_isRefreshing) return;
 
@@ -66,9 +114,10 @@ class _QiblaPageState extends State<QiblaPage>
 
     if (mounted) {
       setState(() {
-        if (!silent) {
+        if (!silent && _position == null) {
           _isLoading = true;
         }
+
         _locationError = null;
       });
     }
@@ -132,7 +181,6 @@ class _QiblaPageState extends State<QiblaPage>
           longitude: position.longitude,
         );
       } catch (_) {
-        // لا نوقف حساب القبلة إذا تعذر حساب الانحراف المغناطيسي.
         declination = null;
       }
 
@@ -161,7 +209,7 @@ class _QiblaPageState extends State<QiblaPage>
             'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.';
         _isLoading = false;
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -194,6 +242,357 @@ class _QiblaPageState extends State<QiblaPage>
     return '${distance.toStringAsFixed(1)} كم';
   }
 
+  String _localizedCategory(QiblaLandmark landmark) {
+    switch (landmark.category) {
+      case QiblaLandmarkCategory.landmark:
+        return 'معلم تاريخي';
+      case QiblaLandmarkCategory.historicalSite:
+        return 'موقع تاريخي';
+      default:
+        return 'موقع تراثي';
+    }
+  }
+
+  IconData _landmarkIcon(QiblaLandmark landmark) {
+    if (landmark.id.startsWith('islamic-')) {
+      if (landmark.id.contains('citadel')) {
+        return Icons.castle_rounded;
+      }
+
+      return Icons.mosque_rounded;
+    }
+
+    if (landmark.id.contains('pyramid')) {
+      return Icons.account_balance_rounded;
+    }
+
+    if (landmark.id.contains('wall')) {
+      return Icons.landscape_rounded;
+    }
+
+    if (landmark.id.contains('colosseum')) {
+      return Icons.stadium_rounded;
+    }
+
+    return Icons.account_balance_rounded;
+  }
+
+  Color _landmarkColor(QiblaLandmark landmark) {
+    return landmark.id.startsWith('islamic-')
+        ? _primaryGreen
+        : const Color(0xFF9B7132);
+  }
+
+  void _openLandmark(QiblaLandmark landmark) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark =
+            Theme.of(context).brightness == Brightness.dark;
+
+        final sheetColor = isDark
+            ? const Color(0xFF172820)
+            : Colors.white;
+
+        final mainTextColor =
+            isDark ? Colors.white : const Color(0xFF19382E);
+
+        final secondaryTextColor =
+            isDark ? Colors.white70 : Colors.black54;
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.62,
+          minChildSize: 0.38,
+          maxChildSize: 0.90,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: sheetColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+              ),
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: secondaryTextColor.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 23),
+                  Container(
+                    height: 170,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _landmarkColor(landmark),
+                          _darkGreen,
+                        ],
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          right: -20,
+                          bottom: -35,
+                          child: Icon(
+                            _landmarkIcon(landmark),
+                            size: 180,
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        Center(
+                          child: Icon(
+                            _landmarkIcon(landmark),
+                            size: 76,
+                            color: _gold,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 14,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _localizedCategory(landmark),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    landmark.nameAr,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: mainTextColor,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    landmark.nameEn,
+                    textAlign: TextAlign.left,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      color: secondaryTextColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _detailRow(
+                    Icons.location_on_outlined,
+                    '${landmark.cityAr ?? ''}، ${landmark.countryCode}',
+                    mainTextColor,
+                    secondaryTextColor,
+                  ),
+                  if (landmark.historicalPeriodAr != null &&
+                      landmark.historicalPeriodAr!.isNotEmpty)
+                    _detailRow(
+                      Icons.history_rounded,
+                      landmark.historicalPeriodAr!,
+                      mainTextColor,
+                      secondaryTextColor,
+                    ),
+                  if (landmark.establishedYear != null)
+                    _detailRow(
+                      Icons.calendar_today_outlined,
+                      'التاريخ التقريبي: ${landmark.establishedYear! < 0 ? '${landmark.establishedYear!.abs()} ق.م' : landmark.establishedYear}',
+                      mainTextColor,
+                      secondaryTextColor,
+                    ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'نبذة تاريخية',
+                    style: TextStyle(
+                      color: mainTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Text(
+                    landmark.descriptionAr,
+                    textAlign: TextAlign.justify,
+                    style: TextStyle(
+                      color: secondaryTextColor,
+                      height: 1.8,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    'الموقع الجغرافي',
+                    style: TextStyle(
+                      color: mainTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Text(
+                    '${landmark.latitude.toStringAsFixed(5)}, ${landmark.longitude.toStringAsFixed(5)}',
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      color: secondaryTextColor,
+                      fontFeatures: const [
+                        FontFeature.tabularFigures(),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    'المصادر والمراجع',
+                    style: TextStyle(
+                      color: mainTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (landmark.sources.isEmpty)
+                    Text(
+                      'لا توجد مراجع مسجلة لهذا المعلم بعد.',
+                      style: TextStyle(
+                        color: secondaryTextColor,
+                        fontSize: 12,
+                      ),
+                    )
+                  else
+                    ...landmark.sources.map(
+                      (source) => Container(
+                        margin: const EdgeInsets.only(bottom: 9),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: secondaryTextColor.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.menu_book_rounded,
+                              color: _gold,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    source.name,
+                                    style: TextStyle(
+                                      color: mainTextColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    source.url,
+                                    textDirection: TextDirection.ltr,
+                                    style: const TextStyle(
+                                      color: _primaryGreen,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _mapController.move(
+                          LatLng(
+                            landmark.latitude,
+                            landmark.longitude,
+                          ),
+                          8.0,
+                        );
+                      },
+                      icon: const Icon(Icons.travel_explore_rounded),
+                      label: const Text('عرض الموقع على الخريطة'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _detailRow(
+    IconData icon,
+    String value,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: _gold, size: 19),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: secondaryColor,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -218,7 +617,7 @@ class _QiblaPageState extends State<QiblaPage>
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'اتجاه القبلة',
+          'قبلة وأطلس',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 19,
@@ -239,10 +638,15 @@ class _QiblaPageState extends State<QiblaPage>
                 ? _buildError()
                 : RefreshIndicator(
                     color: _primaryGreen,
-                    onRefresh: _loadLocation,
+                    onRefresh: () async {
+                      await Future.wait([
+                        _loadLocation(),
+                        _loadLandmarks(),
+                      ]);
+                    },
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
                       children: [
                         _buildIntro(textColor, secondaryColor),
                         const SizedBox(height: 22),
@@ -257,11 +661,22 @@ class _QiblaPageState extends State<QiblaPage>
                           textColor: textColor,
                           secondaryColor: secondaryColor,
                         ),
-                        const SizedBox(height: 20),
-                        _buildMapCard(
-                          cardColor: cardColor,
-                          textColor: textColor,
-                          secondaryColor: secondaryColor,
+                        const SizedBox(height: 25),
+                        _buildAtlasHeader(
+                          textColor,
+                          secondaryColor,
+                        ),
+                        const SizedBox(height: 13),
+                        _buildAtlasMap(
+                          cardColor,
+                          textColor,
+                          secondaryColor,
+                        ),
+                        const SizedBox(height: 22),
+                        _buildLandmarkCollection(
+                          cardColor,
+                          textColor,
+                          secondaryColor,
                         ),
                         const SizedBox(height: 18),
                         _buildAccuracyNote(secondaryColor),
@@ -382,12 +797,12 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         const SizedBox(height: 6),
         Text(
-          'حرّك هاتفك ببطء حتى يستقر المؤشر على اتجاه القبلة',
+          'احسب اتجاه القبلة واستكشف المعالم الإسلامية والتاريخية حول العالم',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: secondaryColor,
             fontSize: 12,
-            height: 1.5,
+            height: 1.6,
           ),
         ),
       ],
@@ -449,12 +864,14 @@ class _QiblaPageState extends State<QiblaPage>
                   );
                 }
 
-                final trueHeading = _declination == null
-                    ? QiblaService.normalize(magneticHeading)
-                    : QiblaService.magneticToTrueHeading(
+                final hasDeclination = _declination != null;
+
+                final trueHeading = hasDeclination
+                    ? QiblaService.magneticToTrueHeading(
                         magneticHeading: magneticHeading,
                         declination: _declination!,
-                      );
+                      )
+                    : QiblaService.normalize(magneticHeading);
 
                 final relativeAngle =
                     QiblaService.shortestAngleDifference(
@@ -567,12 +984,23 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'الاتجاه الحقيقي: ${_formatBearing(_qiblaBearing!)}',
+                      'الاتجاه الجغرافي: ${_formatBearing(_qiblaBearing!)}',
                       style: TextStyle(
                         color: textColor,
                         fontSize: 12,
                       ),
                     ),
+                    if (!hasDeclination) ...[
+                      const SizedBox(height: 9),
+                      Text(
+                        'قراءة البوصلة تقريبية؛ تعذر تصحيح الانحراف المغناطيسي.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: secondaryColor,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ],
                 );
               },
@@ -731,148 +1159,321 @@ class _QiblaPageState extends State<QiblaPage>
     );
   }
 
-  Widget _buildMapCard({
-    required Color cardColor,
-    required Color textColor,
-    required Color secondaryColor,
-  }) {
-    final position = _position;
-
-    if (position == null) {
-      return const SizedBox.shrink();
-    }
-
-    final userLocation = LatLng(
-      position.latitude,
-      position.longitude,
-    );
-
-    final kaabaLocation = LatLng(
-      QiblaService.kaabaLatitude,
-      QiblaService.kaabaLongitude,
-    );
-
-    final route = QiblaService.greatCircleRoute(
-      startLatitude: position.latitude,
-      startLongitude: position.longitude,
-    );
-
-    final routePoints = route
-        .map((point) => LatLng(point.latitude, point.longitude))
-        .toList(growable: false);
-
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.map_rounded,
-                color: _gold,
-                size: 21,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'المسار إلى الكعبة',
+  Widget _buildAtlasHeader(
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.public_rounded,
+              color: _gold,
+              size: 25,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'أطلس المعالم الإسلامية والتاريخية',
                 style: TextStyle(
                   color: textColor,
-                  fontSize: 15,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: _primaryGreen.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${_landmarks.length} موقعاً',
+                style: const TextStyle(
+                  color: _primaryGreen,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Text(
+          'استكشف المواقع، كبّر الخريطة، واضغط على أي علامة لاكتشاف تاريخها.',
+          style: TextStyle(
+            color: secondaryColor,
+            fontSize: 11,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAtlasMap(
+    Color cardColor,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    final userMarker = _position == null
+        ? <Marker>[]
+        : [
+            Marker(
+              point: LatLng(
+                _position!.latitude,
+                _position!.longitude,
+              ),
+              width: 48,
+              height: 48,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.blue,
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.my_location_rounded,
+                  color: Colors.blue,
+                  size: 25,
+                ),
+              ),
+            ),
+          ];
+
+    final landmarkMarkers = _landmarks.map((landmark) {
+      final color = _landmarkColor(landmark);
+
+      return Marker(
+        point: LatLng(
+          landmark.latitude,
+          landmark.longitude,
+        ),
+        width: 46,
+        height: 52,
+        child: GestureDetector(
+          onTap: () => _openLandmark(landmark),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 35,
+                height: 35,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 7,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _landmarkIcon(landmark),
+                  color: Colors.white,
+                  size: 19,
+                ),
+              ),
+              Container(
+                width: 3,
+                height: 8,
+                color: color,
+              ),
             ],
           ),
-          const SizedBox(height: 7),
-          Text(
-            'عرض جغرافي لموقعك واتجاه الكعبة المشرفة',
-            style: TextStyle(
-              color: secondaryColor,
-              fontSize: 11,
-            ),
+        ),
+      );
+    }).toList(growable: false);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
-          const SizedBox(height: 14),
+        ],
+      ),
+      child: Column(
+        children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(17),
             child: SizedBox(
-              height: 230,
-              child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: userLocation,
-                  initialZoom: 3,
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all,
-                  ),
-                ),
+              height: 370,
+              child: Stack(
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.iskander.muslims_app',
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: routePoints,
-                        strokeWidth: 3.5,
-                        color: _primaryGreen,
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: const MapOptions(
+                      initialCenter: LatLng(22, 15),
+                      initialZoom: 1.45,
+                      minZoom: 1,
+                      maxZoom: 18,
+                      interactionOptions: InteractionOptions(
+                        flags: InteractiveFlag.all,
+                      ),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName:
+                            'com.iskander.muslims_app',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          ...landmarkMarkers,
+                          ...userMarker,
+                        ],
+                      ),
+                      RichAttributionWidget(
+                        attributions: [
+                          TextSourceAttribution(
+                            'OpenStreetMap contributors',
+                            onTap: () {},
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: userLocation,
-                        width: 42,
-                        height: 42,
-                        child: const Icon(
-                          Icons.my_location_rounded,
-                          color: Colors.blue,
-                          size: 31,
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: _mapActionButton(
+                      icon: Icons.my_location_rounded,
+                      tooltip: 'موقعي',
+                      onTap: () {
+                        if (_position != null) {
+                          _mapController.move(
+                            LatLng(
+                              _position!.latitude,
+                              _position!.longitude,
+                            ),
+                            7,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Column(
+                      children: [
+                        _mapActionButton(
+                          icon: Icons.add_rounded,
+                          tooltip: 'تكبير',
+                          onTap: () {
+                            final zoom = _mapController.camera.zoom;
+                            _mapController.move(
+                              _mapController.camera.center,
+                              math.min(zoom + 1, 18),
+                            );
+                          },
                         ),
-                      ),
-                      Marker(
-                        point: kaabaLocation,
-                        width: 46,
-                        height: 46,
-                        child: const Icon(
-                          Icons.mosque_rounded,
-                          color: _primaryGreen,
-                          size: 35,
+                        const SizedBox(height: 7),
+                        _mapActionButton(
+                          icon: Icons.remove_rounded,
+                          tooltip: 'تصغير',
+                          onTap: () {
+                            final zoom = _mapController.camera.zoom;
+                            _mapController.move(
+                              _mapController.camera.center,
+                              math.max(zoom - 1, 1),
+                            );
+                          },
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  RichAttributionWidget(
-                    attributions: [
-                      TextSourceAttribution(
-                        'OpenStreetMap contributors',
-                        onTap: () {},
+                  if (_isLoadingLandmarks)
+                    const Positioned(
+                      bottom: 12,
+                      right: 12,
+                      child: _MapStatusPill(
+                        icon: Icons.sync_rounded,
+                        label: 'تحميل المعالم...',
                       ),
-                    ],
-                  ),
+                    ),
+                  if (_landmarkError != null)
+                    Positioned(
+                      bottom: 12,
+                      right: 12,
+                      child: _MapStatusPill(
+                        icon: Icons.warning_amber_rounded,
+                        label: _landmarkError!,
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 13),
           Row(
+            children: [
+              _legendDot(_primaryGreen),
+              const SizedBox(width: 5),
+              Text(
+                'معالم إسلامية',
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 10,
+                ),
+              ),
+              const SizedBox(width: 13),
+              _legendDot(const Color(0xFF9B7132)),
+              const SizedBox(width: 5),
+              Text(
+                'عجائب ومواقع تاريخية',
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 10,
+                ),
+              ),
+              const Spacer(),
+              _legendDot(Colors.blue),
+              const SizedBox(width: 5),
+              Text(
+                'موقعي',
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Icon(
                 Icons.info_outline_rounded,
                 color: _gold,
-                size: 16,
+                size: 17,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'الخريطة تحتاج إلى الإنترنت. البوصلة وحساب الاتجاه '
-                  'يعملان بصورة مستقلة عنها.',
+                  'المعالم مخزنة محلياً. خلفية الخريطة تحتاج إلى الإنترنت في هذه المرحلة.',
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 10,
@@ -883,6 +1484,268 @@ class _QiblaPageState extends State<QiblaPage>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _mapActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 3,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Tooltip(
+          message: tooltip,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(
+              icon,
+              color: _primaryGreen,
+              size: 21,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _buildLandmarkCollection(
+    Color cardColor,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    if (_isLoadingLandmarks) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(
+            color: _gold,
+          ),
+        ),
+      );
+    }
+
+    if (_landmarks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.travel_explore_rounded,
+              color: _gold,
+              size: 35,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'لا توجد معالم متاحة حالياً',
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (_landmarkError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _landmarkError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+            TextButton.icon(
+              onPressed: _loadLandmarks,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة تحميل البيانات'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final islamicLandmarks = _landmarks
+        .where((item) => item.id.startsWith('islamic-'))
+        .toList(growable: false);
+
+    final wonders = _landmarks
+        .where((item) => !item.id.startsWith('islamic-'))
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _collectionTitle(
+          'المعالم الإسلامية',
+          '${islamicLandmarks.length} مواقع',
+          textColor,
+        ),
+        const SizedBox(height: 11),
+        _horizontalLandmarkCards(
+          islamicLandmarks,
+          cardColor,
+          textColor,
+          secondaryColor,
+        ),
+        const SizedBox(height: 22),
+        _collectionTitle(
+          'العجائب والمواقع التاريخية',
+          '${wonders.length} مواقع',
+          textColor,
+        ),
+        const SizedBox(height: 11),
+        _horizontalLandmarkCards(
+          wonders,
+          cardColor,
+          textColor,
+          secondaryColor,
+        ),
+      ],
+    );
+  }
+
+  Widget _collectionTitle(
+    String title,
+    String count,
+    Color textColor,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Text(
+          count,
+          style: const TextStyle(
+            color: _gold,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _horizontalLandmarkCards(
+    List<QiblaLandmark> landmarks,
+    Color cardColor,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    if (landmarks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      height: 158,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: landmarks.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 11),
+        itemBuilder: (context, index) {
+          final landmark = landmarks[index];
+          final color = _landmarkColor(landmark);
+
+          return SizedBox(
+            width: 190,
+            child: Material(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => _openLandmark(landmark),
+                child: Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: secondaryColor.withValues(alpha: 0.10),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.11),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _landmarkIcon(landmark),
+                              color: color,
+                              size: 21,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.arrow_outward_rounded,
+                            color: _gold,
+                            size: 17,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 11),
+                      Text(
+                        landmark.nameAr,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        landmark.cityAr ?? landmark.countryCode,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: secondaryColor,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -916,6 +1779,55 @@ class _QiblaPageState extends State<QiblaPage>
                 fontSize: 11,
                 height: 1.7,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapStatusPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MapStatusPill({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: _primaryGreen,
+            size: 15,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _primaryGreen,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
