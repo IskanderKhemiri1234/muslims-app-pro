@@ -12,22 +12,16 @@ class DiscoveredTimezone {
     required this.location,
   });
 
-  /// IANA timezone identifier, for example: Africa/Casablanca.
   final String timezoneId;
 
-  /// ISO 3166-1 alpha-2 country code, if available.
-  ///
-  /// Null means the country could not be reliably determined.
   final String? countryCode;
 
-  /// Resolved timezone database location.
   final tz.Location location;
 }
 
-/// Resolves geographic coordinates using the shared timezone database.
+/// Domain-level timezone discovery adapter.
 ///
-/// This class delegates timezone discovery to the core service.
-/// It does not perform network requests.
+/// Delegates timezone resolution to the shared Core service.
 class TimezoneDiscoveryService {
   TimezoneDiscoveryService({
     local_timezone.TimezoneDiscoveryService? resolver,
@@ -45,21 +39,15 @@ class TimezoneDiscoveryService {
       longitude: longitude,
     );
 
-    final location = await _resolver.discover(
+    final resolved = await _resolver.discover(
       latitude: latitude,
       longitude: longitude,
     );
 
-    if (location == null) {
-      throw StateError(
-        'No timezone boundary was found for these coordinates. '
-        'A manual timezone selection may be required.',
-      );
-    }
+    final timezoneId = resolved.timezoneId.trim();
 
-    final timezoneId = location.name.trim();
-
-    if (timezoneId.isEmpty) {
+    if (timezoneId.isEmpty ||
+        timezoneId != resolved.location.name) {
       throw StateError(
         'The timezone resolver returned an invalid timezone.',
       );
@@ -67,8 +55,8 @@ class TimezoneDiscoveryService {
 
     return DiscoveredTimezone(
       timezoneId: timezoneId,
-      countryCode: null,
-      location: location,
+      countryCode: resolved.countryCode,
+      location: resolved.location,
     );
   }
 
