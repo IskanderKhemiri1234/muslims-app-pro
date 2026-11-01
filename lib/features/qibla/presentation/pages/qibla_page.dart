@@ -43,6 +43,8 @@ class _QiblaPageState extends State<QiblaPage>
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isLoadingLandmarks = true;
+  bool _isAppActive = true;
+  bool _isCompassUnavailable = false;
 
   String? _locationError;
   String? _landmarkError;
@@ -50,8 +52,8 @@ class _QiblaPageState extends State<QiblaPage>
 
   List<QiblaLandmark> _landmarks = [];
 
-  Stream<CompassEvent>? _compassStream;
   StreamSubscription<CompassEvent>? _compassSubscription;
+  int _compassGeneration = 0;
 
   @override
   void initState() {
@@ -63,47 +65,114 @@ class _QiblaPageState extends State<QiblaPage>
       dataSource: QiblaLandmarkLocalDataSource(),
     );
 
-    _connectCompass();
-
-    _loadLandmarks();
-    _loadLocation();
+    unawaited(_connectCompass());
+    unawaited(_loadLandmarks());
+    unawaited(_loadLocation());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _compassSubscription?.cancel();
+
+    _isAppActive = false;
+    _compassGeneration++;
+
+    final subscription = _compassSubscription;
+    _compassSubscription = null;
+
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _connectCompass();
-      _loadLocation(silent: true);
-    } else if (state == AppLifecycleState.paused) {
-      _compassSubscription?.cancel();
-      _compassSubscription = null;
+      _isAppActive = true;
+      unawaited(_connectCompass());
+      unawaited(_loadLocation(silent: true));
+    } else {
+      _isAppActive = false;
+      _disconnectCompass();
     }
   }
 
-  void _connectCompass() {
-    _compassSubscription?.cancel();
+  Future<void> _connectCompass() async {
+    if (!mounted || !_isAppActive) return;
 
-    _compassStream = FlutterCompass.events;
+    final generation = ++_compassGeneration;
 
-    _compassSubscription = _compassStream?.listen(
-      _onCompassEvent,
-      onError: (_) {
-        if (!mounted) return;
+    final previous = _compassSubscription;
+    _compassSubscription = null;
 
+    if (previous != null) {
+      await previous.cancel();
+    }
+
+    if (!mounted ||
+        !_isAppActive ||
+        generation != _compassGeneration) {
+      return;
+    }
+
+    try {
+      final stream = FlutterCompass.events;
+
+      if (stream == null) {
+        _setCompassUnavailable();
+        return;
+      }
+
+      final subscription = stream.listen(
+        _onCompassEvent,
+        onError: (Object error, StackTrace stackTrace) {
+          if (!mounted || generation != _compassGeneration) return;
+          _setCompassUnavailable();
+        },
+        cancelOnError: false,
+      );
+
+      if (!mounted ||
+          !_isAppActive ||
+          generation != _compassGeneration) {
+        await subscription.cancel();
+        return;
+      }
+
+      _compassSubscription = subscription;
+
+      if (_isCompassUnavailable && mounted) {
         setState(() {
-          _magneticHeading = null;
-          _trueHeading = null;
-          _relativeQiblaAngle = null;
+          _isCompassUnavailable = false;
         });
-      },
-    );
+      }
+    } catch (_) {
+      _setCompassUnavailable();
+    }
+  }
+
+  void _disconnectCompass() {
+    _compassGeneration++;
+
+    final subscription = _compassSubscription;
+    _compassSubscription = null;
+
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+  }
+
+  void _setCompassUnavailable() {
+    if (!mounted) return;
+
+    setState(() {
+      _isCompassUnavailable = true;
+      _magneticHeading = null;
+      _trueHeading = null;
+      _relativeQiblaAngle = null;
+    });
   }
 
   void _onCompassEvent(CompassEvent event) {
@@ -120,26 +189,61 @@ class _QiblaPageState extends State<QiblaPage>
       return;
     }
 
-    final trueHeading = _declination != null
-        ? QiblaService.magneticToTrueHeading(
-            magneticHeading: heading,
-            declination: _declination!,
-          )
-        : QiblaService.normalize(heading);
+    _magneticHeading = QiblaService.normalize(heading);
+    _recalculateCompassHeading();
+  }
 
-    final relativeAngle = _qiblaBearing == null
-        ? null
-        : QiblaService.shortestAngleDifference(
-            _qiblaBearing!,
-            trueHeading,
-          );
+  /// يعيد حساب الاتجاه الحقيقي باستخدام آخر قراءة للحساس.
+  /// تُستدعى عند وصول قراءة جديدة وعند تغير الانحراف المغناطيسي.
+  void _recalculateCompassHeading() {
+    final magneticHeading = _magneticHeading;
+
+    if (magneticHeading == null || !magneticHeading.isFinite) {
+      if (!mounted) return;
+
+      setState(() {
+        _trueHeading = null;
+        _relativeQiblaAngle = null;
+      });
+      return;
+    }
+
+    double trueHeading;
+
+    try {
+      final declination = _declination;
+
+      trueHeading = declination != null && declination.isFinite
+          ? QiblaService.magneticToTrueHeading(
+              magneticHeading: magneticHeading,
+              declination: declination,
+            )
+          : QiblaService.normalize(magneticHeading);
+    } catch (_) {
+      trueHeading = QiblaService.normalize(magneticHeading);
+    }
+
+    double? relativeAngle;
+
+    final bearing = _qiblaBearing;
+
+    if (bearing != null && bearing.isFinite) {
+      try {
+        relativeAngle = QiblaService.shortestAngleDifference(
+          bearing,
+          trueHeading,
+        );
+      } catch (_) {
+        relativeAngle = null;
+      }
+    }
 
     if (!mounted) return;
 
     setState(() {
-      _magneticHeading = heading;
       _trueHeading = trueHeading;
       _relativeQiblaAngle = relativeAngle;
+      _isCompassUnavailable = false;
     });
   }
 
@@ -156,9 +260,20 @@ class _QiblaPageState extends State<QiblaPage>
 
       if (!mounted) return;
 
+      // لا نعرض سجلات تفتقد البيانات الأساسية أو إحداثيات صالحة.
+      final validResults = results.where((landmark) {
+        return landmark.hasValidBasicData &&
+            landmark.hasValidCoordinates;
+      }).toList(growable: false);
+
       setState(() {
-        _landmarks = results;
+        _landmarks = validResults;
         _isLoadingLandmarks = false;
+
+        if (validResults.length != results.length) {
+          _landmarkError =
+              'تم تجاهل بعض سجلات المعالم لوجود بيانات أو إحداثيات غير صالحة.';
+        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -171,18 +286,15 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   Future<void> _loadLocation({bool silent = false}) async {
-    if (_isRefreshing) return;
+    if (!mounted || _isRefreshing) return;
 
-    _isRefreshing = true;
-
-    if (mounted) {
-      setState(() {
-        if (!silent && _position == null) {
-          _isLoading = true;
-        }
-        _locationError = null;
-      });
-    }
+    setState(() {
+      _isRefreshing = true;
+      if (_position == null) {
+        _isLoading = true;
+      }
+      _locationError = null;
+    });
 
     try {
       final serviceEnabled =
@@ -225,23 +337,47 @@ class _QiblaPageState extends State<QiblaPage>
         ),
       );
 
-      final bearing = QiblaService.calculateQiblaBearing(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      if (!_isValidPosition(position)) {
+        throw const _LocationException(
+          'استقبل التطبيق إحداثيات غير صالحة من خدمة الموقع.',
+        );
+      }
+
+      final latitude = position.latitude;
+      final longitude = position.longitude;
 
       final distance = QiblaService.calculateDistanceKm(
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: latitude,
+        longitude: longitude,
       );
+
+      double? bearing;
+
+      // عند الوصول إلى الكعبة تقريباً لا يكون اتجاه المسار إليها معرفاً.
+      if (distance > 0.001) {
+        try {
+          bearing = QiblaService.calculateQiblaBearing(
+            latitude: latitude,
+            longitude: longitude,
+          );
+        } catch (_) {
+          bearing = null;
+        }
+      }
 
       double? declination;
 
       try {
-        declination = QiblaService.calculateMagneticDeclination(
-          latitude: position.latitude,
-          longitude: position.longitude,
+        final calculatedDeclination =
+            QiblaService.calculateMagneticDeclination(
+          latitude: latitude,
+          longitude: longitude,
         );
+
+        if (calculatedDeclination.isFinite &&
+            calculatedDeclination.abs() <= 180) {
+          declination = calculatedDeclination;
+        }
       } catch (_) {
         declination = null;
       }
@@ -257,14 +393,8 @@ class _QiblaPageState extends State<QiblaPage>
         _isLoading = false;
       });
 
-      // Recalculate the true heading after the new declination is loaded.
-      if (_magneticHeading != null) {
-        _onCompassEvent(
-          CompassEvent(
-            heading: _magneticHeading,
-          ),
-        );
-      }
+      // تحديث الاتجاه الحقيقي دون إنشاء CompassEvent اصطناعي.
+      _recalculateCompassHeading();
     } on _LocationException catch (error) {
       if (!mounted) return;
 
@@ -289,16 +419,47 @@ class _QiblaPageState extends State<QiblaPage>
         _isLoading = false;
       });
     } finally {
-      _isRefreshing = false;
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      } else {
+        _isRefreshing = false;
+      }
     }
   }
 
+  bool _isValidPosition(Position position) {
+    return position.latitude.isFinite &&
+        position.longitude.isFinite &&
+        position.latitude >= -90 &&
+        position.latitude <= 90 &&
+        position.longitude >= -180 &&
+        position.longitude <= 180;
+  }
+
   Future<void> _openLocationSettings() async {
-    await Geolocator.openLocationSettings();
+    try {
+      await Geolocator.openLocationSettings();
+    } catch (_) {
+      _showMessage('تعذر فتح إعدادات الموقع على هذا الجهاز.');
+    }
   }
 
   Future<void> _openAppSettings() async {
-    await Geolocator.openAppSettings();
+    try {
+      await Geolocator.openAppSettings();
+    } catch (_) {
+      _showMessage('تعذر فتح إعدادات التطبيق.');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   String _formatBearing(double bearing) {
@@ -314,46 +475,59 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   bool _isIslamicLandmark(QiblaLandmark landmark) {
-    return landmark.id.startsWith('islamic-');
+    switch (landmark.category) {
+      case QiblaLandmarkCategory.holyMosque:
+      case QiblaLandmarkCategory.mosque:
+      case QiblaLandmarkCategory.historicalMosque:
+        return true;
+
+      case QiblaLandmarkCategory.historicalSite:
+      case QiblaLandmarkCategory.landmark:
+        return false;
+    }
   }
 
   String _localizedCategory(QiblaLandmark landmark) {
     switch (landmark.category) {
+      case QiblaLandmarkCategory.holyMosque:
+        return 'مسجد مقدس';
+      case QiblaLandmarkCategory.mosque:
+        return 'مسجد';
+      case QiblaLandmarkCategory.historicalMosque:
+        return 'مسجد تاريخي';
       case QiblaLandmarkCategory.landmark:
         return 'معلم تاريخي';
       case QiblaLandmarkCategory.historicalSite:
         return 'موقع تاريخي';
-      default:
-        return 'موقع تراثي';
     }
   }
 
   IconData _landmarkIcon(QiblaLandmark landmark) {
-    if (_isIslamicLandmark(landmark)) {
-      if (landmark.id.contains('citadel')) {
-        return Icons.castle_rounded;
-      }
+    switch (landmark.category) {
+      case QiblaLandmarkCategory.holyMosque:
+      case QiblaLandmarkCategory.mosque:
+      case QiblaLandmarkCategory.historicalMosque:
+        return Icons.mosque_rounded;
 
-      return Icons.mosque_rounded;
+      case QiblaLandmarkCategory.historicalSite:
+      case QiblaLandmarkCategory.landmark:
+        if (landmark.id.contains('pyramid')) {
+          return Icons.account_balance_rounded;
+        }
+        if (landmark.id.contains('wall')) {
+          return Icons.landscape_rounded;
+        }
+        if (landmark.id.contains('colosseum')) {
+          return Icons.stadium_rounded;
+        }
+        if (landmark.id.contains('petra')) {
+          return Icons.terrain_rounded;
+        }
+        if (landmark.id.contains('citadel')) {
+          return Icons.castle_rounded;
+        }
+        return Icons.account_balance_rounded;
     }
-
-    if (landmark.id.contains('pyramid')) {
-      return Icons.account_balance_rounded;
-    }
-
-    if (landmark.id.contains('wall')) {
-      return Icons.landscape_rounded;
-    }
-
-    if (landmark.id.contains('colosseum')) {
-      return Icons.stadium_rounded;
-    }
-
-    if (landmark.id.contains('petra')) {
-      return Icons.terrain_rounded;
-    }
-
-    return Icons.account_balance_rounded;
   }
 
   Color _landmarkColor(QiblaLandmark landmark) {
@@ -403,6 +577,12 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   void _openLandmark(QiblaLandmark landmark) {
+    if (!landmark.hasValidBasicData ||
+        !landmark.hasValidCoordinates) {
+      _showMessage('بيانات هذا المعلم غير مكتملة أو غير صالحة.');
+      return;
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -411,15 +591,16 @@ class _QiblaPageState extends State<QiblaPage>
         final isDark =
             Theme.of(sheetContext).brightness == Brightness.dark;
 
-        final sheetColor = isDark
-            ? const Color(0xFF172820)
-            : Colors.white;
+        final sheetColor =
+            isDark ? const Color(0xFF172820) : Colors.white;
 
         final mainTextColor =
             isDark ? Colors.white : const Color(0xFF19382E);
 
         final secondaryTextColor =
             isDark ? Colors.white70 : Colors.black54;
+
+        final description = landmark.descriptionAr?.trim();
 
         return DraggableScrollableSheet(
           initialChildSize: 0.68,
@@ -474,17 +655,18 @@ class _QiblaPageState extends State<QiblaPage>
                   _detailRow(
                     Icons.location_on_outlined,
                     [
-                      if (landmark.cityAr?.isNotEmpty == true)
-                        landmark.cityAr!,
+                      if (landmark.cityAr?.trim().isNotEmpty == true)
+                        landmark.cityAr!.trim(),
                       landmark.countryCode,
                     ].join('، '),
                     mainTextColor,
                     secondaryTextColor,
                   ),
-                  if (landmark.historicalPeriodAr?.isNotEmpty == true)
+                  if (landmark.historicalPeriodAr?.trim().isNotEmpty ==
+                      true)
                     _detailRow(
                       Icons.history_rounded,
-                      landmark.historicalPeriodAr!,
+                      landmark.historicalPeriodAr!.trim(),
                       mainTextColor,
                       secondaryTextColor,
                     ),
@@ -499,7 +681,9 @@ class _QiblaPageState extends State<QiblaPage>
                   _sectionHeading('نبذة تاريخية', mainTextColor),
                   const SizedBox(height: 9),
                   Text(
-                    landmark.descriptionAr,
+                    description?.isNotEmpty == true
+                        ? description!
+                        : 'لا يتوفر وصف تاريخي لهذا المعلم حالياً.',
                     textAlign: TextAlign.justify,
                     style: TextStyle(
                       color: secondaryTextColor,
@@ -507,7 +691,7 @@ class _QiblaPageState extends State<QiblaPage>
                       fontSize: 13,
                     ),
                   ),
-                  if (landmark.historicalEvents.isNotEmpty) ...[
+                  if (landmark.chronologicalEvents.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _sectionHeading('المحطات التاريخية', mainTextColor),
                     const SizedBox(height: 13),
@@ -544,8 +728,15 @@ class _QiblaPageState extends State<QiblaPage>
                       ),
                     )
                   else
-                    ...landmark.sources.map(
-                      (source) => Container(
+                    ...landmark.sources.map((source) {
+                      final sourceName = source.name.trim();
+                      final sourceUrl = source.url.trim();
+
+                      if (sourceName.isEmpty && sourceUrl.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 9),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -565,39 +756,44 @@ class _QiblaPageState extends State<QiblaPage>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    source.name,
-                                    style: TextStyle(
-                                      color: mainTextColor,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                                  if (sourceName.isNotEmpty)
+                                    Text(
+                                      sourceName,
+                                      style: TextStyle(
+                                        color: mainTextColor,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  SelectableText(
-                                    source.url,
-                                    textDirection: TextDirection.ltr,
-                                    style: const TextStyle(
-                                      color: _primaryGreen,
-                                      fontSize: 10,
+                                  if (sourceUrl.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    SelectableText(
+                                      sourceUrl,
+                                      textDirection: TextDirection.ltr,
+                                      style: const TextStyle(
+                                        color: _primaryGreen,
+                                        fontSize: 10,
+                                      ),
                                     ),
-                                  ),
-                                  if (source.publisher?.isNotEmpty == true)
+                                  ],
+                                  if (source.publisher?.trim().isNotEmpty ==
+                                      true)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 5),
                                       child: Text(
-                                        source.publisher!,
+                                        source.publisher!.trim(),
                                         style: TextStyle(
                                           color: secondaryTextColor,
                                           fontSize: 10,
                                         ),
                                       ),
                                     ),
-                                  if (source.license?.isNotEmpty == true)
+                                  if (source.license?.trim().isNotEmpty ==
+                                      true)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Text(
-                                        'الترخيص: ${source.license}',
+                                        'الترخيص: ${source.license!.trim()}',
                                         style: TextStyle(
                                           color: secondaryTextColor,
                                           fontSize: 10,
@@ -609,19 +805,14 @@ class _QiblaPageState extends State<QiblaPage>
                             ),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(sheetContext);
-                        setState(() {
-                          _selectedCountry = landmark.countryCode;
-                        });
-                      },
-                      icon: const Icon(Icons.travel_explore_rounded),
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.arrow_back_rounded),
                       label: const Text('العودة إلى الأطلس'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryGreen,
@@ -724,6 +915,14 @@ class _QiblaPageState extends State<QiblaPage>
     Color mainTextColor,
     Color secondaryTextColor,
   ) {
+    final title = event.titleAr.trim();
+    final description = event.descriptionAr.trim();
+    final dateLabel = event.dateLabelAr.trim();
+
+    if (title.isEmpty && description.isEmpty && dateLabel.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
@@ -743,32 +942,37 @@ class _QiblaPageState extends State<QiblaPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  event.dateLabelAr,
-                  style: const TextStyle(
-                    color: _historicalColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                if (dateLabel.isNotEmpty)
+                  Text(
+                    dateLabel,
+                    style: const TextStyle(
+                      color: _historicalColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  event.titleAr,
-                  style: TextStyle(
-                    color: mainTextColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                if (title.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: mainTextColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  event.descriptionAr,
-                  style: TextStyle(
-                    color: secondaryTextColor,
-                    fontSize: 11,
-                    height: 1.65,
+                ],
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: secondaryTextColor,
+                      fontSize: 11,
+                      height: 1.65,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -783,6 +987,10 @@ class _QiblaPageState extends State<QiblaPage>
     Color textColor,
     Color secondaryColor,
   ) {
+    if (value.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -837,156 +1045,173 @@ class _QiblaPageState extends State<QiblaPage>
           IconButton(
             tooltip: 'تحديث الموقع',
             onPressed: _isRefreshing ? null : () => _loadLocation(),
-            icon: const Icon(Icons.refresh_rounded),
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: SafeArea(
-        child: _isLoading && _position == null
-            ? _buildLoading()
-            : _locationError != null && _position == null
-                ? _buildError()
-                : RefreshIndicator(
-                    color: _primaryGreen,
-                    onRefresh: () async {
-                      await Future.wait([
-                        _loadLocation(),
-                        _loadLandmarks(),
-                      ]);
-                    },
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-                      children: [
-                        _buildIntro(textColor, secondaryColor),
-                        const SizedBox(height: 22),
-                        _buildCompassCard(
-                          cardColor: cardColor,
-                          textColor: textColor,
-                          secondaryColor: secondaryColor,
-                        ),
-                        const SizedBox(height: 18),
-                        _buildInformationCards(
-                          cardColor: cardColor,
-                          textColor: textColor,
-                          secondaryColor: secondaryColor,
-                        ),
-                        const SizedBox(height: 18),
-                        _buildDirectionGuide(
-                          cardColor,
-                          textColor,
-                          secondaryColor,
-                        ),
-                        const SizedBox(height: 25),
-                        _buildAtlasHeader(textColor, secondaryColor),
-                        const SizedBox(height: 13),
-                        _buildAtlasMap(
-                          cardColor,
-                          textColor,
-                          secondaryColor,
-                        ),
-                        const SizedBox(height: 22),
-                        _buildLandmarkCollection(
-                          cardColor,
-                          textColor,
-                          secondaryColor,
-                        ),
-                        const SizedBox(height: 18),
-                        _buildAccuracyNote(secondaryColor),
-                      ],
-                    ),
-                  ),
+        // الأطلس والمعالم يظلان متاحين حتى عند تعذر GPS.
+        child: RefreshIndicator(
+          color: _primaryGreen,
+          onRefresh: () async {
+            await Future.wait([
+              _loadLocation(),
+              _loadLandmarks(),
+            ]);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+            children: [
+              _buildIntro(textColor, secondaryColor),
+              const SizedBox(height: 18),
+              _buildLocationStatus(
+                cardColor,
+                textColor,
+                secondaryColor,
+              ),
+              const SizedBox(height: 22),
+              _buildCompassCard(
+                cardColor: cardColor,
+                textColor: textColor,
+                secondaryColor: secondaryColor,
+              ),
+              const SizedBox(height: 18),
+              _buildInformationCards(
+                cardColor: cardColor,
+                textColor: textColor,
+                secondaryColor: secondaryColor,
+              ),
+              const SizedBox(height: 18),
+              _buildDirectionGuide(
+                cardColor,
+                textColor,
+                secondaryColor,
+              ),
+              const SizedBox(height: 25),
+              _buildAtlasHeader(textColor, secondaryColor),
+              const SizedBox(height: 13),
+              _buildAtlasMap(
+                cardColor,
+                textColor,
+                secondaryColor,
+              ),
+              const SizedBox(height: 22),
+              _buildLandmarkCollection(
+                cardColor,
+                textColor,
+                secondaryColor,
+              ),
+              const SizedBox(height: 18),
+              _buildAccuracyNote(secondaryColor),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildLoading() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  Widget _buildLocationStatus(
+    Color cardColor,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    final hasError = _locationError != null;
+    final isLoading = _isLoading && _position == null;
+
+    if (!hasError && !isLoading && _position != null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: hasError
+              ? Colors.orange.withValues(alpha: 0.35)
+              : _gold.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircularProgressIndicator(
-            color: _gold,
-            strokeWidth: 3,
+          Icon(
+            hasError
+                ? Icons.location_off_rounded
+                : Icons.gps_fixed_rounded,
+            color: hasError ? Colors.orange : _gold,
+            size: 23,
           ),
-          const SizedBox(height: 18),
-          Text(
-            'جارٍ تحديد موقعك وحساب اتجاه القبلة...',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 14,
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasError
+                      ? 'تعذر تحديد الموقع'
+                      : 'جارٍ تحديد موقعك',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _locationError ??
+                      'يتم تحديد موقعك لحساب اتجاه القبلة. يمكنك استكشاف الأطلس والمعالم أثناء الانتظار.',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 11,
+                    height: 1.6,
+                  ),
+                ),
+                if (hasError) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 5,
+                    children: [
+                      TextButton(
+                        onPressed: _isRefreshing
+                            ? null
+                            : () => _loadLocation(),
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                      TextButton(
+                        onPressed: _openLocationSettings,
+                        child: const Text('إعدادات الموقع'),
+                      ),
+                      TextButton(
+                        onPressed: _openAppSettings,
+                        child: const Text('صلاحيات التطبيق'),
+                      ),
+                    ],
+                  ),
+                ],
+                if (isLoading && _isRefreshing) ...[
+                  const SizedBox(height: 10),
+                  const LinearProgressIndicator(
+                    color: _gold,
+                    minHeight: 2,
+                  ),
+                ],
+              ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildError() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(26),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 86,
-              height: 86,
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.location_off_rounded,
-                color: Colors.orange,
-                size: 42,
-              ),
-            ),
-            const SizedBox(height: 22),
-            const Text(
-              'تعذر تحديد موقعك',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _locationError ?? 'حدث خطأ غير متوقع.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isRefreshing ? null : () => _loadLocation(),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('إعادة المحاولة'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: _openLocationSettings,
-              icon: const Icon(Icons.location_searching_rounded),
-              label: const Text('إعدادات الموقع'),
-            ),
-            TextButton.icon(
-              onPressed: _openAppSettings,
-              icon: const Icon(Icons.settings_rounded),
-              label: const Text('إعدادات التطبيق والصلاحيات'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1027,6 +1252,10 @@ class _QiblaPageState extends State<QiblaPage>
     required Color textColor,
     required Color secondaryColor,
   }) {
+    final hasQibla = _qiblaBearing != null;
+    final hasLiveDirection =
+        hasQibla && _relativeQiblaAngle != null;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
       decoration: BoxDecoration(
@@ -1062,7 +1291,7 @@ class _QiblaPageState extends State<QiblaPage>
             ],
           ),
           const SizedBox(height: 22),
-          if (_qiblaBearing != null && _relativeQiblaAngle != null)
+          if (hasLiveDirection)
             Column(
               children: [
                 SizedBox(
@@ -1181,7 +1410,11 @@ class _QiblaPageState extends State<QiblaPage>
               ],
             )
           else
-            _buildCompassUnavailable(textColor, secondaryColor),
+            _buildCompassUnavailable(
+              textColor,
+              secondaryColor,
+              hasQibla: hasQibla,
+            ),
         ],
       ),
     );
@@ -1199,13 +1432,17 @@ class _QiblaPageState extends State<QiblaPage>
         children: [
           _headingRow(
             'اتجاه القبلة الجغرافي',
-            _qiblaBearing == null ? '--' : _formatBearing(_qiblaBearing!),
+            _qiblaBearing == null
+                ? '--'
+                : _formatBearing(_qiblaBearing!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
           _headingRow(
             'اتجاه الهاتف الحقيقي',
-            _trueHeading == null ? '--' : _formatBearing(_trueHeading!),
+            _trueHeading == null
+                ? '--'
+                : _formatBearing(_trueHeading!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
@@ -1273,18 +1510,37 @@ class _QiblaPageState extends State<QiblaPage>
 
   Widget _buildCompassUnavailable(
     Color textColor,
-    Color secondaryColor,
-  ) {
+    Color secondaryColor, {
+    required bool hasQibla,
+  }) {
+    final isAtKaaba = _distanceKm != null && _distanceKm! <= 0.001;
+
+    final title = isAtKaaba
+        ? 'أنت عند الكعبة تقريباً'
+        : hasQibla
+            ? 'حساس البوصلة غير متاح'
+            : 'اتجاه القبلة غير متاح بعد';
+
+    final message = isAtKaaba
+        ? 'المسافة المحسوبة تشير إلى أنك قريب جداً من الكعبة؛ لذلك لا يكون اتجاه المسار إليها معرفاً.'
+        : hasQibla
+            ? 'اتجاه القبلة الجغرافي محسوب، لكن التوجيه المباشر يحتاج إلى حساس بوصلة متاح ويقدم قراءة صالحة.'
+            : 'يلزم تحديد موقعك أولاً لحساب اتجاه القبلة. يمكنك استخدام الأطلس والمعالم دون GPS.';
+
     return Column(
       children: [
-        const Icon(
-          Icons.sensors_off_rounded,
-          color: Colors.orange,
+        Icon(
+          isAtKaaba
+              ? Icons.mosque_rounded
+              : hasQibla
+                  ? Icons.sensors_off_rounded
+                  : Icons.location_searching_rounded,
+          color: isAtKaaba ? _gold : Colors.orange,
           size: 45,
         ),
         const SizedBox(height: 12),
         Text(
-          'حساس البوصلة غير متاح',
+          title,
           style: TextStyle(
             color: textColor,
             fontWeight: FontWeight.bold,
@@ -1292,8 +1548,7 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         const SizedBox(height: 7),
         Text(
-          'يمكنك معرفة اتجاه القبلة المحسوب والخريطة، '
-          'لكن التوجيه المباشر يحتاج إلى جهاز يدعم حساس البوصلة.',
+          message,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: secondaryColor,
@@ -1301,12 +1556,25 @@ class _QiblaPageState extends State<QiblaPage>
             height: 1.6,
           ),
         ),
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: _connectCompass,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('إعادة الاتصال بالحساس'),
-        ),
+        if (!hasQibla && !isAtKaaba) ...[
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _isRefreshing ? null : () => _loadLocation(),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('تحديث الموقع'),
+          ),
+        ] else if (hasQibla && _isCompassUnavailable) ...[
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _connectCompass,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('إعادة الاتصال بالحساس'),
+          ),
+        ],
+        if (hasQibla) ...[
+          const SizedBox(height: 12),
+          _buildHeadingDetails(secondaryColor),
+        ],
       ],
     );
   }
@@ -1317,14 +1585,13 @@ class _QiblaPageState extends State<QiblaPage>
     Color secondaryColor,
   ) {
     final angle = _relativeQiblaAngle;
-
     final isAligned = angle != null && angle.abs() <= 3;
 
     final steps = [
       'أمسك الهاتف أفقياً وبعيداً عن المعادن والمغناطيس.',
       'انتظر استقرار قراءة البوصلة قبل البدء بالدوران.',
       angle == null
-          ? 'انتظر قراءة حساس الاتجاه.'
+          ? 'انتظر حساب اتجاه القبلة وتوفر قراءة الحساس.'
           : _directionStep(angle),
       isAligned
           ? 'ثبّت الهاتف؛ أنت بمحاذاة اتجاه القبلة تقريباً.'
@@ -1568,7 +1835,7 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         const SizedBox(height: 7),
         Text(
-          'استكشف دول العالم دون إنترنت، واضغط على أي دولة لاكتشاف موقعها.',
+          'استكشف حدود دول العالم دون إنترنت. هذه خريطة جغرافية عامة وليست خريطة شوارع أو مبانٍ.',
           style: TextStyle(
             color: secondaryColor,
             fontSize: 11,
@@ -1779,6 +2046,16 @@ class _QiblaPageState extends State<QiblaPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_landmarkError != null) ...[
+          Text(
+            _landmarkError!,
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         _collectionTitle(
           'المعالم الإسلامية',
           '${islamicLandmarks.length} مواقع',
@@ -1805,12 +2082,19 @@ class _QiblaPageState extends State<QiblaPage>
           textColor,
         ),
         const SizedBox(height: 11),
-        _horizontalLandmarkCards(
-          wonders,
-          cardColor,
-          textColor,
-          secondaryColor,
-        ),
+        if (wonders.isEmpty)
+          _emptyCollectionMessage(
+            'لا توجد مواقع تاريخية أخرى متاحة حالياً.',
+            cardColor,
+            secondaryColor,
+          )
+        else
+          _horizontalLandmarkCards(
+            wonders,
+            cardColor,
+            textColor,
+            secondaryColor,
+          ),
       ],
     );
   }
@@ -1944,7 +2228,9 @@ class _QiblaPageState extends State<QiblaPage>
                       ),
                       const Spacer(),
                       Text(
-                        landmark.cityAr ?? landmark.countryCode,
+                        landmark.cityAr?.trim().isNotEmpty == true
+                            ? landmark.cityAr!.trim()
+                            : landmark.countryCode,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1966,19 +2252,23 @@ class _QiblaPageState extends State<QiblaPage>
   Widget _buildAccuracyNote(Color secondaryColor) {
     final accuracy = _position?.accuracy;
 
+    final validAccuracy = accuracy != null &&
+        accuracy.isFinite &&
+        accuracy >= 0;
+
     String accuracyText;
 
-    if (accuracy == null) {
-      accuracyText = 'لم تتوفر قراءة دقة GPS بعد.';
+    if (!validAccuracy) {
+      accuracyText = 'لم تتوفر قراءة صالحة لدقة GPS بعد.';
     } else if (accuracy <= 10) {
       accuracyText =
-          'دقة الموقع جيدة جداً وفق قراءة GPS الحالية (±${accuracy.toStringAsFixed(1)} متر).';
+          'تقدير دقة GPS جيد جداً وفق القراءة الحالية (±${accuracy.toStringAsFixed(1)} متر).';
     } else if (accuracy <= 30) {
       accuracyText =
-          'دقة الموقع متوسطة (±${accuracy.toStringAsFixed(1)} متر). انتظر قليلاً لتحسين القراءة.';
+          'تقدير دقة GPS متوسط (±${accuracy.toStringAsFixed(1)} متر). انتظر قليلاً لتحسين القراءة.';
     } else {
       accuracyText =
-          'دقة الموقع منخفضة حالياً (±${accuracy.toStringAsFixed(1)} متر). انتقل إلى مكان مفتوح وحاول مجدداً.';
+          'تقدير دقة GPS منخفض حالياً (±${accuracy.toStringAsFixed(1)} متر). انتقل إلى مكان مفتوح وحاول مجدداً.';
     }
 
     return Container(
@@ -2028,7 +2318,8 @@ class _QiblaPageState extends State<QiblaPage>
                 child: Text(
                   'لتحسين قراءة البوصلة، أبعد الهاتف عن المعادن '
                   'والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 '
-                  'لمعايرة الحساس عند الحاجة.',
+                  'لمعايرة الحساس عند الحاجة. لا يعرض التطبيق رقماً '
+                  'لدقة البوصلة ما لم توفره واجهة الحساس.',
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 11,
