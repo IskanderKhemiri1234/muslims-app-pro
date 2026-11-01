@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -31,7 +32,116 @@ class _QiblaPageState extends State<QiblaPage>
   late final QiblaLandmarkRepositoryImpl _landmarkRepository;
 
   Position? _position;
+  
+ static const String _languageKey = 'qibla_page_language';
 
+String _language = 'ar';
+
+bool get _isArabic => _language == 'ar';
+bool get _isFrench => _language == 'fr';
+
+TextDirection get _textDirection =>
+    _isArabic ? TextDirection.rtl : TextDirection.ltr;
+
+String _tr(String ar, String en, String fr) {
+  switch (_language) {
+    case 'en':
+      return en;
+    case 'fr':
+      return fr;
+    default:
+      return ar;
+  }
+}
+
+Future<void> _loadSavedLanguage() async {
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    final saved = preferences.getString(_languageKey);
+
+    if (!mounted || saved == null) return;
+
+    if (saved == 'ar' || saved == 'en' || saved == 'fr') {
+      setState(() {
+        _language = saved;
+      });
+    }
+  } catch (_) {
+    // الاستمرار باللغة الافتراضية عند تعذر قراءة الإعداد.
+  }
+}
+
+Future<void> _changeLanguage(String language) async {
+  if (!['ar', 'en', 'fr'].contains(language)) return;
+
+  if (_language == language) return;
+
+  setState(() {
+    _language = language;
+  });
+
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_languageKey, language);
+  } catch (_) {
+    _showMessage(
+      _tr(
+        'تعذر حفظ اختيار اللغة.',
+        'Could not save the language preference.',
+        'Impossible d’enregistrer la langue.',
+      ),
+    );
+  }
+}
+
+void _showLanguageSelector() {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Theme.of(context).cardColor,
+    builder: (sheetContext) {
+      final textColor = Theme.of(sheetContext).colorScheme.onSurface;
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _tr('لغة الصفحة', 'Page language', 'Langue de la page'),
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _languageOption('ar', 'العربية'),
+              _languageOption('en', 'English'),
+              _languageOption('fr', 'Français'),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _languageOption(String code, String label) {
+  final selected = _language == code;
+  final color = Theme.of(context).colorScheme.onSurface;
+
+  return ListTile(
+    title: Text(label, style: TextStyle(color: color)),
+    trailing: selected
+        ? const Icon(Icons.check_circle_rounded, color: _gold)
+        : null,
+    onTap: () {
+      Navigator.pop(context);
+      unawaited(_changeLanguage(code));
+    },
+  );
+}
   double? _qiblaBearing;
   double? _distanceKm;
   double? _declination;
@@ -58,6 +168,7 @@ class _QiblaPageState extends State<QiblaPage>
   @override
   void initState() {
     super.initState();
+    unawaited(_loadSavedLanguage());
 
     WidgetsBinding.instance.addObserver(this);
 
