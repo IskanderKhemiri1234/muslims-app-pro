@@ -14,16 +14,16 @@ class LocationDataSource {
         assert(maximumCachedAge > Duration.zero),
         assert(locationTimeout > Duration.zero);
 
-  /// Maximum accepted GPS uncertainty for a fresh location.
+  /// Maximum accepted GPS uncertainty for a fresh location, in meters.
   final double maximumCurrentAccuracy;
 
-  /// Maximum accepted uncertainty for a cached location.
+  /// Maximum accepted uncertainty for a cached location, in meters.
   final double maximumCachedAccuracy;
 
   /// Maximum accepted age of a cached location.
   final Duration maximumCachedAge;
 
-  /// Maximum total time allowed for location acquisition.
+  /// Maximum total time for service checks, permissions and GPS acquisition.
   final Duration locationTimeout;
 
   // --------------------------------------------------
@@ -103,16 +103,13 @@ class LocationDataSource {
     Position position, {
     required Duration maximumAge,
   }) {
-    final age = DateTime.now().difference(
-      position.timestamp,
-    );
+    final age = DateTime.now().difference(position.timestamp);
 
-    // Reject timestamps more than two minutes in the future.
+    // Allow a small clock synchronization difference.
     if (age < const Duration(minutes: -2)) {
       return false;
     }
 
-    // Reject stale location data.
     if (age > maximumAge) {
       return false;
     }
@@ -142,34 +139,32 @@ class LocationDataSource {
 
   /// Reads the last known position without requesting permission.
   ///
-  /// Returns null if the cached position cannot be trusted.
+  /// Returns null when the cached position is unavailable
+  /// or does not satisfy the validation rules.
   Future<Position?> getLastKnownLocation() async {
     try {
-      final enabled =
-          await Geolocator.isLocationServiceEnabled();
+      final enabled = await Geolocator.isLocationServiceEnabled();
 
       if (!enabled) return null;
 
-      final permission =
-          await Geolocator.checkPermission();
+      final permission = await Geolocator.checkPermission();
 
       if (permission != LocationPermission.whileInUse &&
           permission != LocationPermission.always) {
         return null;
       }
 
-      final position =
-          await Geolocator.getLastKnownPosition();
+      final position = await Geolocator.getLastKnownPosition();
 
       if (position == null) return null;
 
-      final isUsable = _isUsablePosition(
+      return _isUsablePosition(
         position,
         maximumAccuracy: maximumCachedAccuracy,
         maximumAge: maximumCachedAge,
-      );
-
-      return isUsable ? position : null;
+      )
+          ? position
+          : null;
     } catch (_) {
       // Cached location is optional.
       return null;
@@ -182,16 +177,8 @@ class LocationDataSource {
 
   Future<Position> getCurrentLocation() async {
     try {
-      // The outer timeout covers service checks, permission
-      // requests and the GPS acquisition operation.
       return await _acquireCurrentLocation().timeout(
         locationTimeout,
-        onTimeout: () {
-          throw TimeoutException(
-            'انتهت مهلة تحديد الموقع. '
-            'تحقق من GPS وحاول مرة أخرى.',
-          );
-        },
       );
     } on TimeoutException {
       throw Exception(
@@ -210,8 +197,7 @@ class LocationDataSource {
   }
 
   Future<Position> _acquireCurrentLocation() async {
-    final enabled =
-        await Geolocator.isLocationServiceEnabled();
+    final enabled = await Geolocator.isLocationServiceEnabled();
 
     if (!enabled) {
       throw Exception(
@@ -223,9 +209,8 @@ class LocationDataSource {
     await _checkPermission();
 
     final position = await Geolocator.getCurrentPosition(
-      locationSettings: LocationSettings(
+      locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        timeLimit: locationTimeout,
       ),
     );
 
