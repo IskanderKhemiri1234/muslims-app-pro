@@ -5,14 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-/// A reusable glass-morphism surface.
+/// A reusable, theme-aware glass surface.
 ///
-/// Features:
-/// - Bounded backdrop blur.
-/// - Theme-aware surface and border colors.
-/// - Optional custom surface and border colors.
-/// - Reduced-transparency support.
-/// - Backwards-compatible constructor.
+/// Designed for bounded UI regions such as cards and panels.
+/// Blur can be disabled independently for performance and accessibility.
 class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
@@ -23,8 +19,11 @@ class GlassContainer extends StatelessWidget {
     this.color,
     this.blurSigma = 16,
     this.enableBlur = true,
-  }) : assert(radius >= 0),
-       assert(blurSigma >= 0);
+    this.borderWidth = 1,
+    this.clipBehavior = Clip.antiAlias,
+  })  : assert(radius >= 0),
+        assert(blurSigma >= 0),
+        assert(borderWidth >= 0);
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -32,40 +31,50 @@ class GlassContainer extends StatelessWidget {
   final Color? borderColor;
   final Color? color;
 
-  /// Blur intensity applied behind the surface.
+  /// Blur intensity applied to content behind this surface.
   final double blurSigma;
 
-  /// Allows disabling blur for performance or accessibility.
+  /// Whether backdrop blur is enabled.
   final bool enableBlur;
+
+  /// Border thickness.
+  final double borderWidth;
+
+  /// Controls clipping around the rounded surface.
+  final Clip clipBehavior;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final mediaQuery = MediaQuery.maybeOf(context);
+
     final isDark = theme.brightness == Brightness.dark;
 
+    // Reduced transparency and reduced motion are separate
+    // accessibility preferences.
     final reduceTransparency =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+        mediaQuery?.disableAnimations == true
+            ? false
+            : false;
 
     final effectiveColor = color ??
         (isDark
             ? Colors.white.withValues(alpha: 0.055)
-            : Colors.white.withValues(alpha: 0.72));
+            : Colors.white.withValues(alpha: 0.82));
 
     final effectiveBorderColor = borderColor ??
         (isDark
             ? Colors.white.withValues(alpha: 0.10)
-            : AppColors.emerald.withValues(alpha: 0.10));
+            : AppColors.emerald.withValues(alpha: 0.12));
 
-    final shouldBlur = enableBlur &&
-        !reduceTransparency &&
-        blurSigma > 0;
+    final effectiveRadius = BorderRadius.circular(radius);
 
     final decoration = BoxDecoration(
       color: effectiveColor,
-      borderRadius: BorderRadius.circular(radius),
+      borderRadius: effectiveRadius,
       border: Border.all(
         color: effectiveBorderColor,
-        width: 1,
+        width: borderWidth,
       ),
     );
 
@@ -77,16 +86,19 @@ class GlassContainer extends StatelessWidget {
       ),
     );
 
-    if (!shouldBlur) {
+    // A solid surface is cheaper and more predictable than
+    // BackdropFilter when blur is disabled.
+    if (!enableBlur || blurSigma == 0 || reduceTransparency) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: effectiveRadius,
+        clipBehavior: clipBehavior,
         child: surface,
       );
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      clipBehavior: Clip.antiAlias,
+      borderRadius: effectiveRadius,
+      clipBehavior: clipBehavior,
       child: BackdropFilter(
         filter: ImageFilter.blur(
           sigmaX: blurSigma,
