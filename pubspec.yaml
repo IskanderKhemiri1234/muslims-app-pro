@@ -15,23 +15,24 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # Core application
   quran_madina_flutter: ^2.2.2
   cupertino_icons: ^1.0.8
   adhan: ^2.0.0
-  geolocator: ^13.0.2
   provider: ^6.1.2
   shared_preferences: ^2.3.2
   timezone: ^0.11.2
   timezone_finder: ^1.0.1
 
-  # Compass and location
+  # Location and Qibla compass
+  geolocator: ^13.0.2
   flutter_compass: ^0.8.1
   geomag: ^0.3.0
-  geolocator: ^13.0.2
 
-  # Offline world map - Natural Earth
+  # Offline world atlas - Natural Earth
   dv_map: ^1.1.0
   dv_geo_core: ^1.1.0
+  vector_math: ^2.4.4
 
   # Existing map utilities
   flutter_map: ^8.3.2
