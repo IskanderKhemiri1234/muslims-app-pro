@@ -27,6 +27,7 @@ class _QiblaPageState extends State<QiblaPage>
   static const Color _darkGreen = Color(0xFF064536);
   static const Color _gold = Color(0xFFD8B66A);
   static const Color _background = Color(0xFFF5F7F3);
+  static const Color _historicalColor = Color(0xFF9B7132);
 
   final MapController _mapController = MapController();
 
@@ -81,12 +82,12 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   Future<void> _loadLandmarks() async {
-    if (mounted) {
-      setState(() {
-        _isLoadingLandmarks = true;
-        _landmarkError = null;
-      });
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingLandmarks = true;
+      _landmarkError = null;
+    });
 
     try {
       final results = await _landmarkRepository.getAll();
@@ -97,7 +98,7 @@ class _QiblaPageState extends State<QiblaPage>
         _landmarks = results;
         _isLoadingLandmarks = false;
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -117,7 +118,6 @@ class _QiblaPageState extends State<QiblaPage>
         if (!silent && _position == null) {
           _isLoading = true;
         }
-
         _locationError = null;
       });
     }
@@ -242,6 +242,10 @@ class _QiblaPageState extends State<QiblaPage>
     return '${distance.toStringAsFixed(1)} كم';
   }
 
+  bool _isIslamicLandmark(QiblaLandmark landmark) {
+    return landmark.id.startsWith('islamic-');
+  }
+
   String _localizedCategory(QiblaLandmark landmark) {
     switch (landmark.category) {
       case QiblaLandmarkCategory.landmark:
@@ -254,7 +258,7 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   IconData _landmarkIcon(QiblaLandmark landmark) {
-    if (landmark.id.startsWith('islamic-')) {
+    if (_isIslamicLandmark(landmark)) {
       if (landmark.id.contains('citadel')) {
         return Icons.castle_rounded;
       }
@@ -274,13 +278,17 @@ class _QiblaPageState extends State<QiblaPage>
       return Icons.stadium_rounded;
     }
 
+    if (landmark.id.contains('petra')) {
+      return Icons.terrain_rounded;
+    }
+
     return Icons.account_balance_rounded;
   }
 
   Color _landmarkColor(QiblaLandmark landmark) {
-    return landmark.id.startsWith('islamic-')
+    return _isIslamicLandmark(landmark)
         ? _primaryGreen
-        : const Color(0xFF9B7132);
+        : _historicalColor;
   }
 
   void _openLandmark(QiblaLandmark landmark) {
@@ -288,9 +296,9 @@ class _QiblaPageState extends State<QiblaPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+            Theme.of(sheetContext).brightness == Brightness.dark;
 
         final sheetColor = isDark
             ? const Color(0xFF172820)
@@ -303,9 +311,9 @@ class _QiblaPageState extends State<QiblaPage>
             isDark ? Colors.white70 : Colors.black54;
 
         return DraggableScrollableSheet(
-          initialChildSize: 0.62,
-          minChildSize: 0.38,
-          maxChildSize: 0.90,
+          initialChildSize: 0.68,
+          minChildSize: 0.40,
+          maxChildSize: 0.94,
           expand: false,
           builder: (context, scrollController) {
             return Container(
@@ -330,62 +338,7 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                   ),
                   const SizedBox(height: 23),
-                  Container(
-                    height: 170,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          _landmarkColor(landmark),
-                          _darkGreen,
-                        ],
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          right: -20,
-                          bottom: -35,
-                          child: Icon(
-                            _landmarkIcon(landmark),
-                            size: 180,
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                        ),
-                        Center(
-                          child: Icon(
-                            _landmarkIcon(landmark),
-                            size: 76,
-                            color: _gold,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 14,
-                          right: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _localizedCategory(landmark),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildLandmarkHero(landmark),
                   const SizedBox(height: 22),
                   Text(
                     landmark.nameAr,
@@ -409,12 +362,15 @@ class _QiblaPageState extends State<QiblaPage>
                   const SizedBox(height: 18),
                   _detailRow(
                     Icons.location_on_outlined,
-                    '${landmark.cityAr ?? ''}، ${landmark.countryCode}',
+                    [
+                      if (landmark.cityAr?.isNotEmpty == true)
+                        landmark.cityAr!,
+                      landmark.countryCode,
+                    ].join('، '),
                     mainTextColor,
                     secondaryTextColor,
                   ),
-                  if (landmark.historicalPeriodAr != null &&
-                      landmark.historicalPeriodAr!.isNotEmpty)
+                  if (landmark.historicalPeriodAr?.isNotEmpty == true)
                     _detailRow(
                       Icons.history_rounded,
                       landmark.historicalPeriodAr!,
@@ -424,19 +380,12 @@ class _QiblaPageState extends State<QiblaPage>
                   if (landmark.establishedYear != null)
                     _detailRow(
                       Icons.calendar_today_outlined,
-                      'التاريخ التقريبي: ${landmark.establishedYear! < 0 ? '${landmark.establishedYear!.abs()} ق.م' : landmark.establishedYear}',
+                      _formatHistoricalYear(landmark.establishedYear!),
                       mainTextColor,
                       secondaryTextColor,
                     ),
                   const SizedBox(height: 18),
-                  Text(
-                    'نبذة تاريخية',
-                    style: TextStyle(
-                      color: mainTextColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  _sectionHeading('نبذة تاريخية', mainTextColor),
                   const SizedBox(height: 9),
                   Text(
                     landmark.descriptionAr,
@@ -447,15 +396,20 @@ class _QiblaPageState extends State<QiblaPage>
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 22),
-                  Text(
-                    'الموقع الجغرافي',
-                    style: TextStyle(
-                      color: mainTextColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  if (landmark.historicalEvents.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _sectionHeading('المحطات التاريخية', mainTextColor),
+                    const SizedBox(height: 13),
+                    ...landmark.chronologicalEvents.map(
+                      (event) => _buildHistoricalEvent(
+                        event,
+                        mainTextColor,
+                        secondaryTextColor,
+                      ),
                     ),
-                  ),
+                  ],
+                  const SizedBox(height: 22),
+                  _sectionHeading('الموقع الجغرافي', mainTextColor),
                   const SizedBox(height: 9),
                   Text(
                     '${landmark.latitude.toStringAsFixed(5)}, ${landmark.longitude.toStringAsFixed(5)}',
@@ -468,14 +422,7 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                   ),
                   const SizedBox(height: 22),
-                  Text(
-                    'المصادر والمراجع',
-                    style: TextStyle(
-                      color: mainTextColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  _sectionHeading('المصادر والمراجع', mainTextColor),
                   const SizedBox(height: 10),
                   if (landmark.sources.isEmpty)
                     Text(
@@ -517,7 +464,7 @@ class _QiblaPageState extends State<QiblaPage>
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
+                                  SelectableText(
                                     source.url,
                                     textDirection: TextDirection.ltr,
                                     style: const TextStyle(
@@ -525,6 +472,28 @@ class _QiblaPageState extends State<QiblaPage>
                                       fontSize: 10,
                                     ),
                                   ),
+                                  if (source.publisher?.isNotEmpty == true)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 5),
+                                      child: Text(
+                                        source.publisher!,
+                                        style: TextStyle(
+                                          color: secondaryTextColor,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  if (source.license?.isNotEmpty == true)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'الترخيص: ${source.license}',
+                                        style: TextStyle(
+                                          color: secondaryTextColor,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -537,7 +506,7 @@ class _QiblaPageState extends State<QiblaPage>
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.pop(context);
+                        Navigator.pop(sheetContext);
                         _mapController.move(
                           LatLng(
                             landmark.latitude,
@@ -564,6 +533,141 @@ class _QiblaPageState extends State<QiblaPage>
           },
         );
       },
+    );
+  }
+
+  Widget _buildLandmarkHero(QiblaLandmark landmark) {
+    final color = _landmarkColor(landmark);
+
+    return Container(
+      height: 170,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color, _darkGreen],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            bottom: -35,
+            child: Icon(
+              _landmarkIcon(landmark),
+              size: 180,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Center(
+            child: Icon(
+              _landmarkIcon(landmark),
+              size: 76,
+              color: _gold,
+            ),
+          ),
+          Positioned(
+            bottom: 14,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 7,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _localizedCategory(landmark),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatHistoricalYear(int year) {
+    if (year < 0) {
+      return 'التاريخ التقريبي: ${year.abs()} ق.م';
+    }
+
+    return 'التاريخ التقريبي: $year م';
+  }
+
+  Widget _sectionHeading(String title, Color color) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: color,
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildHistoricalEvent(
+    QiblaLandmarkHistoricalEvent event,
+    Color mainTextColor,
+    Color secondaryTextColor,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 11,
+            height: 11,
+            margin: const EdgeInsets.only(top: 5),
+            decoration: const BoxDecoration(
+              color: _gold,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.dateLabelAr,
+                  style: const TextStyle(
+                    color: _historicalColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event.titleAr,
+                  style: TextStyle(
+                    color: mainTextColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event.descriptionAr,
+                  style: TextStyle(
+                    color: secondaryTextColor,
+                    fontSize: 11,
+                    height: 1.65,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -662,10 +766,7 @@ class _QiblaPageState extends State<QiblaPage>
                           secondaryColor: secondaryColor,
                         ),
                         const SizedBox(height: 25),
-                        _buildAtlasHeader(
-                          textColor,
-                          secondaryColor,
-                        ),
+                        _buildAtlasHeader(textColor, secondaryColor),
                         const SizedBox(height: 13),
                         _buildAtlasMap(
                           cardColor,
@@ -1222,7 +1323,7 @@ class _QiblaPageState extends State<QiblaPage>
     Color textColor,
     Color secondaryColor,
   ) {
-    final userMarker = _position == null
+    final userMarkers = _position == null
         ? <Marker>[]
         : [
             Marker(
@@ -1261,6 +1362,7 @@ class _QiblaPageState extends State<QiblaPage>
         width: 46,
         height: 52,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => _openLandmark(landmark),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1342,14 +1444,13 @@ class _QiblaPageState extends State<QiblaPage>
                       MarkerLayer(
                         markers: [
                           ...landmarkMarkers,
-                          ...userMarker,
+                          ...userMarkers,
                         ],
                       ),
-                      RichAttributionWidget(
+                      const RichAttributionWidget(
                         attributions: [
                           TextSourceAttribution(
-                            'OpenStreetMap contributors',
-                            onTap: () {},
+                            '© OpenStreetMap contributors',
                           ),
                         ],
                       ),
@@ -1420,7 +1521,7 @@ class _QiblaPageState extends State<QiblaPage>
                       right: 12,
                       child: _MapStatusPill(
                         icon: Icons.warning_amber_rounded,
-                        label: _landmarkError!,
+                        label: 'تعذر تحميل المعالم',
                       ),
                     ),
                 ],
@@ -1428,37 +1529,17 @@ class _QiblaPageState extends State<QiblaPage>
             ),
           ),
           const SizedBox(height: 13),
-          Row(
+          Wrap(
+            spacing: 13,
+            runSpacing: 8,
             children: [
-              _legendDot(_primaryGreen),
-              const SizedBox(width: 5),
-              Text(
-                'معالم إسلامية',
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 10,
-                ),
+              _legendItem(_primaryGreen, 'معالم إسلامية', secondaryColor),
+              _legendItem(
+                _historicalColor,
+                'مواقع تاريخية',
+                secondaryColor,
               ),
-              const SizedBox(width: 13),
-              _legendDot(const Color(0xFF9B7132)),
-              const SizedBox(width: 5),
-              Text(
-                'عجائب ومواقع تاريخية',
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 10,
-                ),
-              ),
-              const Spacer(),
-              _legendDot(Colors.blue),
-              const SizedBox(width: 5),
-              Text(
-                'موقعي',
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 10,
-                ),
-              ),
+              _legendItem(Colors.blue, 'موقعي', secondaryColor),
             ],
           ),
           const SizedBox(height: 12),
@@ -1473,7 +1554,7 @@ class _QiblaPageState extends State<QiblaPage>
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'المعالم مخزنة محلياً. خلفية الخريطة تحتاج إلى الإنترنت في هذه المرحلة.',
+                  'بيانات المعالم مخزنة محلياً. أما خلفية الخريطة فتحتاج إلى الإنترنت حالياً.',
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 10,
@@ -1485,6 +1566,27 @@ class _QiblaPageState extends State<QiblaPage>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _legendItem(
+    Color color,
+    String label,
+    Color textColor,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _legendDot(color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1587,11 +1689,11 @@ class _QiblaPageState extends State<QiblaPage>
     }
 
     final islamicLandmarks = _landmarks
-        .where((item) => item.id.startsWith('islamic-'))
+        .where(_isIslamicLandmark)
         .toList(growable: false);
 
     final wonders = _landmarks
-        .where((item) => !item.id.startsWith('islamic-'))
+        .where((item) => !_isIslamicLandmark(item))
         .toList(growable: false);
 
     return Column(
@@ -1603,12 +1705,19 @@ class _QiblaPageState extends State<QiblaPage>
           textColor,
         ),
         const SizedBox(height: 11),
-        _horizontalLandmarkCards(
-          islamicLandmarks,
-          cardColor,
-          textColor,
-          secondaryColor,
-        ),
+        if (islamicLandmarks.isEmpty)
+          _emptyCollectionMessage(
+            'ستظهر هنا المساجد والمعالم الإسلامية عند إضافتها إلى قاعدة البيانات.',
+            cardColor,
+            secondaryColor,
+          )
+        else
+          _horizontalLandmarkCards(
+            islamicLandmarks,
+            cardColor,
+            textColor,
+            secondaryColor,
+          ),
         const SizedBox(height: 22),
         _collectionTitle(
           'العجائب والمواقع التاريخية',
@@ -1623,6 +1732,30 @@ class _QiblaPageState extends State<QiblaPage>
           secondaryColor,
         ),
       ],
+    );
+  }
+
+  Widget _emptyCollectionMessage(
+    String message,
+    Color cardColor,
+    Color secondaryColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: secondaryColor,
+          fontSize: 11,
+          height: 1.6,
+        ),
+      ),
     );
   }
 
@@ -1818,14 +1951,14 @@ class _MapStatusPill extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: _primaryGreen,
+            color: const Color(0xFF075B46),
             size: 15,
           ),
           const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
-              color: _primaryGreen,
+              color: Color(0xFF075B46),
               fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
