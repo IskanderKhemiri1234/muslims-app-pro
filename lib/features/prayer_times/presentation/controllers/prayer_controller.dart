@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
@@ -8,8 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../../../core/services/timezone_discovery_service.dart';
 import '../../data/datasources/location_datasource.dart';
-import '../../data/timezone_discovery_service.dart';
 import '../../domain/services/global_prayer_calculation_service.dart';
 import '../../domain/services/prayer_calculation_service.dart';
 import '../../domain/services/prayer_rules_service.dart';
@@ -22,20 +21,17 @@ class PrayerController extends ChangeNotifier
     GlobalPrayerCalculationService? globalCalculationService,
     PrayerCalculationService? calculationService,
     PrayerRulesService? rulesService,
-  })  : _locationSource =
-            locationSource ?? LocationDataSource(),
+  })  : _locationSource = locationSource ?? LocationDataSource(),
         _timezoneService =
             timezoneService ?? TimezoneDiscoveryService(),
         _globalCalculationService =
             globalCalculationService ??
                 const GlobalPrayerCalculationService(),
         _calculationService =
-            calculationService ??
-                const PrayerCalculationService(),
+            calculationService ?? const PrayerCalculationService(),
         _rulesService = rulesService ??
             PrayerRulesService(
-              fallbackMethod:
-                  CalculationMethod.muslim_world_league,
+              fallbackMethod: CalculationMethod.muslim_world_league,
               fallbackMadhab: Madhab.shafi,
             ) {
     WidgetsBinding.instance.addObserver(this);
@@ -51,8 +47,10 @@ class PrayerController extends ChangeNotifier
 
   final LocationDataSource _locationSource;
   final TimezoneDiscoveryService _timezoneService;
+
   final GlobalPrayerCalculationService
       _globalCalculationService;
+
   final PrayerCalculationService _calculationService;
   final PrayerRulesService _rulesService;
 
@@ -65,8 +63,10 @@ class PrayerController extends ChangeNotifier
   static const String _methodKey = 'prayer_method';
   static const String _madhabKey = 'prayer_madhab';
 
-  Future<void> _settingsWriteQueue =
-      Future<void>.value();
+  Future<void> _settingsWriteQueue = Future<void>.value();
+
+  bool _hasSavedMethod = false;
+  bool _hasSavedMadhab = false;
 
   // --------------------------------------------------
   // DEFAULT SETTINGS
@@ -88,11 +88,9 @@ class PrayerController extends ChangeNotifier
 
   DiscoveredTimezone? _discoveredTimezone;
 
-  String? get timezoneId =>
-      _discoveredTimezone?.timezoneId;
+  String? get timezoneId => _discoveredTimezone?.timezoneId;
 
-  String? get countryCode =>
-      _discoveredTimezone?.countryCode;
+  String? get countryCode => _discoveredTimezone?.countryCode;
 
   tz.Location? get timezoneLocation =>
       _discoveredTimezone?.location;
@@ -114,8 +112,12 @@ class PrayerController extends ChangeNotifier
 
   PrayerTimes? get prayerTimes => _prayerTimes;
 
-  GlobalPrayerSchedule? get globalSchedule =>
-      _globalSchedule;
+  PrayerTimes? get tomorrowPrayerTimes => _tomorrowPrayerTimes;
+
+  GlobalPrayerSchedule? get globalSchedule => _globalSchedule;
+
+  GlobalPrayerSchedule? get tomorrowGlobalSchedule =>
+      _tomorrowGlobalSchedule;
 
   Prayer get nextPrayer => _nextPrayer;
 
@@ -132,8 +134,7 @@ class PrayerController extends ChangeNotifier
 
   Timer? _timer;
 
-  static const Duration _clockInterval =
-      Duration(seconds: 1);
+  static const Duration _clockInterval = Duration(seconds: 1);
 
   // --------------------------------------------------
   // STATUS
@@ -150,6 +151,8 @@ class PrayerController extends ChangeNotifier
 
   Future<void>? _initializationTask;
 
+  bool _isAppActive = true;
+
   // --------------------------------------------------
   // COUNTDOWN
   // --------------------------------------------------
@@ -163,9 +166,7 @@ class PrayerController extends ChangeNotifier
 
     final difference = target.difference(clock.value);
 
-    return difference.isNegative
-        ? Duration.zero
-        : difference;
+    return difference.isNegative ? Duration.zero : difference;
   }
 
   // --------------------------------------------------
@@ -218,12 +219,11 @@ class PrayerController extends ChangeNotifier
       isInitialized = true;
       message = null;
 
-      _startClock();
+      if (_isAppActive) {
+        _startClock();
+      }
     } catch (error, stackTrace) {
-      debugPrint(
-        'Prayer initialization error: $error',
-      );
-
+      debugPrint('Prayer initialization error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (_disposed) return;
@@ -242,10 +242,7 @@ class PrayerController extends ChangeNotifier
   // VALIDATION
   // --------------------------------------------------
 
-  bool _isValidCoordinates(
-    double lat,
-    double lon,
-  ) {
+  bool _isValidCoordinates(double lat, double lon) {
     return lat.isFinite &&
         lon.isFinite &&
         lat >= -90 &&
@@ -254,10 +251,7 @@ class PrayerController extends ChangeNotifier
         lon <= 180;
   }
 
-  bool _isSameDate(
-    DateTime first,
-    DateTime second,
-  ) {
+  bool _isSameDate(DateTime first, DateTime second) {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
@@ -269,57 +263,48 @@ class PrayerController extends ChangeNotifier
 
   Future<void> _loadSettings() async {
     try {
-      final prefs =
-          await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
       if (_disposed) return;
 
-      final savedLatitude =
-          prefs.getDouble(_latitudeKey);
-
-      final savedLongitude =
-          prefs.getDouble(_longitudeKey);
+      final savedLatitude = prefs.getDouble(_latitudeKey);
+      final savedLongitude = prefs.getDouble(_longitudeKey);
 
       if (savedLatitude != null &&
           savedLongitude != null &&
-          _isValidCoordinates(
-            savedLatitude,
-            savedLongitude,
-          )) {
+          _isValidCoordinates(savedLatitude, savedLongitude)) {
         latitude = savedLatitude;
         longitude = savedLongitude;
         city = 'Saved location';
       }
 
-      final savedMethod =
-          prefs.getString(_methodKey);
+      final savedMethod = prefs.getString(_methodKey);
 
       if (savedMethod != null) {
         for (final value in CalculationMethod.values) {
           if (value.name == savedMethod) {
             method = value;
+            _hasSavedMethod = true;
             break;
           }
         }
       }
 
-      final savedMadhab =
-          prefs.getString(_madhabKey);
+      final savedMadhab = prefs.getString(_madhabKey);
 
       switch (savedMadhab) {
         case 'hanafi':
           madhab = Madhab.hanafi;
+          _hasSavedMadhab = true;
           break;
 
         case 'shafi':
           madhab = Madhab.shafi;
+          _hasSavedMadhab = true;
           break;
       }
     } catch (error, stackTrace) {
-      debugPrint(
-        'Prayer settings load error: $error',
-      );
-
+      debugPrint('Prayer settings load error: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -338,48 +323,25 @@ class PrayerController extends ChangeNotifier
     final savedMethod = method.name;
 
     final savedMadhab =
-        madhab == Madhab.hanafi
-            ? 'hanafi'
-            : 'shafi';
+        madhab == Madhab.hanafi ? 'hanafi' : 'shafi';
 
-    final operation = _settingsWriteQueue.then(
-      (_) async {
-        if (_disposed) return;
+    final operation = _settingsWriteQueue.then((_) async {
+      if (_disposed) return;
 
-        final prefs =
-            await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-        if (_disposed) return;
+      if (_disposed) return;
 
-        await prefs.setDouble(
-          _latitudeKey,
-          savedLatitude,
-        );
+      await prefs.setDouble(_latitudeKey, savedLatitude);
+      await prefs.setDouble(_longitudeKey, savedLongitude);
+      await prefs.setString(_methodKey, savedMethod);
+      await prefs.setString(_madhabKey, savedMadhab);
+    });
 
-        await prefs.setDouble(
-          _longitudeKey,
-          savedLongitude,
-        );
-
-        await prefs.setString(
-          _methodKey,
-          savedMethod,
-        );
-
-        await prefs.setString(
-          _madhabKey,
-          savedMadhab,
-        );
-      },
-    );
-
-    // Keep subsequent writes operational after a failure.
     _settingsWriteQueue = operation.then<void>(
       (_) {},
       onError: (Object error, StackTrace stackTrace) {
-        debugPrint(
-          'Prayer settings save error: $error',
-        );
+        debugPrint('Prayer settings save error: $error');
       },
     );
 
@@ -398,10 +360,15 @@ class PrayerController extends ChangeNotifier
 
     if (_disposed) return;
 
-    if (result.timezoneId != result.location.name) {
+    if (result == null) {
       throw StateError(
-        'Timezone identifier mismatch.',
+        'No timezone could be resolved for the selected coordinates.',
       );
+    }
+
+    if (result.timezoneId.isEmpty ||
+        result.timezoneId != result.location.name) {
+      throw StateError('Invalid discovered timezone.');
     }
 
     _discoveredTimezone = result;
@@ -412,14 +379,21 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
 
   void _applyRulesProfileIfNoSavedSettings() {
-    // Explicitly selected and persisted settings take priority.
-    // The built-in defaults are used otherwise.
+    if (_hasSavedMethod && _hasSavedMadhab) {
+      return;
+    }
+
     final profile = _rulesService.resolve(
       countryCode: countryCode ?? 'GLOBAL',
     );
 
-    method = profile.method;
-    madhab = profile.madhab;
+    if (!_hasSavedMethod) {
+      method = profile.method;
+    }
+
+    if (!_hasSavedMadhab) {
+      madhab = profile.madhab;
+    }
   }
 
   /// Installs a previously fetched and validated rules configuration.
@@ -446,11 +420,7 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
 
   DateTime _dateOnly(DateTime date) {
-    return DateTime.utc(
-      date.year,
-      date.month,
-      date.day,
-    );
+    return DateTime.utc(date.year, date.month, date.day);
   }
 
   DateTime _nextCalendarDay(DateTime date) {
@@ -461,15 +431,11 @@ class PrayerController extends ChangeNotifier
     );
   }
 
-  GlobalPrayerSchedule _createGlobalSchedule(
-    DateTime date,
-  ) {
+  GlobalPrayerSchedule _createGlobalSchedule(DateTime date) {
     final timezone = _discoveredTimezone?.location;
 
     if (timezone == null) {
-      throw StateError(
-        'Timezone has not been discovered.',
-      );
+      throw StateError('Timezone has not been discovered.');
     }
 
     return _globalCalculationService.calculate(
@@ -496,47 +462,32 @@ class PrayerController extends ChangeNotifier
     );
   }
 
-  // Calculate all schedules before committing state.
   void _calculateSchedule() {
     if (_disposed) return;
 
     if (!_isValidCoordinates(latitude, longitude)) {
-      throw StateError(
-        'Invalid prayer calculation coordinates.',
-      );
+      throw StateError('Invalid prayer calculation coordinates.');
     }
 
     final timezone = _discoveredTimezone?.location;
 
     if (timezone == null) {
-      throw StateError(
-        'Timezone is not available.',
-      );
+      throw StateError('Timezone is not available.');
     }
 
     final now = DateTime.now();
 
-    final localNow = tz.TZDateTime.from(
-      now,
-      timezone,
-    );
+    final localNow = tz.TZDateTime.from(now, timezone);
 
     final todayDate = _dateOnly(localNow);
+    final tomorrowDate = _nextCalendarDay(localNow);
 
-    final tomorrowDate =
-        _nextCalendarDay(localNow);
+    final todayGlobal = _createGlobalSchedule(todayDate);
+    final tomorrowGlobal = _createGlobalSchedule(tomorrowDate);
 
-    final todayGlobal =
-        _createGlobalSchedule(todayDate);
+    final todayLegacy = _createLegacyPrayerTimes(localNow);
 
-    final tomorrowGlobal =
-        _createGlobalSchedule(tomorrowDate);
-
-    final todayLegacy =
-        _createLegacyPrayerTimes(localNow);
-
-    final tomorrowLegacy =
-        _createLegacyPrayerTimes(
+    final tomorrowLegacy = _createLegacyPrayerTimes(
       DateTime(
         tomorrowDate.year,
         tomorrowDate.month,
@@ -567,10 +518,7 @@ class PrayerController extends ChangeNotifier
   // NEXT PRAYER ENGINE
   // --------------------------------------------------
 
-  (
-    Prayer,
-    tz.TZDateTime?,
-  ) _findNextPrayer({
+  (Prayer, tz.TZDateTime?) _findNextPrayer({
     required GlobalPrayerSchedule today,
     required GlobalPrayerSchedule tomorrow,
     required DateTime now,
@@ -586,17 +534,14 @@ class PrayerController extends ChangeNotifier
     for (final prayer in dailyPrayers) {
       final prayerTime = today.timeForPrayer(prayer);
 
-      if (prayerTime != null &&
-          prayerTime.isAfter(now)) {
+      if (prayerTime != null && prayerTime.isAfter(now)) {
         return (prayer, prayerTime);
       }
     }
 
-    final tomorrowFajr =
-        tomorrow.timeForPrayer(Prayer.fajr);
+    final tomorrowFajr = tomorrow.timeForPrayer(Prayer.fajr);
 
-    if (tomorrowFajr != null &&
-        tomorrowFajr.isAfter(now)) {
+    if (tomorrowFajr != null && tomorrowFajr.isAfter(now)) {
       return (Prayer.fajr, tomorrowFajr);
     }
 
@@ -628,7 +573,7 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
 
   void _startClock() {
-    if (_disposed) return;
+    if (_disposed || !_isAppActive) return;
 
     _stopClock();
 
@@ -637,7 +582,7 @@ class PrayerController extends ChangeNotifier
     _timer = Timer.periodic(
       _clockInterval,
       (_) {
-        if (!_disposed) {
+        if (!_disposed && _isAppActive) {
           _synchronizeClock();
         }
       },
@@ -656,10 +601,7 @@ class PrayerController extends ChangeNotifier
 
     if (timezone == null) return;
 
-    final localNow = tz.TZDateTime.from(
-      now,
-      timezone,
-    );
+    final localNow = tz.TZDateTime.from(now, timezone);
 
     final scheduleDate = _scheduleDate;
 
@@ -669,11 +611,8 @@ class PrayerController extends ChangeNotifier
       return;
     }
 
-    final expectedElapsed =
-        _clockInterval.inMilliseconds;
-
-    final actualElapsed =
-        now.difference(previous).inMilliseconds;
+    final expectedElapsed = _clockInterval.inMilliseconds;
+    final actualElapsed = now.difference(previous).inMilliseconds;
 
     if (actualElapsed < 0 ||
         actualElapsed > expectedElapsed * 5) {
@@ -697,10 +636,7 @@ class PrayerController extends ChangeNotifier
       message = null;
       _notifySafely();
     } catch (error, stackTrace) {
-      debugPrint(
-        'Prayer schedule recalculation error: $error',
-      );
-
+      debugPrint('Prayer schedule recalculation error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       message = 'Unable to refresh prayer times.';
@@ -719,16 +655,18 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_disposed) return;
 
     if (state == AppLifecycleState.resumed) {
+      _isAppActive = true;
+
       _recalculateSafely();
       _startClock();
+
       _notifySafely();
     } else {
+      _isAppActive = false;
       _stopClock();
     }
   }
@@ -754,13 +692,8 @@ class PrayerController extends ChangeNotifier
       final newLatitude = position.latitude;
       final newLongitude = position.longitude;
 
-      if (!_isValidCoordinates(
-        newLatitude,
-        newLongitude,
-      )) {
-        throw StateError(
-          'Received invalid location coordinates.',
-        );
+      if (!_isValidCoordinates(newLatitude, newLongitude)) {
+        throw StateError('Received invalid location coordinates.');
       }
 
       final oldLatitude = latitude;
@@ -781,6 +714,8 @@ class PrayerController extends ChangeNotifier
 
         await _saveSettings();
       } catch (_) {
+        if (_disposed) return;
+
         latitude = oldLatitude;
         longitude = oldLongitude;
         city = oldCity;
@@ -795,10 +730,7 @@ class PrayerController extends ChangeNotifier
 
       message = 'Location updated successfully.';
     } catch (error, stackTrace) {
-      debugPrint(
-        'Location update error: $error',
-      );
-
+      debugPrint('Location update error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (_disposed) return;
@@ -843,10 +775,12 @@ class PrayerController extends ChangeNotifier
     try {
       if (newMethod != null) {
         method = newMethod;
+        _hasSavedMethod = true;
       }
 
       if (newMadhab != null) {
         madhab = newMadhab;
+        _hasSavedMadhab = true;
       }
 
       _calculateSchedule();
@@ -865,10 +799,7 @@ class PrayerController extends ChangeNotifier
 
       _notifySafely();
     } catch (error, stackTrace) {
-      debugPrint(
-        'Prayer settings update error: $error',
-      );
-
+      debugPrint('Prayer settings update error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       method = previousMethod;
@@ -876,8 +807,7 @@ class PrayerController extends ChangeNotifier
 
       _recalculateSafely();
 
-      message =
-          'Unable to update prayer calculation settings.';
+      message = 'Unable to update prayer calculation settings.';
 
       _notifySafely();
     }
