@@ -1,4 +1,6 @@
 
+import 'dart:ui' show FontFeature;
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
@@ -55,7 +57,8 @@ class PrayerScheduleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     final entries = prayers
         .map((prayer) {
@@ -94,7 +97,6 @@ class PrayerScheduleSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 15),
-
         if (entries.isEmpty)
           _EmptyScheduleState(isArabic: isArabic)
         else
@@ -105,13 +107,14 @@ class PrayerScheduleSection extends StatelessWidget {
                 entry.prayer != Prayer.sunrise;
 
             return _PrayerScheduleTile(
-              key: ValueKey(entry.prayer),
+              key: ValueKey<Prayer>(entry.prayer),
               name: prayerName(entry.prayer),
               formattedTime: formatTime(entry.time),
               isNext: isNext,
-              isDark: isDark,
+              isDark: theme.brightness == Brightness.dark,
               isArabic: isArabic,
               icon: _iconFor(entry.prayer),
+              reduceMotion: reduceMotion,
             );
           }),
       ],
@@ -176,6 +179,7 @@ class _PrayerScheduleTile extends StatelessWidget {
     required this.isDark,
     required this.isArabic,
     required this.icon,
+    required this.reduceMotion,
   });
 
   final String name;
@@ -184,11 +188,11 @@ class _PrayerScheduleTile extends StatelessWidget {
   final bool isDark;
   final bool isArabic;
   final IconData icon;
+  final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final primaryColor = theme.colorScheme.primary;
     final surfaceText = theme.colorScheme.onSurface;
 
@@ -202,6 +206,10 @@ class _PrayerScheduleTile extends StatelessWidget {
         ? AppColors.gold.withValues(alpha: 0.42)
         : null;
 
+    final duration = reduceMotion
+        ? Duration.zero
+        : _PrayerScheduleTile._animationDuration;
+
     return Semantics(
       container: true,
       label: isNext
@@ -212,97 +220,90 @@ class _PrayerScheduleTile extends StatelessWidget {
               ? '$name، $formattedTime'
               : '$name, $formattedTime'),
       child: ExcludeSemantics(
-        child: AnimatedContainer(
-          duration: _animationDuration,
-          curve: Curves.easeInOut,
-          margin: const EdgeInsets.only(bottom: 10),
-          child: GlassContainer(
-            radius: 19,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 15,
-              vertical: 13,
-            ),
-            color: backgroundColor,
-            borderColor: borderColor,
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: _animationDuration,
-                  curve: Curves.easeInOut,
-                  width: 43,
-                  height: 43,
-                  decoration: BoxDecoration(
-                    color: isNext
-                        ? primaryColor
-                        : (isDark
-                            ? Colors.white.withValues(alpha: 0.07)
-                            : primaryColor.withValues(alpha: 0.08)),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: isNext
-                        ? theme.colorScheme.onPrimary
-                        : AppColors.gold,
-                    size: 21,
-                  ),
+        child: GlassContainer(
+          radius: 19,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 15,
+            vertical: 13,
+          ),
+          color: backgroundColor,
+          borderColor: borderColor,
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeInOut,
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: isNext
+                      ? primaryColor
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : primaryColor.withValues(alpha: 0.08)),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Icon(
+                  icon,
+                  color: isNext
+                      ? theme.colorScheme.onPrimary
+                      : AppColors.gold,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: surfaceText,
+                        fontSize: 15,
+                        fontWeight: isNext
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
+                    ),
+                    if (isNext) ...[
+                      const SizedBox(height: 3),
                       Text(
-                        name,
+                        isArabic
+                            ? 'الصلاة القادمة'
+                            : 'Next prayer',
                         style: TextStyle(
-                          color: surfaceText,
-                          fontSize: 15,
-                          fontWeight: isNext
-                              ? FontWeight.w800
-                              : FontWeight.w600,
+                          color: primaryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (isNext) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          isArabic
-                              ? 'الصلاة القادمة'
-                              : 'Next prayer',
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
                     ],
+                  ],
+                ),
+              ),
+              if (isNext)
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(end: 9),
+                  child: Icon(
+                    Icons.radio_button_checked_rounded,
+                    size: 14,
+                    color: AppColors.gold,
                   ),
                 ),
-                if (isNext)
-                  const Padding(
-                    padding: EdgeInsetsDirectional.only(end: 9),
-                    child: Icon(
-                      Icons.radio_button_checked_rounded,
-                      size: 14,
-                      color: AppColors.gold,
-                    ),
-                  ),
-                Text(
-                  formattedTime,
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(
-                    color: isNext
-                        ? AppColors.gold
-                        : surfaceText,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: const [
-                      FontFeature.tabularFigures(),
-                    ],
-                  ),
+              Text(
+                formattedTime,
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  color: isNext ? AppColors.gold : surfaceText,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [
+                    FontFeature.tabularFigures(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
