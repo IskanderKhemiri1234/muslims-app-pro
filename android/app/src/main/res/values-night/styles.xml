@@ -2,7 +2,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Muslims Pro - Dark Launch Theme -->
+    <!-- Muslims Pro - Light Launch Theme -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowBackground">#071C17</item>
@@ -12,7 +12,7 @@
         <item name="android:windowActionModeOverlay">true</item>
     </style>
 
-    <!-- Muslims Pro - Dark Flutter Theme -->
+    <!-- Muslims Pro - Flutter Normal Theme -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowBackground">#071C17</item>
