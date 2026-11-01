@@ -105,6 +105,41 @@ class AppColors {
     Color(0xFF087F5B),
     Color(0xFF064E3B),
   ];
+  
+  // ============================================================
+  // INTERACTION COLORS
+  // ============================================================
+
+  static const Color focus = Color(0xFF12A77A);
+  static const Color selection = Color(0x332AA77A);
+  static const Color disabled = Color(0xFF82938A);
+  static const Color pressedOverlay = Color(0x1F087F5B);
+
+  // ============================================================
+  // SPECIAL SURFACES
+  // ============================================================
+
+  static const Color darkCard = Color(0xFF142C24);
+  static const Color lightCard = Color(0xFFFFFFFF);
+
+  static const Color darkDivider = Color(0xFF294238);
+  static const Color lightDivider = Color(0xFFE5ECE7);
+
+  // ============================================================
+  // PRAYER EXPERIENCE
+  // ============================================================
+
+  static const Color prayerActive = Color(0xFFC6A76A);
+  static const Color prayerUpcoming = Color(0xFF12A77A);
+  static const Color prayerCompleted = Color(0xFF82938A);
+
+  // ============================================================
+  // QIBLA EXPERIENCE
+  // ============================================================
+
+  static const Color qiblaNorth = Color(0xFF087F5B);
+  static const Color qiblaDirection = Color(0xFFC6A76A);
+
 
   static const List<Color> darkGradient = [
     Color(0xFF18352C),
