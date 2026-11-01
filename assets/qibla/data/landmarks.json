@@ -1,204 +1,373 @@
 
 [
   {
-    "id": "masjid-al-haram",
-    "nameAr": "المسجد الحرام والكعبة المشرفة",
-    "nameEn": "Al-Masjid al-Haram and the Kaaba",
-    "category": "holyMosque",
-    "latitude": 21.4224779,
-    "longitude": 39.8251832,
-    "countryCode": "SA",
-    "cityAr": "مكة المكرمة",
-    "cityEn": "Makkah",
-    "regionAr": "منطقة مكة المكرمة",
-    "regionEn": "Makkah Region",
-    "descriptionAr": "المسجد الحرام في مكة المكرمة، ويضم الكعبة المشرفة التي يتجه إليها المسلمون في صلاتهم. وهو مقصد الحج والعمرة.",
-    "descriptionEn": "The Grand Mosque in Makkah contains the Kaaba, toward which Muslims face in prayer. It is the destination of Hajj and Umrah.",
-    "historicalPeriodAr": "التاريخ الإسلامي",
-    "historicalPeriodEn": "Islamic history",
-    "isFeatured": true,
-    "images": [],
-    "historicalEvents": [],
-    "sources": [
-      {
-        "id": "google-qibla-kaaba",
-        "name": "Google Qibla Finder",
-        "url": "https://support.google.com/faqs/answer/7364753",
-        "sourceType": "reference",
-        "publisher": "Google",
-        "license": "Reference information; image rights not included"
-      }
-    ]
-  },
-  {
-    "id": "prophets-mosque",
-    "nameAr": "المسجد النبوي",
-    "nameEn": "The Prophet's Mosque",
-    "category": "holyMosque",
-    "latitude": 24.4672,
-    "longitude": 39.6111,
-    "countryCode": "SA",
-    "cityAr": "المدينة المنورة",
-    "cityEn": "Al-Madinah",
-    "regionAr": "منطقة المدينة المنورة",
-    "regionEn": "Al-Madinah Region",
-    "descriptionAr": "المسجد النبوي في المدينة المنورة، بناه النبي محمد ﷺ بعد الهجرة، وشهد توسعات متعاقبة عبر العصور الإسلامية.",
-    "descriptionEn": "The Prophet's Mosque in Al-Madinah was established by Prophet Muhammad after the Hijrah and underwent successive expansions throughout Islamic history.",
-    "historicalPeriodAr": "العصر النبوي والعصور الإسلامية",
-    "historicalPeriodEn": "Prophetic and Islamic periods",
-    "isFeatured": true,
-    "images": [],
-    "historicalEvents": [
-      {
-        "id": "first-expansion-628",
-        "titleAr": "التوسعة الأولى بعد خيبر",
-        "titleEn": "First expansion after Khaybar",
-        "descriptionAr": "تذكر سعوديبيديا أن المسجد شهد توسعته الأولى عام 628م بعد عودة النبي ﷺ من خيبر.",
-        "descriptionEn": "Saudipedia records the mosque's first expansion in 628 CE, after the Prophet's return from Khaybar.",
-        "dateLabelAr": "628م",
-        "dateLabelEn": "628 CE",
-        "sortOrder": 1,
-        "startYear": 628,
-        "endYear": 628,
-        "calendar": "Gregorian",
-        "sourceIds": [
-          "saudipedia-prophets-mosque"
-        ]
-      }
-    ],
-    "sources": [
-      {
-        "id": "saudipedia-prophets-mosque",
-        "name": "The Prophet's Mosque",
-        "url": "https://saudipedia.com/en/the-prophet%22s-mosque",
-        "sourceType": "official-reference",
-        "publisher": "Saudipedia",
-        "license": "Reference information; image rights not included"
-      }
-    ]
-  },
-  {
-    "id": "al-aqsa-mosque",
-    "nameAr": "المسجد الأقصى",
-    "nameEn": "Al-Aqsa Mosque",
-    "category": "holyMosque",
-    "latitude": 31.7774917,
-    "longitude": 35.2358083,
-    "countryCode": "PS",
-    "cityAr": "القدس",
-    "cityEn": "Jerusalem",
-    "regionAr": "القدس",
-    "regionEn": "Jerusalem",
-    "descriptionAr": "المسجد الأقصى في البلدة القديمة بالقدس. ويُستخدم اسم المسجد الأقصى أيضاً للدلالة على الحرم الشريف ومرافقه وساحاته ضمن نطاقه التاريخي.",
-    "descriptionEn": "Al-Aqsa Mosque is located in Jerusalem's Old City. The name Al-Aqsa Mosque is also used to refer to the wider historic Al-Haram Ash-Sharif compound and its structures and courtyards.",
-    "historicalPeriodAr": "العصر الإسلامي المبكر",
-    "historicalPeriodEn": "Early Islamic period",
-    "isFeatured": true,
-    "images": [],
-    "historicalEvents": [],
-    "sources": [
-      {
-        "id": "ircica-al-aqsa",
-        "name": "Al-Aqsa Mosque - Architectural Heritage Inventory",
-        "url": "https://www.islamicarchitecturalheritage.com/listings/al-aqsa-mosque-al-masjid-al-aqsa-al-haram-ash-sharif",
-        "sourceType": "heritage-inventory",
-        "publisher": "IRCICA",
-        "license": "Reference information; image rights not included"
-      },
-      {
-        "id": "unesco-al-aqsa",
-        "name": "Al-Aqsa Mosque / Al-Haram Ash-Sharif",
-        "url": "https://whc.unesco.org/document/221350",
-        "sourceType": "heritage-document",
-        "publisher": "UNESCO",
-        "license": "UNESCO document; image rights must be checked separately"
-      }
-    ]
-  },
-  {
-    "id": "salah-al-din-citadel",
-    "nameAr": "قلعة صلاح الدين الأيوبي بالقاهرة",
-    "nameEn": "Cairo Citadel of Salah al-Din",
-    "category": "historicalSite",
-    "latitude": 30.0294,
-    "longitude": 31.2617,
-    "countryCode": "EG",
-    "cityAr": "القاهرة",
-    "cityEn": "Cairo",
-    "regionAr": "القاهرة",
-    "regionEn": "Cairo",
-    "descriptionAr": "قلعة تاريخية على مرتفعات المقطم بالقاهرة. أمر صلاح الدين الأيوبي بإنشائها سنة 572هـ الموافق 1176م لتكون جزءاً من منظومة الدفاع عن المدينة، واستمر العمل فيها بعد وفاته.",
-    "descriptionEn": "A historic fortress on the Muqattam Hills in Cairo. Salah al-Din ordered its construction in 572 AH / 1176 CE as part of the city's defensive system; work continued after his death.",
-    "historicalPeriodAr": "العصر الأيوبي",
-    "historicalPeriodEn": "Ayyubid period",
-    "establishedYear": 1176,
-    "isFeatured": true,
-    "images": [],
-    "historicalEvents": [
-      {
-        "id": "citadel-construction-1176",
-        "titleAr": "بدء إنشاء القلعة",
-        "titleEn": "Construction of the citadel begins",
-        "descriptionAr": "أمر السلطان صلاح الدين الأيوبي ببدء إنشاء القلعة فوق مرتفعات المقطم سنة 572هـ الموافق 1176م.",
-        "descriptionEn": "Sultan Salah al-Din al-Ayyubi ordered the construction of the citadel on the Muqattam Hills in 572 AH / 1176 CE.",
-        "dateLabelAr": "572هـ / 1176م",
-        "dateLabelEn": "572 AH / 1176 CE",
-        "sortOrder": 1,
-        "startYear": 1176,
-        "endYear": 1176,
-        "calendar": "Gregorian",
-        "sourceIds": [
-          "egypt-ministry-cairo-citadel"
-        ]
-      }
-    ],
-    "sources": [
-      {
-        "id": "egypt-ministry-cairo-citadel",
-        "name": "Cairo Citadel",
-        "url": "https://egymonuments.gov.eg/archaeological-sites/cairo-citadel/",
-        "sourceType": "official-heritage",
-        "publisher": "Egyptian Ministry of Tourism and Antiquities",
-        "license": "Reference information; image rights not included"
-      }
-    ]
-  },
-  {
-    "id": "giza-pyramids",
-    "nameAr": "أهرامات الجيزة",
-    "nameEn": "Pyramids of Giza",
-    "category": "historicalSite",
-    "latitude": 29.9760,
-    "longitude": 31.1304,
+    "id": "wonder-great-pyramid-giza",
+    "nameAr": "الهرم الأكبر بالجيزة",
+    "nameEn": "Great Pyramid of Giza",
+    "category": "landmark",
+    "latitude": 29.979167,
+    "longitude": 31.134167,
     "countryCode": "EG",
     "cityAr": "الجيزة",
     "cityEn": "Giza",
     "regionAr": "محافظة الجيزة",
     "regionEn": "Giza Governorate",
-    "descriptionAr": "مجموعة الأهرامات الواقعة على هضبة الجيزة، وهي جزء من موقع ممفيس ومقبرتها المدرج على قائمة التراث العالمي لليونسكو. تضم المنطقة أهرامات الجيزة الثلاثة وأبو الهول.",
-    "descriptionEn": "The pyramid complex on the Giza Plateau forms part of the UNESCO World Heritage property of Memphis and its Necropolis. The area includes the three major Giza pyramids and the Great Sphinx.",
-    "historicalPeriodAr": "مصر القديمة - الدولة القديمة",
-    "historicalPeriodEn": "Ancient Egypt - Old Kingdom",
-    "isFeatured": true,
+    "descriptionAr": "أحد أهرامات الجيزة الثلاثة، ويرتبط بالملك خوفو من الأسرة الرابعة في مصر القديمة. يمثل إنجازاً استثنائياً في العمارة والهندسة المصرية القديمة.",
+    "descriptionEn": "The largest of the three Giza pyramids, associated with Pharaoh Khufu of Egypt's Fourth Dynasty. It represents an extraordinary achievement of ancient Egyptian architecture and engineering.",
+    "historicalPeriodAr": "الدولة المصرية القديمة - الأسرة الرابعة",
+    "historicalPeriodEn": "Old Kingdom - Fourth Dynasty",
+    "establishedYear": -2560,
     "images": [],
     "historicalEvents": [],
     "sources": [
       {
-        "id": "unesco-memphis-pyramids",
-        "name": "Memphis and its Necropolis - The Pyramid Fields from Giza to Dahshur",
-        "url": "https://whc.unesco.org/en/list/86/",
-        "sourceType": "world-heritage",
+        "id": "giza-unesco-astronomy",
+        "name": "UNESCO Portal to the Heritage of Astronomy",
+        "url": "https://web.astronomicalheritage.net/index.php/show-entity?identity=24",
+        "sourceType": "academic",
         "publisher": "UNESCO",
-        "license": "CC-BY-SA IGO 3.0 for the cited UNESCO description; image rights must be checked separately"
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-great-wall-badaling",
+    "nameAr": "سور الصين العظيم",
+    "nameEn": "Great Wall of China",
+    "category": "landmark",
+    "latitude": 40.35,
+    "longitude": 116.016667,
+    "countryCode": "CN",
+    "cityAr": "بادالينغ",
+    "cityEn": "Badaling",
+    "regionAr": "بكين",
+    "regionEn": "Beijing",
+    "descriptionAr": "منظومة دفاعية تاريخية ضخمة شُيّدت على مراحل عبر عصور صينية متعددة. جُمعت أجزاء من التحصينات السابقة في عهد تشين شي هوانغ نحو 220 قبل الميلاد، واستمر البناء والتطوير حتى عهد أسرة مينغ.",
+    "descriptionEn": "A vast historic defensive system built in successive periods of Chinese history. Earlier fortifications were joined around 220 BCE under Qin Shi Huang, with construction and development continuing through the Ming dynasty.",
+    "historicalPeriodAr": "من العصور الصينية القديمة حتى عهد أسرة مينغ",
+    "historicalPeriodEn": "Ancient China through the Ming dynasty",
+    "establishedYear": -220,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "great-wall-unesco",
+        "name": "The Great Wall - UNESCO World Heritage Centre",
+        "url": "https://whc.unesco.org/en/list/438",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "license": "CC-BY-SA IGO 3.0",
+        "accessedAt": "2026-11-01"
       },
       {
-        "id": "egypt-ministry-memphis",
-        "name": "Memphis and its Necropolis",
-        "url": "https://egymonuments.gov.eg/world-heritage/memphis-and-its-necropolis/",
-        "sourceType": "official-heritage",
-        "publisher": "Egyptian Ministry of Tourism and Antiquities",
-        "license": "Reference information; image rights not included"
+        "id": "great-wall-unesco-maps",
+        "name": "The Great Wall - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/fr/list/438/cartes/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
       }
-    ]
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-petra-jordan",
+    "nameAr": "مدينة البتراء الأثرية",
+    "nameEn": "Petra Archaeological City",
+    "category": "historicalSite",
+    "latitude": 30.33056,
+    "longitude": 35.44333,
+    "countryCode": "JO",
+    "cityAr": "وادي موسى",
+    "cityEn": "Wadi Musa",
+    "regionAr": "محافظة معان",
+    "regionEn": "Ma'an Governorate",
+    "descriptionAr": "مدينة أثرية ارتبطت بالحضارة النبطية، واشتهرت بواجهاتها ومقابرها المنحوتة في الحجر الرملي وأنظمة إدارة المياه. تُعرف بلقب المدينة الوردية.",
+    "descriptionEn": "An archaeological city associated with the Nabataean civilization, renowned for its rock-cut facades, tombs and water-management systems. It is widely known as the Rose City.",
+    "historicalPeriodAr": "الحضارة النبطية",
+    "historicalPeriodEn": "Nabataean civilization",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "petra-unesco-maps",
+        "name": "Petra - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/326/maps",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "petra-unesco-site",
+        "name": "Petra - UNESCO World Heritage Centre",
+        "url": "https://whc.unesco.org/en/list/326",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-taj-mahal-india",
+    "nameAr": "تاج محل",
+    "nameEn": "Taj Mahal",
+    "category": "landmark",
+    "latitude": 27.174167,
+    "longitude": 78.042222,
+    "countryCode": "IN",
+    "cityAr": "أغرا",
+    "cityEn": "Agra",
+    "regionAr": "أوتار براديش",
+    "regionEn": "Uttar Pradesh",
+    "descriptionAr": "ضريح ضخم من الرخام الأبيض أمر الإمبراطور المغولي شاه جهان ببنائه تخليداً لذكرى زوجته ممتاز محل. يضم المجمع مسجداً ومباني وحدائق تاريخية، ويُعد من أبرز نماذج الفن المعماري المغولي.",
+    "descriptionEn": "An immense white-marble mausoleum commissioned by Mughal emperor Shah Jahan in memory of Mumtaz Mahal. The complex includes a mosque, other historic buildings and gardens, and is a major example of Mughal architecture.",
+    "historicalPeriodAr": "العصر المغولي في الهند",
+    "historicalPeriodEn": "Mughal period in India",
+    "establishedYear": 1632,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "taj-mahal-unesco-maps",
+        "name": "Taj Mahal - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/252/maps",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "taj-mahal-official",
+        "name": "Taj Mahal - Official Heritage Information",
+        "url": "https://www.tajmahal.gov.in/uneso-world-heritage-site.aspx",
+        "sourceType": "official",
+        "publisher": "Government of India",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-machu-picchu-peru",
+    "nameAr": "ماتشو بيتشو",
+    "nameEn": "Machu Picchu",
+    "category": "historicalSite",
+    "latitude": -13.184934,
+    "longitude": -72.533427,
+    "countryCode": "PE",
+    "cityAr": "ماتشو بيتشو",
+    "cityEn": "Machu Picchu",
+    "regionAr": "إقليم كوسكو",
+    "regionEn": "Cusco Region",
+    "descriptionAr": "موقع أثري تاريخي في جبال الأنديز، يرتبط بحضارة الإنكا ويضم منشآت حجرية ومناطق سكنية ودينية وزراعية متكاملة.",
+    "descriptionEn": "A historic archaeological site in the Andes associated with the Inca civilization, featuring integrated stone structures, residential, ceremonial and agricultural areas.",
+    "historicalPeriodAr": "حضارة الإنكا",
+    "historicalPeriodEn": "Inca civilization",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "machu-picchu-unesco-maps",
+        "name": "Historic Sanctuary of Machu Picchu - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/274/maps/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "machu-picchu-unesco-site",
+        "name": "Historic Sanctuary of Machu Picchu - UNESCO",
+        "url": "https://whc.unesco.org/en/list/274",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-chichen-itza-mexico",
+    "nameAr": "تشيتشن إيتزا",
+    "nameEn": "Chichen Itza",
+    "category": "historicalSite",
+    "latitude": 20.682739,
+    "longitude": -88.568611,
+    "countryCode": "MX",
+    "cityAr": "تينوم",
+    "cityEn": "Tinum",
+    "regionAr": "ولاية يوكاتان",
+    "regionEn": "Yucatan State",
+    "descriptionAr": "مركز حضاري أثري بارز في شبه جزيرة يوكاتان، يعكس تطور حضارة المايا والتأثيرات الثقافية المتبادلة بينها وبين شعوب وسط المكسيك. يضم هياكل معمارية مثل إل كاستيو ومعبد المحاربين والمرصد.",
+    "descriptionEn": "A major archaeological centre on the Yucatan Peninsula, reflecting Maya civilization and cultural interactions with peoples of central Mexico. Its structures include El Castillo, the Temple of the Warriors and the observatory.",
+    "historicalPeriodAr": "حضارات المايا والمايا التولتيكية",
+    "historicalPeriodEn": "Maya and Maya-Toltec civilizations",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "chichen-unesco-maps",
+        "name": "Chichen-Itza - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/483/maps/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "chichen-unesco-site",
+        "name": "Chichen-Itza - UNESCO World Heritage Centre",
+        "url": "https://whc.unesco.org/en/list/483",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-angkor-wat-cambodia",
+    "nameAr": "أنغكور وات",
+    "nameEn": "Angkor Wat",
+    "category": "historicalSite",
+    "latitude": 13.438056,
+    "longitude": 103.8675,
+    "countryCode": "KH",
+    "cityAr": "سيام ريب",
+    "cityEn": "Siem Reap",
+    "regionAr": "محافظة سيام ريب",
+    "regionEn": "Siem Reap Province",
+    "descriptionAr": "أحد أبرز المعالم المعمارية في مجمع أنغكور التاريخي بكمبوديا، ويعكس تطور العمارة الدينية والخبرة الهندسية في إمبراطورية الخمير.",
+    "descriptionEn": "One of the most prominent architectural monuments within Cambodia's historic Angkor complex, reflecting the religious architecture and engineering of the Khmer Empire.",
+    "historicalPeriodAr": "إمبراطورية الخمير",
+    "historicalPeriodEn": "Khmer Empire",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "angkor-unesco-maps",
+        "name": "Angkor - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/668/maps/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "angkor-unesco-site",
+        "name": "Angkor - UNESCO World Heritage Centre",
+        "url": "https://whc.unesco.org/en/list/668",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-alhambra-spain",
+    "nameAr": "قصر الحمراء",
+    "nameEn": "Alhambra",
+    "category": "historicalSite",
+    "latitude": 37.176,
+    "longitude": -3.588,
+    "countryCode": "ES",
+    "cityAr": "غرناطة",
+    "cityEn": "Granada",
+    "regionAr": "الأندلس",
+    "regionEn": "Andalusia",
+    "descriptionAr": "مجمع قصري وحصن تاريخي في غرناطة، يمثل أحد أبرز شواهد العمارة الأندلسية الإسلامية. يضم قصوراً وحدائق ومنشآت دفاعية، ويرتبط بتاريخ إمارات غرناطة في القرنين الثالث عشر والرابع عشر.",
+    "descriptionEn": "A historic palace and fortress complex in Granada and one of the major surviving examples of Islamic Andalusian architecture. It includes palaces, gardens and defensive structures associated with the rulers of Granada in the 13th and 14th centuries.",
+    "historicalPeriodAr": "العصر الأندلسي - إمارة غرناطة",
+    "historicalPeriodEn": "Andalusi period - Emirate of Granada",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "alhambra-unesco-maps",
+        "name": "Alhambra - UNESCO Geographical Data",
+        "url": "https://whc.unesco.org/en/list/314/maps/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "alhambra-unesco-site",
+        "name": "Alhambra, Generalife and Albayzin - UNESCO",
+        "url": "https://whc.unesco.org/en/list/314",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-hagia-sophia-turkey",
+    "nameAr": "آيا صوفيا",
+    "nameEn": "Hagia Sophia",
+    "category": "historicalSite",
+    "latitude": 41.008611,
+    "longitude": 28.980278,
+    "countryCode": "TR",
+    "cityAr": "إسطنبول",
+    "cityEn": "Istanbul",
+    "regionAr": "منطقة الفاتح",
+    "regionEn": "Fatih District",
+    "descriptionAr": "معلم معماري بارز في إسطنبول، شُيّد في القرن السادس الميلادي خلال العصر البيزنطي، ثم أصبح جزءاً محورياً من تاريخ المدينة العثماني والإسلامي. يتميز بقبته الكبرى وفسيفسائه وعماراته المتعاقبة.",
+    "descriptionEn": "A major architectural monument in Istanbul, built in the sixth century during the Byzantine period and later becoming central to the city's Ottoman and Islamic history. It is renowned for its great dome, mosaics and successive architectural layers.",
+    "historicalPeriodAr": "العصر البيزنطي والعثماني",
+    "historicalPeriodEn": "Byzantine and Ottoman periods",
+    "establishedYear": 537,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "istanbul-unesco",
+        "name": "Historic Areas of Istanbul - UNESCO",
+        "url": "https://whc.unesco.org/en/list/356",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "wonder-colosseum-italy",
+    "nameAr": "الكولوسيوم",
+    "nameEn": "Colosseum",
+    "category": "historicalSite",
+    "latitude": 41.890251,
+    "longitude": 12.492373,
+    "countryCode": "IT",
+    "cityAr": "روما",
+    "cityEn": "Rome",
+    "regionAr": "لاتسيو",
+    "regionEn": "Lazio",
+    "descriptionAr": "مدرج روماني أثري ضخم في قلب روما، يُعد من أبرز شواهد العمارة والهندسة في الإمبراطورية الرومانية القديمة، وهو جزء من المركز التاريخي لروما المدرج على قائمة التراث العالمي.",
+    "descriptionEn": "A monumental ancient Roman amphitheatre in the heart of Rome, representing a major achievement of Roman architecture and engineering. It forms part of the Historic Centre of Rome World Heritage property.",
+    "historicalPeriodAr": "الإمبراطورية الرومانية",
+    "historicalPeriodEn": "Roman Empire",
+    "establishedYear": 80,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "rome-unesco",
+        "name": "Historic Centre of Rome - UNESCO",
+        "url": "https://whc.unesco.org/en/list/91/maps/",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "colosseum-official-location",
+        "name": "Colosseum Archaeological Park - Rome Tourism",
+        "url": "https://www.turismoroma.it/en/node/35035",
+        "sourceType": "official",
+        "publisher": "Roma Capitale",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
   }
 ]
