@@ -180,6 +180,72 @@ void initState() {
   unawaited(_loadLocation());
   unawaited(_loadSavedLanguage());
 }
+  Future<void> _loadSavedLanguage() async {
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    final savedLanguage = preferences.getString(_languageKey);
+
+    if (!mounted) return;
+
+    if (savedLanguage == 'ar' ||
+        savedLanguage == 'en' ||
+        savedLanguage == 'fr') {
+      setState(() {
+        _language = savedLanguage!;
+      });
+    }
+  } catch (error) {
+    debugPrint('Could not load saved language: $error');
+  }
+}
+
+Future<void> _changeLanguage(String language) async {
+  if (!['ar', 'en', 'fr'].contains(language)) return;
+
+  setState(() {
+    _language = language;
+  });
+
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_languageKey, language);
+  } catch (error) {
+    debugPrint('Could not save language: $error');
+  }
+}
+
+void _showLanguageSelector() {
+  showModalBottomSheet<void>(
+    context: context,
+    builder: (context) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _languageOption('ar', 'العربية'),
+            _languageOption('en', 'English'),
+            _languageOption('fr', 'Français'),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Widget _languageOption(String code, String label) {
+  final isSelected = _language == code;
+
+  return ListTile(
+    title: Text(label),
+    trailing: isSelected
+        ? const Icon(Icons.check_circle)
+        : null,
+    onTap: () {
+      Navigator.of(context).pop();
+      unawaited(_changeLanguage(code));
+    },
+  );
+}
 
   @override
   void dispose() {
