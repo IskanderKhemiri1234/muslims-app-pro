@@ -5,14 +5,13 @@ import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../data/datasources/qibla_landmark_local_data_source.dart';
 import '../../data/repositories/qibla_landmark_repository_impl.dart';
 import '../../domain/models/qibla_landmark.dart';
 import '../../domain/services/qibla_service.dart';
+import '../widgets/offline_world_map.dart';
 
 class QiblaPage extends StatefulWidget {
   const QiblaPage({super.key});
@@ -29,8 +28,6 @@ class _QiblaPageState extends State<QiblaPage>
   static const Color _background = Color(0xFFF5F7F3);
   static const Color _historicalColor = Color(0xFF9B7132);
 
-  final MapController _mapController = MapController();
-
   late final QiblaLandmarkRepositoryImpl _landmarkRepository;
 
   Position? _position;
@@ -39,16 +36,22 @@ class _QiblaPageState extends State<QiblaPage>
   double? _distanceKm;
   double? _declination;
 
+  double? _magneticHeading;
+  double? _trueHeading;
+  double? _relativeQiblaAngle;
+
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isLoadingLandmarks = true;
 
   String? _locationError;
   String? _landmarkError;
+  String? _selectedCountry;
 
   List<QiblaLandmark> _landmarks = [];
 
   Stream<CompassEvent>? _compassStream;
+  StreamSubscription<CompassEvent>? _compassSubscription;
 
   @override
   void initState() {
@@ -60,7 +63,7 @@ class _QiblaPageState extends State<QiblaPage>
       dataSource: QiblaLandmarkLocalDataSource(),
     );
 
-    _compassStream = FlutterCompass.events;
+    _connectCompass();
 
     _loadLandmarks();
     _loadLocation();
@@ -69,16 +72,75 @@ class _QiblaPageState extends State<QiblaPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _mapController.dispose();
+    _compassSubscription?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _compassStream = FlutterCompass.events;
+      _connectCompass();
       _loadLocation(silent: true);
+    } else if (state == AppLifecycleState.paused) {
+      _compassSubscription?.cancel();
+      _compassSubscription = null;
     }
+  }
+
+  void _connectCompass() {
+    _compassSubscription?.cancel();
+
+    _compassStream = FlutterCompass.events;
+
+    _compassSubscription = _compassStream?.listen(
+      _onCompassEvent,
+      onError: (_) {
+        if (!mounted) return;
+
+        setState(() {
+          _magneticHeading = null;
+          _trueHeading = null;
+          _relativeQiblaAngle = null;
+        });
+      },
+    );
+  }
+
+  void _onCompassEvent(CompassEvent event) {
+    final heading = event.heading;
+
+    if (heading == null || !heading.isFinite) {
+      if (!mounted) return;
+
+      setState(() {
+        _magneticHeading = null;
+        _trueHeading = null;
+        _relativeQiblaAngle = null;
+      });
+      return;
+    }
+
+    final trueHeading = _declination != null
+        ? QiblaService.magneticToTrueHeading(
+            magneticHeading: heading,
+            declination: _declination!,
+          )
+        : QiblaService.normalize(heading);
+
+    final relativeAngle = _qiblaBearing == null
+        ? null
+        : QiblaService.shortestAngleDifference(
+            _qiblaBearing!,
+            trueHeading,
+          );
+
+    if (!mounted) return;
+
+    setState(() {
+      _magneticHeading = heading;
+      _trueHeading = trueHeading;
+      _relativeQiblaAngle = relativeAngle;
+    });
   }
 
   Future<void> _loadLandmarks() async {
@@ -194,6 +256,15 @@ class _QiblaPageState extends State<QiblaPage>
         _locationError = null;
         _isLoading = false;
       });
+
+      // Recalculate the true heading after the new declination is loaded.
+      if (_magneticHeading != null) {
+        _onCompassEvent(
+          CompassEvent(
+            heading: _magneticHeading,
+          ),
+        );
+      }
     } on _LocationException catch (error) {
       if (!mounted) return;
 
@@ -289,6 +360,46 @@ class _QiblaPageState extends State<QiblaPage>
     return _isIslamicLandmark(landmark)
         ? _primaryGreen
         : _historicalColor;
+  }
+
+  String _directionInstruction(double angle) {
+    final difference = angle.abs();
+
+    if (difference <= 3) {
+      return 'أنت الآن في اتجاه القبلة تقريباً';
+    }
+
+    if (difference <= 12) {
+      return 'اقتربت من اتجاه القبلة، اضبط الهاتف قليلاً';
+    }
+
+    if (angle > 0) {
+      return 'أدر الهاتف إلى اليمين باتجاه القبلة';
+    }
+
+    return 'أدر الهاتف إلى اليسار باتجاه القبلة';
+  }
+
+  String _directionStep(double angle) {
+    final difference = angle.abs();
+
+    if (difference <= 3) {
+      return 'الخطوة 4: ثبّت الهاتف، أنت بمحاذاة اتجاه القبلة';
+    }
+
+    if (difference <= 12) {
+      return 'الخطوة 3: اقتربت، أجرِ تعديلاً بسيطاً';
+    }
+
+    if (difference <= 45) {
+      return angle > 0
+          ? 'الخطوة 2: أدر الهاتف يميناً تدريجياً'
+          : 'الخطوة 2: أدر الهاتف يساراً تدريجياً';
+    }
+
+    return angle > 0
+        ? 'الخطوة 1: ابدأ بالدوران نحو اليمين'
+        : 'الخطوة 1: ابدأ بالدوران نحو اليسار';
   }
 
   void _openLandmark(QiblaLandmark landmark) {
@@ -452,8 +563,7 @@ class _QiblaPageState extends State<QiblaPage>
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     source.name,
@@ -507,16 +617,12 @@ class _QiblaPageState extends State<QiblaPage>
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-                        _mapController.move(
-                          LatLng(
-                            landmark.latitude,
-                            landmark.longitude,
-                          ),
-                          8.0,
-                        );
+                        setState(() {
+                          _selectedCountry = landmark.countryCode;
+                        });
                       },
                       icon: const Icon(Icons.travel_explore_rounded),
-                      label: const Text('عرض الموقع على الخريطة'),
+                      label: const Text('العودة إلى الأطلس'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryGreen,
                         foregroundColor: Colors.white,
@@ -765,6 +871,12 @@ class _QiblaPageState extends State<QiblaPage>
                           textColor: textColor,
                           secondaryColor: secondaryColor,
                         ),
+                        const SizedBox(height: 18),
+                        _buildDirectionGuide(
+                          cardColor,
+                          textColor,
+                          secondaryColor,
+                        ),
                         const SizedBox(height: 25),
                         _buildAtlasHeader(textColor, secondaryColor),
                         const SizedBox(height: 13),
@@ -950,166 +1062,191 @@ class _QiblaPageState extends State<QiblaPage>
             ],
           ),
           const SizedBox(height: 22),
-          if (_qiblaBearing != null)
-            StreamBuilder<CompassEvent>(
-              stream: _compassStream,
-              builder: (context, snapshot) {
-                final magneticHeading = snapshot.data?.heading;
-
-                if (snapshot.hasError ||
-                    magneticHeading == null ||
-                    !magneticHeading.isFinite) {
-                  return _buildCompassUnavailable(
-                    textColor,
-                    secondaryColor,
-                  );
-                }
-
-                final hasDeclination = _declination != null;
-
-                final trueHeading = hasDeclination
-                    ? QiblaService.magneticToTrueHeading(
-                        magneticHeading: magneticHeading,
-                        declination: _declination!,
-                      )
-                    : QiblaService.normalize(magneticHeading);
-
-                final relativeAngle =
-                    QiblaService.shortestAngleDifference(
-                  _qiblaBearing!,
-                  trueHeading,
-                );
-
-                return Column(
-                  children: [
-                    SizedBox(
-                      width: 270,
-                      height: 270,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 260,
-                            height: 260,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFF0B7055),
-                                  Color(0xFF063E31),
-                                ],
-                              ),
-                              border: Border.all(
-                                color: _gold.withValues(alpha: 0.8),
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _primaryGreen.withValues(alpha: 0.2),
-                                  blurRadius: 22,
-                                  spreadRadius: 2,
-                                ),
-                              ],
+          if (_qiblaBearing != null && _relativeQiblaAngle != null)
+            Column(
+              children: [
+                SizedBox(
+                  width: 270,
+                  height: 270,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 260,
+                        height: 260,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF0B7055),
+                              Color(0xFF063E31),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: _gold.withValues(alpha: 0.8),
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _primaryGreen.withValues(alpha: 0.2),
+                              blurRadius: 22,
+                              spreadRadius: 2,
                             ),
-                          ),
-                          _buildCompassTicks(),
-                          Positioned(
-                            top: 20,
-                            child: _compassLabel('شمال'),
-                          ),
-                          Positioned(
-                            bottom: 20,
-                            child: _compassLabel('جنوب'),
-                          ),
-                          Positioned(
-                            right: 20,
-                            child: _compassLabel('شرق'),
-                          ),
-                          Positioned(
-                            left: 20,
-                            child: _compassLabel('غرب'),
-                          ),
-                          AnimatedRotation(
-                            turns: relativeAngle / 360.0,
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOut,
-                            child: const Icon(
-                              Icons.navigation_rounded,
-                              color: _gold,
-                              size: 82,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black45,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 3),
-                                ),
-                              ],
+                          ],
+                        ),
+                      ),
+                      _buildCompassTicks(),
+                      Positioned(
+                        top: 20,
+                        child: _compassLabel('شمال'),
+                      ),
+                      Positioned(
+                        bottom: 20,
+                        child: _compassLabel('جنوب'),
+                      ),
+                      Positioned(
+                        right: 20,
+                        child: _compassLabel('شرق'),
+                      ),
+                      Positioned(
+                        left: 20,
+                        child: _compassLabel('غرب'),
+                      ),
+                      AnimatedRotation(
+                        turns: _relativeQiblaAngle! / 360.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        child: const Icon(
+                          Icons.navigation_rounded,
+                          color: _gold,
+                          size: 82,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black45,
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
                             ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 15,
+                        height: 15,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(
+                            color: _gold,
+                            width: 3,
                           ),
-                          Container(
-                            width: 15,
-                            height: 15,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              border: Border.all(
-                                color: _gold,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'اتجاه القبلة بالنسبة لهاتفك',
-                      style: TextStyle(
-                        color: secondaryColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      '${relativeAngle.toStringAsFixed(1)}°',
-                      style: const TextStyle(
-                        color: _primaryGreen,
-                        fontSize: 29,
-                        fontWeight: FontWeight.bold,
-                        fontFeatures: [
-                          FontFeature.tabularFigures(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'الاتجاه الجغرافي: ${_formatBearing(_qiblaBearing!)}',
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (!hasDeclination) ...[
-                      const SizedBox(height: 9),
-                      Text(
-                        'قراءة البوصلة تقريبية؛ تعذر تصحيح الانحراف المغناطيسي.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: secondaryColor,
-                          fontSize: 10,
                         ),
                       ),
                     ],
-                  ],
-                );
-              },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'الانحراف عن اتجاه القبلة',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  '${_relativeQiblaAngle!.abs().toStringAsFixed(1)}°',
+                  style: const TextStyle(
+                    color: _primaryGreen,
+                    fontSize: 29,
+                    fontWeight: FontWeight.bold,
+                    fontFeatures: [
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _directionInstruction(_relativeQiblaAngle!),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildHeadingDetails(secondaryColor),
+              ],
             )
           else
             _buildCompassUnavailable(textColor, secondaryColor),
         ],
       ),
+    );
+  }
+
+  Widget _buildHeadingDetails(Color secondaryColor) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: secondaryColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          _headingRow(
+            'اتجاه القبلة الجغرافي',
+            _qiblaBearing == null ? '--' : _formatBearing(_qiblaBearing!),
+            secondaryColor,
+          ),
+          const SizedBox(height: 8),
+          _headingRow(
+            'اتجاه الهاتف الحقيقي',
+            _trueHeading == null ? '--' : _formatBearing(_trueHeading!),
+            secondaryColor,
+          ),
+          const SizedBox(height: 8),
+          _headingRow(
+            'قراءة الحساس المغناطيسية',
+            _magneticHeading == null
+                ? '--'
+                : _formatBearing(_magneticHeading!),
+            secondaryColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headingRow(
+    String label,
+    String value,
+    Color secondaryColor,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 10,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: _gold,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1166,15 +1303,138 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         const SizedBox(height: 12),
         TextButton.icon(
-          onPressed: () {
-            setState(() {
-              _compassStream = FlutterCompass.events;
-            });
-          },
+          onPressed: _connectCompass,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('إعادة الاتصال بالحساس'),
         ),
       ],
+    );
+  }
+
+  Widget _buildDirectionGuide(
+    Color cardColor,
+    Color textColor,
+    Color secondaryColor,
+  ) {
+    final angle = _relativeQiblaAngle;
+
+    final isAligned = angle != null && angle.abs() <= 3;
+
+    final steps = [
+      'أمسك الهاتف أفقياً وبعيداً عن المعادن والمغناطيس.',
+      'انتظر استقرار قراءة البوصلة قبل البدء بالدوران.',
+      angle == null
+          ? 'انتظر قراءة حساس الاتجاه.'
+          : _directionStep(angle),
+      isAligned
+          ? 'ثبّت الهاتف؛ أنت بمحاذاة اتجاه القبلة تقريباً.'
+          : 'واصل التعديل حتى تقترب زاوية الانحراف من الصفر.',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(
+          color: _gold.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.assistant_direction_rounded,
+                color: _gold,
+                size: 23,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'خطوات ضبط اتجاه القبلة',
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (isAligned)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: _primaryGreen,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(steps.length, (index) {
+            final active = index == 2 && angle != null;
+            final completed = index == 3 && isAligned;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 13),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 27,
+                    height: 27,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: completed
+                          ? _primaryGreen
+                          : active
+                              ? _gold.withValues(alpha: 0.22)
+                              : secondaryColor.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: completed
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          )
+                        : Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: active ? _historicalColor : textColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(
+                      steps[index],
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 11,
+                        height: 1.6,
+                        fontWeight: active || completed
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const Divider(height: 14),
+          Text(
+            'ملاحظة: اتجاه الهاتف يعتمد على حساس الجهاز، '
+            'ولا يمكن ضمان دقته من التطبيق وحده.',
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 10,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1277,7 +1537,7 @@ class _QiblaPageState extends State<QiblaPage>
             const SizedBox(width: 9),
             Expanded(
               child: Text(
-                'أطلس المعالم الإسلامية والتاريخية',
+                'أطلس العالم والمعالم التاريخية',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 17,
@@ -1294,12 +1554,13 @@ class _QiblaPageState extends State<QiblaPage>
                 color: _primaryGreen.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                '${_landmarks.length} موقعاً',
-                style: const TextStyle(
+              child: const Text(
+                'OFFLINE',
+                style: TextStyle(
                   color: _primaryGreen,
                   fontWeight: FontWeight.bold,
-                  fontSize: 11,
+                  fontSize: 10,
+                  letterSpacing: 0.7,
                 ),
               ),
             ),
@@ -1307,7 +1568,7 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         const SizedBox(height: 7),
         Text(
-          'استكشف المواقع، كبّر الخريطة، واضغط على أي علامة لاكتشاف تاريخها.',
+          'استكشف دول العالم دون إنترنت، واضغط على أي دولة لاكتشاف موقعها.',
           style: TextStyle(
             color: secondaryColor,
             fontSize: 11,
@@ -1323,85 +1584,6 @@ class _QiblaPageState extends State<QiblaPage>
     Color textColor,
     Color secondaryColor,
   ) {
-    final userMarkers = _position == null
-        ? <Marker>[]
-        : [
-            Marker(
-              point: LatLng(
-                _position!.latitude,
-                _position!.longitude,
-              ),
-              width: 48,
-              height: 48,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.blue,
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.my_location_rounded,
-                  color: Colors.blue,
-                  size: 25,
-                ),
-              ),
-            ),
-          ];
-
-    final landmarkMarkers = _landmarks.map((landmark) {
-      final color = _landmarkColor(landmark);
-
-      return Marker(
-        point: LatLng(
-          landmark.latitude,
-          landmark.longitude,
-        ),
-        width: 46,
-        height: 52,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _openLandmark(landmark),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 35,
-                height: 35,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.22),
-                      blurRadius: 7,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  _landmarkIcon(landmark),
-                  color: Colors.white,
-                  size: 19,
-                ),
-              ),
-              Container(
-                width: 3,
-                height: 8,
-                color: color,
-              ),
-            ],
-          ),
-        ),
-      );
-    }).toList(growable: false);
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1418,213 +1600,111 @@ class _QiblaPageState extends State<QiblaPage>
       child: Column(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(17),
+            borderRadius: BorderRadius.circular(18),
             child: SizedBox(
-              height: 370,
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    mapController: _mapController,
-                    options: const MapOptions(
-                      initialCenter: LatLng(22, 15),
-                      initialZoom: 1.45,
-                      minZoom: 1,
-                      maxZoom: 18,
-                      interactionOptions: InteractionOptions(
-                        flags: InteractiveFlag.all,
-                      ),
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName:
-                            'com.iskander.muslims_app',
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          ...landmarkMarkers,
-                          ...userMarkers,
-                        ],
-                      ),
-                      const RichAttributionWidget(
-                        attributions: [
-                          TextSourceAttribution(
-                            '© OpenStreetMap contributors',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: _mapActionButton(
-                      icon: Icons.my_location_rounded,
-                      tooltip: 'موقعي',
-                      onTap: () {
-                        if (_position != null) {
-                          _mapController.move(
-                            LatLng(
-                              _position!.latitude,
-                              _position!.longitude,
-                            ),
-                            7,
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Column(
-                      children: [
-                        _mapActionButton(
-                          icon: Icons.add_rounded,
-                          tooltip: 'تكبير',
-                          onTap: () {
-                            final zoom = _mapController.camera.zoom;
-                            _mapController.move(
-                              _mapController.camera.center,
-                              math.min(zoom + 1, 18),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 7),
-                        _mapActionButton(
-                          icon: Icons.remove_rounded,
-                          tooltip: 'تصغير',
-                          onTap: () {
-                            final zoom = _mapController.camera.zoom;
-                            _mapController.move(
-                              _mapController.camera.center,
-                              math.max(zoom - 1, 1),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isLoadingLandmarks)
-                    const Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: _MapStatusPill(
-                        icon: Icons.sync_rounded,
-                        label: 'تحميل المعالم...',
-                      ),
-                    ),
-                  if (_landmarkError != null)
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: _MapStatusPill(
-                        icon: Icons.warning_amber_rounded,
-                        label: 'تعذر تحميل المعالم',
-                      ),
-                    ),
-                ],
+              height: 430,
+              width: double.infinity,
+              child: OfflineWorldMap(
+                showGrid: true,
+                initialScale: 1,
+                onCountrySelected: (country) {
+                  if (!mounted) return;
+
+                  setState(() {
+                    _selectedCountry = country;
+                  });
+                },
               ),
             ),
           ),
           const SizedBox(height: 13),
-          Wrap(
-            spacing: 13,
-            runSpacing: 8,
-            children: [
-              _legendItem(_primaryGreen, 'معالم إسلامية', secondaryColor),
-              _legendItem(
-                _historicalColor,
-                'مواقع تاريخية',
-                secondaryColor,
+          if (_selectedCountry != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 13,
+                vertical: 12,
               ),
-              _legendItem(Colors.blue, 'موقعي', secondaryColor),
-            ],
-          ),
-          const SizedBox(height: 12),
+              decoration: BoxDecoration(
+                color: _primaryGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: _primaryGreen,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedCountry!,
+                      style: const TextStyle(
+                        color: _primaryGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'مسح التحديد',
+                    onPressed: () {
+                      setState(() {
+                        _selectedCountry = null;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Icon(
-                Icons.info_outline_rounded,
+                Icons.touch_app_rounded,
                 color: _gold,
-                size: 17,
+                size: 18,
               ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'بيانات المعالم مخزنة محلياً. أما خلفية الخريطة فتحتاج إلى الإنترنت حالياً.',
+                  'اسحب الخريطة للتحريك، واستخدم إصبعين للتكبير والتصغير، واضغط على الدولة لتحديدها.',
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 10,
-                    height: 1.5,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.offline_pin_rounded,
+                color: _primaryGreen,
+                size: 18,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'حدود الدول وبيانات الخريطة الأساسية مضمنة في التطبيق ولا تحتاج إلى الإنترنت.',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 10,
+                    height: 1.6,
                   ),
                 ),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _legendItem(
-    Color color,
-    String label,
-    Color textColor,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _legendDot(color),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 10,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _mapActionButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 3,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Tooltip(
-          message: tooltip,
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(
-              icon,
-              color: _primaryGreen,
-              size: 21,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _legendDot(Color color) {
-    return Container(
-      width: 9,
-      height: 9,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
       ),
     );
   }
@@ -1884,6 +1964,23 @@ class _QiblaPageState extends State<QiblaPage>
   }
 
   Widget _buildAccuracyNote(Color secondaryColor) {
+    final accuracy = _position?.accuracy;
+
+    String accuracyText;
+
+    if (accuracy == null) {
+      accuracyText = 'لم تتوفر قراءة دقة GPS بعد.';
+    } else if (accuracy <= 10) {
+      accuracyText =
+          'دقة الموقع جيدة جداً وفق قراءة GPS الحالية (±${accuracy.toStringAsFixed(1)} متر).';
+    } else if (accuracy <= 30) {
+      accuracyText =
+          'دقة الموقع متوسطة (±${accuracy.toStringAsFixed(1)} متر). انتظر قليلاً لتحسين القراءة.';
+    } else {
+      accuracyText =
+          'دقة الموقع منخفضة حالياً (±${accuracy.toStringAsFixed(1)} متر). انتقل إلى مكان مفتوح وحاول مجدداً.';
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1893,75 +1990,53 @@ class _QiblaPageState extends State<QiblaPage>
           color: _gold.withValues(alpha: 0.25),
         ),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.tips_and_updates_outlined,
-            color: _gold,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'للحصول على قراءة أدق، أبعد الهاتف عن المعادن '
-              'والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 '
-              'لمعايرة الحساس عند الحاجة.',
-              style: TextStyle(
-                color: secondaryColor,
-                fontSize: 11,
-                height: 1.7,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.gps_fixed_rounded,
+                color: _gold,
+                size: 20,
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  accuracyText,
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 11,
+                    height: 1.7,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapStatusPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MapStatusPill({
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: const Color(0xFF075B46),
-            size: 15,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF075B46),
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
+          const SizedBox(height: 9),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.tips_and_updates_outlined,
+                color: _gold,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'لتحسين قراءة البوصلة، أبعد الهاتف عن المعادن '
+                  'والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 '
+                  'لمعايرة الحساس عند الحاجة.',
+                  style: TextStyle(
+                    color: secondaryColor,
+                    fontSize: 11,
+                    height: 1.7,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
