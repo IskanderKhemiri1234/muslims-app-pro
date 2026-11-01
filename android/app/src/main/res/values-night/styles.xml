@@ -2,21 +2,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Native Android launch screen - Dark Mode -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <!-- Muslims Pro - Dark Launch Theme -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">#071C17</item>
+        <item name="android:statusBarColor">#071C17</item>
         <item name="android:navigationBarColor">#071C17</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
 
-    <!-- Flutter initialized theme - Dark Mode -->
-    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <!-- Muslims Pro - Dark Flutter Theme -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">#071C17</item>
+        <item name="android:statusBarColor">#071C17</item>
         <item name="android:navigationBarColor">#071C17</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
 
