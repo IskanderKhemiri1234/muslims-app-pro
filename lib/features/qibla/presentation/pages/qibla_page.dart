@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
@@ -29,119 +28,130 @@ class _QiblaPageState extends State<QiblaPage>
   static const Color _background = Color(0xFFF5F7F3);
   static const Color _historicalColor = Color(0xFF9B7132);
 
+  static const String _languageKey = 'qibla_page_language';
+
   late final QiblaLandmarkRepositoryImpl _landmarkRepository;
 
-  Position? _position;
-  
- static const String _languageKey = 'qibla_page_language';
+  String _language = 'ar';
+  int _languageRevision = 0;
 
-String _language = 'ar';
+  bool get _isArabic => _language == 'ar';
 
-bool get _isArabic => _language == 'ar';
-bool get _isFrench => _language == 'fr';
+  TextDirection get _textDirection =>
+      _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
-TextDirection get _textDirection =>
-    _isArabic ? TextDirection.rtl : TextDirection.ltr;
-
-String _tr(String ar, String en, String fr) {
-  switch (_language) {
-    case 'en':
-      return en;
-    case 'fr':
-      return fr;
-    default:
-      return ar;
-  }
-}
-
-Future<void> _loadSavedLanguage() async {
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    final saved = preferences.getString(_languageKey);
-
-    if (!mounted || saved == null) return;
-
-    if (saved == 'ar' || saved == 'en' || saved == 'fr') {
-      setState(() {
-        _language = saved;
-      });
+  String _tr(String ar, String en, String fr) {
+    switch (_language) {
+      case 'en':
+        return en;
+      case 'fr':
+        return fr;
+      default:
+        return ar;
     }
-  } catch (_) {
-    // الاستمرار باللغة الافتراضية عند تعذر قراءة الإعداد.
   }
-}
 
-Future<void> _changeLanguage(String language) async {
-  if (!['ar', 'en', 'fr'].contains(language)) return;
-
-  if (_language == language) return;
-
-  setState(() {
-    _language = language;
-  });
-
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_languageKey, language);
-  } catch (_) {
-    _showMessage(
-      _tr(
-        'تعذر حفظ اختيار اللغة.',
-        'Could not save the language preference.',
-        'Impossible d’enregistrer la langue.',
-      ),
-    );
+  String _localizedLandmarkName(QiblaLandmark landmark) {
+    if (_language == 'ar') return landmark.nameAr;
+    return landmark.nameEn.trim().isNotEmpty
+        ? landmark.nameEn
+        : landmark.nameAr;
   }
-}
 
-void _showLanguageSelector() {
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Theme.of(context).cardColor,
-    builder: (sheetContext) {
-      final textColor = Theme.of(sheetContext).colorScheme.onSurface;
+  Future<void> _loadSavedLanguage() async {
+    final revision = _languageRevision;
 
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _tr('لغة الصفحة', 'Page language', 'Langue de la page'),
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _languageOption('ar', 'العربية'),
-              _languageOption('en', 'English'),
-              _languageOption('fr', 'Français'),
-            ],
-          ),
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final saved = preferences.getString(_languageKey);
+
+      if (!mounted || revision != _languageRevision) return;
+
+      if (saved == 'ar' || saved == 'en' || saved == 'fr') {
+        setState(() => _language = saved);
+      }
+    } catch (error) {
+      debugPrint('Could not load saved language: $error');
+    }
+  }
+
+  Future<void> _changeLanguage(String language) async {
+    if (!['ar', 'en', 'fr'].contains(language)) return;
+    if (_language == language) return;
+
+    _languageRevision++;
+
+    setState(() => _language = language);
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_languageKey, language);
+    } catch (error) {
+      debugPrint('Could not save language: $error');
+      _showMessage(
+        _tr(
+          'تعذر حفظ اختيار اللغة.',
+          'Could not save the language preference.',
+          'Impossible d’enregistrer la langue.',
         ),
       );
-    },
-  );
-}
+    }
+  }
 
-Widget _languageOption(String code, String label) {
-  final selected = _language == code;
-  final color = Theme.of(context).colorScheme.onSurface;
+  void _showLanguageSelector() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      builder: (sheetContext) {
+        final textColor =
+            Theme.of(sheetContext).colorScheme.onSurface;
 
-  return ListTile(
-    title: Text(label, style: TextStyle(color: color)),
-    trailing: selected
-        ? const Icon(Icons.check_circle_rounded, color: _gold)
-        : null,
-    onTap: () {
-      Navigator.pop(context);
-      unawaited(_changeLanguage(code));
-    },
-  );
-}
+        return Directionality(
+          textDirection: _textDirection,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _tr('لغة الصفحة', 'Page language', 'Langue de la page'),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _languageOption('ar', 'العربية'),
+                  _languageOption('en', 'English'),
+                  _languageOption('fr', 'Français'),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _languageOption(String code, String label) {
+    final selected = _language == code;
+
+    return ListTile(
+      title: Text(label),
+      trailing: selected
+          ? const Icon(Icons.check_circle_rounded, color: _gold)
+          : null,
+      onTap: () {
+        Navigator.pop(context);
+        unawaited(_changeLanguage(code));
+      },
+    );
+  }
+
+  Position? _position;
+
   double? _qiblaBearing;
   double? _distanceKm;
   double? _declination;
@@ -155,6 +165,8 @@ Widget _languageOption(String code, String label) {
   bool _isLoadingLandmarks = true;
   bool _isAppActive = true;
   bool _isCompassUnavailable = false;
+  bool _locationPermissionPermanentlyDenied = false;
+  bool _locationServiceDisabled = false;
 
   String? _locationError;
   String? _landmarkError;
@@ -166,86 +178,20 @@ Widget _languageOption(String code, String label) {
   int _compassGeneration = 0;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
 
-  _landmarkRepository = QiblaLandmarkRepositoryImpl(
-    dataSource: QiblaLandmarkLocalDataSource(),
-  );
+    _landmarkRepository = QiblaLandmarkRepositoryImpl(
+      dataSource: QiblaLandmarkLocalDataSource(),
+    );
 
-  unawaited(_connectCompass());
-  unawaited(_loadLandmarks());
-  unawaited(_loadLocation());
-  unawaited(_loadSavedLanguage());
-}
-  Future<void> _loadSavedLanguage() async {
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    final savedLanguage = preferences.getString(_languageKey);
-
-    if (!mounted) return;
-
-    if (savedLanguage == 'ar' ||
-        savedLanguage == 'en' ||
-        savedLanguage == 'fr') {
-      setState(() {
-        _language = savedLanguage!;
-      });
-    }
-  } catch (error) {
-    debugPrint('Could not load saved language: $error');
+    unawaited(_connectCompass());
+    unawaited(_loadLandmarks());
+    unawaited(_loadLocation());
+    unawaited(_loadSavedLanguage());
   }
-}
-
-Future<void> _changeLanguage(String language) async {
-  if (!['ar', 'en', 'fr'].contains(language)) return;
-
-  setState(() {
-    _language = language;
-  });
-
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_languageKey, language);
-  } catch (error) {
-    debugPrint('Could not save language: $error');
-  }
-}
-
-void _showLanguageSelector() {
-  showModalBottomSheet<void>(
-    context: context,
-    builder: (context) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _languageOption('ar', 'العربية'),
-            _languageOption('en', 'English'),
-            _languageOption('fr', 'Français'),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-Widget _languageOption(String code, String label) {
-  final isSelected = _language == code;
-
-  return ListTile(
-    title: Text(label),
-    trailing: isSelected
-        ? const Icon(Icons.check_circle)
-        : null,
-    onTap: () {
-      Navigator.of(context).pop();
-      unawaited(_changeLanguage(code));
-    },
-  );
-}
 
   @override
   void dispose() {
@@ -277,83 +223,107 @@ Widget _languageOption(String code, String label) {
   }
 
   Future<void> _connectCompass() async {
-  if (!mounted || !_isAppActive) return;
+    if (!mounted || !_isAppActive) return;
+    if (_compassSubscription != null) return;
 
-  // لا تنشئ اشتراكاً جديداً إذا كان الاشتراك الحالي موجوداً.
-  if (_compassSubscription != null) return;
+    final generation = ++_compassGeneration;
 
-  final generation = ++_compassGeneration;
+    try {
+      final stream = FlutterCompass.events;
 
-  try {
-    final stream = FlutterCompass.events;
-
-    if (stream == null) {
-      _setCompassUnavailable();
-      return;
-    }
-
-    final subscription = stream.listen(
-      (event) {
-        if (!mounted ||
-            !_isAppActive ||
-            generation != _compassGeneration) {
-          return;
-        }
-
-        _onCompassEvent(event);
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        if (!mounted ||
-            generation != _compassGeneration) {
-          return;
-        }
-
+      if (stream == null) {
         _setCompassUnavailable();
-      },
-      cancelOnError: false,
-    );
+        return;
+      }
 
-    if (!mounted ||
-        !_isAppActive ||
-        generation != _compassGeneration) {
-      await subscription.cancel();
-      return;
-    }
+      late final StreamSubscription<CompassEvent> subscription;
 
-    // الحماية من أي اشتراك أحدث.
-    if (_compassSubscription != null) {
-      await subscription.cancel();
-      return;
-    }
+      subscription = stream.listen(
+        (event) {
+          if (!mounted ||
+              !_isAppActive ||
+              generation != _compassGeneration) {
+            return;
+          }
 
-    _compassSubscription = subscription;
+          _onCompassEvent(event);
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!mounted || generation != _compassGeneration) return;
+          _setCompassUnavailable();
+        },
+        onDone: () {
+          if (!mounted || generation != _compassGeneration) return;
 
-    if (_isCompassUnavailable) {
-      setState(() {
-        _isCompassUnavailable = false;
-      });
-    }
-  } catch (_) {
-    if (mounted && generation == _compassGeneration) {
-      _setCompassUnavailable();
+          if (identical(_compassSubscription, subscription)) {
+            _compassSubscription = null;
+          }
+
+          _setCompassUnavailable();
+        },
+        cancelOnError: false,
+      );
+
+      if (!mounted ||
+          !_isAppActive ||
+          generation != _compassGeneration) {
+        await subscription.cancel();
+        return;
+      }
+
+      if (_compassSubscription != null) {
+        await subscription.cancel();
+        return;
+      }
+
+      _compassSubscription = subscription;
+
+      if (_isCompassUnavailable) {
+        setState(() => _isCompassUnavailable = false);
+      }
+    } catch (error) {
+      debugPrint('Compass connection error: $error');
+
+      if (mounted && generation == _compassGeneration) {
+        _setCompassUnavailable();
+      }
     }
   }
+
+  void _setCompassUnavailable() {
+    if (!mounted) return;
+
+    setState(() {
+      _isCompassUnavailable = true;
+      _magneticHeading = null;
+      _trueHeading = null;
+      _relativeQiblaAngle = null;
+    });
   }
 
   void _disconnectCompass() {
-  _compassGeneration++;
+    _compassGeneration++;
 
-  final subscription = _compassSubscription;
-  _compassSubscription = null;
+    final subscription = _compassSubscription;
+    _compassSubscription = null;
 
-  if (subscription != null) {
-    unawaited(subscription.cancel());
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
+
+    if (!mounted) {
+      _magneticHeading = null;
+      _trueHeading = null;
+      _relativeQiblaAngle = null;
+      return;
+    }
+
+    setState(() {
+      _magneticHeading = null;
+      _trueHeading = null;
+      _relativeQiblaAngle = null;
+    });
   }
-
-  _magneticHeading = null;
-  _trueHeading = null;
-  _relativeQiblaAngle = null;
-}
 
   void _onCompassEvent(CompassEvent event) {
     final heading = event.heading;
@@ -373,8 +343,6 @@ Widget _languageOption(String code, String label) {
     _recalculateCompassHeading();
   }
 
-  /// يعيد حساب الاتجاه الحقيقي باستخدام آخر قراءة للحساس.
-  /// تُستدعى عند وصول قراءة جديدة وعند تغير الانحراف المغناطيسي.
   void _recalculateCompassHeading() {
     final magneticHeading = _magneticHeading;
 
@@ -404,7 +372,6 @@ Widget _languageOption(String code, String label) {
     }
 
     double? relativeAngle;
-
     final bearing = _qiblaBearing;
 
     if (bearing != null && bearing.isFinite) {
@@ -440,7 +407,6 @@ Widget _languageOption(String code, String label) {
 
       if (!mounted) return;
 
-      // لا نعرض سجلات تفتقد البيانات الأساسية أو إحداثيات صالحة.
       final validResults = results.where((landmark) {
         return landmark.hasValidBasicData &&
             landmark.hasValidCoordinates;
@@ -451,15 +417,24 @@ Widget _languageOption(String code, String label) {
         _isLoadingLandmarks = false;
 
         if (validResults.length != results.length) {
-          _landmarkError =
-              'تم تجاهل بعض سجلات المعالم لوجود بيانات أو إحداثيات غير صالحة.';
+          _landmarkError = _tr(
+            'تم تجاهل بعض سجلات المعالم لوجود بيانات أو إحداثيات غير صالحة.',
+            'Some landmark records were skipped because their data or coordinates are invalid.',
+            'Certaines fiches de monuments ont été ignorées car leurs données ou coordonnées sont invalides.',
+          );
         }
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Landmark loading error: $error');
+
       if (!mounted) return;
 
       setState(() {
-        _landmarkError = 'تعذر تحميل بيانات المعالم المحلية.';
+        _landmarkError = _tr(
+          'تعذر تحميل بيانات المعالم المحلية.',
+          'Could not load local landmark data.',
+          'Impossible de charger les données locales des monuments.',
+        );
         _isLoadingLandmarks = false;
       });
     }
@@ -470,10 +445,14 @@ Widget _languageOption(String code, String label) {
 
     setState(() {
       _isRefreshing = true;
+
       if (_position == null) {
         _isLoading = true;
       }
-      _locationError = null;
+
+      if (!silent) {
+        _locationError = null;
+      }
     });
 
     try {
@@ -481,32 +460,57 @@ Widget _languageOption(String code, String label) {
           await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
-        throw const _LocationException(
-          'خدمة الموقع GPS غير مفعّلة. فعّل الموقع من إعدادات الهاتف.',
+        _locationServiceDisabled = true;
+
+        throw _LocationException(
+          _tr(
+            'خدمة الموقع GPS غير مفعّلة. فعّل الموقع من إعدادات الهاتف.',
+            'Location services are disabled. Enable GPS in your device settings.',
+            'Les services de localisation sont désactivés. Activez le GPS dans les paramètres du téléphone.',
+          ),
         );
       }
 
+      _locationServiceDisabled = false;
+
       var permission = await Geolocator.checkPermission();
 
-      if (permission == LocationPermission.denied) {
+      // لا نطلب الإذن تلقائياً عند استئناف التطبيق.
+      if (permission == LocationPermission.denied && !silent) {
         permission = await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied) {
-        throw const _LocationException(
-          'لم يتم منح إذن الوصول إلى الموقع.',
+        _locationPermissionPermanentlyDenied = false;
+
+        throw _LocationException(
+          _tr(
+            'لم يتم منح إذن الوصول إلى الموقع. يمكنك السماح به ثم إعادة المحاولة.',
+            'Location permission was not granted. Allow access and try again.',
+            'L’autorisation de localisation n’a pas été accordée. Autorisez l’accès puis réessayez.',
+          ),
         );
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw const _LocationException(
-          'إذن الموقع مرفوض نهائياً. افتح إعدادات التطبيق واسمح بالوصول للموقع.',
+        _locationPermissionPermanentlyDenied = true;
+
+        throw _LocationException(
+          _tr(
+            'إذن الموقع مرفوض نهائياً. افتح إعدادات التطبيق واسمح بالوصول إلى الموقع.',
+            'Location permission is permanently denied. Open app settings and allow location access.',
+            'L’autorisation de localisation est définitivement refusée. Ouvrez les paramètres de l’application pour autoriser l’accès.',
+          ),
         );
       }
 
       if (permission == LocationPermission.unableToDetermine) {
-        throw const _LocationException(
-          'تعذر تحديد حالة إذن الموقع على هذا الجهاز.',
+        throw _LocationException(
+          _tr(
+            'تعذر تحديد حالة إذن الموقع على هذا الجهاز.',
+            'Unable to determine location permission status on this device.',
+            'Impossible de déterminer l’état de l’autorisation de localisation sur cet appareil.',
+          ),
         );
       }
 
@@ -518,27 +522,27 @@ Widget _languageOption(String code, String label) {
       );
 
       if (!_isValidPosition(position)) {
-        throw const _LocationException(
-          'استقبل التطبيق إحداثيات غير صالحة من خدمة الموقع.',
+        throw _LocationException(
+          _tr(
+            'استقبل التطبيق إحداثيات غير صالحة من خدمة الموقع.',
+            'The location service returned invalid coordinates.',
+            'Le service de localisation a renvoyé des coordonnées invalides.',
+          ),
         );
       }
 
-      final latitude = position.latitude;
-      final longitude = position.longitude;
-
       final distance = QiblaService.calculateDistanceKm(
-        latitude: latitude,
-        longitude: longitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
 
       double? bearing;
 
-      // عند الوصول إلى الكعبة تقريباً لا يكون اتجاه المسار إليها معرفاً.
       if (distance > 0.001) {
         try {
           bearing = QiblaService.calculateQiblaBearing(
-            latitude: latitude,
-            longitude: longitude,
+            latitude: position.latitude,
+            longitude: position.longitude,
           );
         } catch (_) {
           bearing = null;
@@ -548,15 +552,13 @@ Widget _languageOption(String code, String label) {
       double? declination;
 
       try {
-        final calculatedDeclination =
-            QiblaService.calculateMagneticDeclination(
-          latitude: latitude,
-          longitude: longitude,
+        final value = QiblaService.calculateMagneticDeclination(
+          latitude: position.latitude,
+          longitude: position.longitude,
         );
 
-        if (calculatedDeclination.isFinite &&
-            calculatedDeclination.abs() <= 180) {
-          declination = calculatedDeclination;
+        if (value.isFinite && value.abs() <= 180) {
+          declination = value;
         }
       } catch (_) {
         declination = null;
@@ -571,40 +573,55 @@ Widget _languageOption(String code, String label) {
         _declination = declination;
         _locationError = null;
         _isLoading = false;
+        _locationPermissionPermanentlyDenied = false;
       });
 
-      // تحديث الاتجاه الحقيقي دون إنشاء CompassEvent اصطناعي.
       _recalculateCompassHeading();
     } on _LocationException catch (error) {
       if (!mounted) return;
 
       setState(() {
-        _locationError = error.message;
+        if (!silent || _position == null) {
+          _locationError = error.message;
+        }
+
         _isLoading = false;
       });
     } on TimeoutException {
       if (!mounted) return;
 
       setState(() {
-        _locationError =
-            'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.';
+        if (!silent || _position == null) {
+          _locationError = _tr(
+            'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.',
+            'Location request timed out. Check GPS and try again.',
+            'La localisation a expiré. Vérifiez le GPS et réessayez.',
+          );
+        }
+
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Location error: $error');
+
       if (!mounted) return;
 
       setState(() {
-        _locationError =
-            'تعذر تحديد موقعك حالياً. تحقق من إعدادات الموقع وحاول مجدداً.';
+        if (!silent || _position == null) {
+          _locationError = _tr(
+            'تعذر تحديد موقعك حالياً. تحقق من إعدادات الموقع وحاول مجدداً.',
+            'Unable to determine your location. Check location settings and try again.',
+            'Impossible de déterminer votre position. Vérifiez les paramètres de localisation et réessayez.',
+          );
+        }
+
         _isLoading = false;
       });
     } finally {
+      _isRefreshing = false;
+
       if (mounted) {
-        setState(() {
-          _isRefreshing = false;
-        });
-      } else {
-        _isRefreshing = false;
+        setState(() {});
       }
     }
   }
@@ -622,7 +639,13 @@ Widget _languageOption(String code, String label) {
     try {
       await Geolocator.openLocationSettings();
     } catch (_) {
-      _showMessage('تعذر فتح إعدادات الموقع على هذا الجهاز.');
+      _showMessage(
+        _tr(
+          'تعذر فتح إعدادات الموقع على هذا الجهاز.',
+          'Could not open location settings on this device.',
+          'Impossible d’ouvrir les paramètres de localisation.',
+        ),
+      );
     }
   }
 
@@ -630,28 +653,43 @@ Widget _languageOption(String code, String label) {
     try {
       await Geolocator.openAppSettings();
     } catch (_) {
-      _showMessage('تعذر فتح إعدادات التطبيق.');
+      _showMessage(
+        _tr(
+          'تعذر فتح إعدادات التطبيق.',
+          'Could not open app settings.',
+          'Impossible d’ouvrir les paramètres de l’application.',
+        ),
+      );
     }
   }
 
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _formatBearing(double bearing) {
-    return '${bearing.toStringAsFixed(1)}°';
-  }
+  String _formatBearing(double bearing) =>
+      '${bearing.toStringAsFixed(1)}°';
 
   String _formatDistance(double distance) {
     if (distance >= 1000) {
-      return '${(distance / 1000).toStringAsFixed(2)} ألف كم';
+      final value = (distance / 1000).toStringAsFixed(2);
+
+      return _tr(
+        '$value ألف كم',
+        '$value thousand km',
+        '$value milliers de km',
+      );
     }
 
-    return '${distance.toStringAsFixed(1)} كم';
+    return _tr(
+      '${distance.toStringAsFixed(1)} كم',
+      '${distance.toStringAsFixed(1)} km',
+      '${distance.toStringAsFixed(1)} km',
+    );
   }
 
   bool _isIslamicLandmark(QiblaLandmark landmark) {
@@ -660,7 +698,6 @@ Widget _languageOption(String code, String label) {
       case QiblaLandmarkCategory.mosque:
       case QiblaLandmarkCategory.historicalMosque:
         return true;
-
       case QiblaLandmarkCategory.historicalSite:
       case QiblaLandmarkCategory.landmark:
         return false;
@@ -670,15 +707,15 @@ Widget _languageOption(String code, String label) {
   String _localizedCategory(QiblaLandmark landmark) {
     switch (landmark.category) {
       case QiblaLandmarkCategory.holyMosque:
-        return 'مسجد مقدس';
+        return _tr('مسجد مقدس', 'Holy mosque', 'Mosquée sacrée');
       case QiblaLandmarkCategory.mosque:
-        return 'مسجد';
+        return _tr('مسجد', 'Mosque', 'Mosquée');
       case QiblaLandmarkCategory.historicalMosque:
-        return 'مسجد تاريخي';
+        return _tr('مسجد تاريخي', 'Historic mosque', 'Mosquée historique');
       case QiblaLandmarkCategory.landmark:
-        return 'معلم تاريخي';
+        return _tr('معلم تاريخي', 'Historic landmark', 'Monument historique');
       case QiblaLandmarkCategory.historicalSite:
-        return 'موقع تاريخي';
+        return _tr('موقع تاريخي', 'Historic site', 'Site historique');
     }
   }
 
@@ -688,7 +725,6 @@ Widget _languageOption(String code, String label) {
       case QiblaLandmarkCategory.mosque:
       case QiblaLandmarkCategory.historicalMosque:
         return Icons.mosque_rounded;
-
       case QiblaLandmarkCategory.historicalSite:
       case QiblaLandmarkCategory.landmark:
         if (landmark.id.contains('pyramid')) {
@@ -710,56 +746,83 @@ Widget _languageOption(String code, String label) {
     }
   }
 
-  Color _landmarkColor(QiblaLandmark landmark) {
-    return _isIslamicLandmark(landmark)
-        ? _primaryGreen
-        : _historicalColor;
-  }
+  Color _landmarkColor(QiblaLandmark landmark) =>
+      _isIslamicLandmark(landmark) ? _primaryGreen : _historicalColor;
 
   String _directionInstruction(double angle) {
     final difference = angle.abs();
 
     if (difference <= 3) {
-      return 'أنت الآن في اتجاه القبلة تقريباً';
+      return _tr(
+        'أنت الآن في اتجاه القبلة تقريباً',
+        'You are approximately aligned with the Qibla',
+        'Vous êtes presque aligné avec la Qibla',
+      );
     }
 
     if (difference <= 12) {
-      return 'اقتربت من اتجاه القبلة، اضبط الهاتف قليلاً';
+      return _tr(
+        'اقتربت من اتجاه القبلة، اضبط الهاتف قليلاً',
+        'Almost aligned. Adjust your phone slightly',
+        'Presque aligné. Ajustez légèrement votre téléphone',
+      );
     }
 
-    if (angle > 0) {
-      return 'أدر الهاتف إلى اليمين باتجاه القبلة';
-    }
-
-    return 'أدر الهاتف إلى اليسار باتجاه القبلة';
+    return angle > 0
+        ? _tr(
+            'أدر الهاتف إلى اليمين باتجاه القبلة',
+            'Turn your phone to the right towards the Qibla',
+            'Tournez votre téléphone vers la droite en direction de la Qibla',
+          )
+        : _tr(
+            'أدر الهاتف إلى اليسار باتجاه القبلة',
+            'Turn your phone to the left towards the Qibla',
+            'Tournez votre téléphone vers la gauche en direction de la Qibla',
+          );
   }
 
   String _directionStep(double angle) {
     final difference = angle.abs();
 
     if (difference <= 3) {
-      return 'الخطوة 4: ثبّت الهاتف، أنت بمحاذاة اتجاه القبلة';
+      return _tr(
+        'ثبّت الهاتف، أنت بمحاذاة اتجاه القبلة',
+        'Hold still. You are aligned with the Qibla',
+        'Gardez le téléphone immobile, vous êtes aligné avec la Qibla',
+      );
     }
 
     if (difference <= 12) {
-      return 'الخطوة 3: اقتربت، أجرِ تعديلاً بسيطاً';
-    }
-
-    if (difference <= 45) {
-      return angle > 0
-          ? 'الخطوة 2: أدر الهاتف يميناً تدريجياً'
-          : 'الخطوة 2: أدر الهاتف يساراً تدريجياً';
+      return _tr(
+        'اقتربت، أجرِ تعديلاً بسيطاً',
+        'Almost there. Make a small adjustment',
+        'Vous y êtes presque. Effectuez un léger ajustement',
+      );
     }
 
     return angle > 0
-        ? 'الخطوة 1: ابدأ بالدوران نحو اليمين'
-        : 'الخطوة 1: ابدأ بالدوران نحو اليسار';
+        ? _tr(
+            'أدر الهاتف يميناً تدريجياً',
+            'Gradually turn your phone to the right',
+            'Tournez progressivement votre téléphone vers la droite',
+          )
+        : _tr(
+            'أدر الهاتف يساراً تدريجياً',
+            'Gradually turn your phone to the left',
+            'Tournez progressivement votre téléphone vers la gauche',
+          );
   }
 
   void _openLandmark(QiblaLandmark landmark) {
     if (!landmark.hasValidBasicData ||
         !landmark.hasValidCoordinates) {
-      _showMessage('بيانات هذا المعلم غير مكتملة أو غير صالحة.');
+      _showMessage(
+        _tr(
+          'بيانات هذا المعلم غير مكتملة أو غير صالحة.',
+          'This landmark has incomplete or invalid data.',
+          'Les données de ce monument sont incomplètes ou invalides.',
+        ),
+      );
       return;
     }
 
@@ -773,241 +836,267 @@ Widget _languageOption(String code, String label) {
 
         final sheetColor =
             isDark ? const Color(0xFF172820) : Colors.white;
-
         final mainTextColor =
             isDark ? Colors.white : const Color(0xFF19382E);
-
         final secondaryTextColor =
             isDark ? Colors.white70 : Colors.black54;
 
         final description = landmark.descriptionAr?.trim();
 
-        return DraggableScrollableSheet(
-          initialChildSize: 0.68,
-          minChildSize: 0.40,
-          maxChildSize: 0.94,
-          expand: false,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: sheetColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
+        return Directionality(
+          textDirection: _textDirection,
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.68,
+            minChildSize: 0.40,
+            maxChildSize: 0.94,
+            expand: false,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: sheetColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
                 ),
-              ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: secondaryTextColor.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(10),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: secondaryTextColor.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 23),
-                  _buildLandmarkHero(landmark),
-                  const SizedBox(height: 22),
-                  Text(
-                    landmark.nameAr,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: mainTextColor,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 23),
+                    _buildLandmarkHero(landmark),
+                    const SizedBox(height: 22),
+                    Text(
+                      _localizedLandmarkName(landmark),
+                      textAlign: _isArabic ? TextAlign.right : TextAlign.left,
+                      style: TextStyle(
+                        color: mainTextColor,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    landmark.nameEn,
-                    textAlign: TextAlign.left,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      color: secondaryTextColor,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _detailRow(
-                    Icons.location_on_outlined,
-                    [
-                      if (landmark.cityAr?.trim().isNotEmpty == true)
-                        landmark.cityAr!.trim(),
-                      landmark.countryCode,
-                    ].join('، '),
-                    mainTextColor,
-                    secondaryTextColor,
-                  ),
-                  if (landmark.historicalPeriodAr?.trim().isNotEmpty ==
-                      true)
+                    if (_language != 'ar') ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        landmark.nameAr,
+                        textAlign: TextAlign.right,
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          color: secondaryTextColor,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
                     _detailRow(
-                      Icons.history_rounded,
-                      landmark.historicalPeriodAr!.trim(),
+                      Icons.location_on_outlined,
+                      [
+                        if (landmark.cityAr?.trim().isNotEmpty == true)
+                          landmark.cityAr!.trim(),
+                        landmark.countryCode,
+                      ].join('، '),
                       mainTextColor,
                       secondaryTextColor,
                     ),
-                  if (landmark.establishedYear != null)
-                    _detailRow(
-                      Icons.calendar_today_outlined,
-                      _formatHistoricalYear(landmark.establishedYear!),
-                      mainTextColor,
-                      secondaryTextColor,
-                    ),
-                  const SizedBox(height: 18),
-                  _sectionHeading('نبذة تاريخية', mainTextColor),
-                  const SizedBox(height: 9),
-                  Text(
-                    description?.isNotEmpty == true
-                        ? description!
-                        : 'لا يتوفر وصف تاريخي لهذا المعلم حالياً.',
-                    textAlign: TextAlign.justify,
-                    style: TextStyle(
-                      color: secondaryTextColor,
-                      height: 1.8,
-                      fontSize: 13,
-                    ),
-                  ),
-                  if (landmark.chronologicalEvents.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    _sectionHeading('المحطات التاريخية', mainTextColor),
-                    const SizedBox(height: 13),
-                    ...landmark.chronologicalEvents.map(
-                      (event) => _buildHistoricalEvent(
-                        event,
+                    if (landmark.historicalPeriodAr?.trim().isNotEmpty ==
+                        true)
+                      _detailRow(
+                        Icons.history_rounded,
+                        landmark.historicalPeriodAr!.trim(),
                         mainTextColor,
                         secondaryTextColor,
                       ),
+                    if (landmark.establishedYear != null)
+                      _detailRow(
+                        Icons.calendar_today_outlined,
+                        _formatHistoricalYear(landmark.establishedYear!),
+                        mainTextColor,
+                        secondaryTextColor,
+                      ),
+                    const SizedBox(height: 18),
+                    _sectionHeading(
+                      _tr('نبذة تاريخية', 'Historical overview', 'Aperçu historique'),
+                      mainTextColor,
                     ),
-                  ],
-                  const SizedBox(height: 22),
-                  _sectionHeading('الموقع الجغرافي', mainTextColor),
-                  const SizedBox(height: 9),
-                  Text(
-                    '${landmark.latitude.toStringAsFixed(5)}, ${landmark.longitude.toStringAsFixed(5)}',
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      color: secondaryTextColor,
-                      fontFeatures: const [
-                        FontFeature.tabularFigures(),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  _sectionHeading('المصادر والمراجع', mainTextColor),
-                  const SizedBox(height: 10),
-                  if (landmark.sources.isEmpty)
+                    const SizedBox(height: 9),
                     Text(
-                      'لا توجد مراجع مسجلة لهذا المعلم بعد.',
+                      description?.isNotEmpty == true
+                          ? description!
+                          : _tr(
+                              'لا يتوفر وصف تاريخي لهذا المعلم حالياً.',
+                              'No historical description is currently available.',
+                              'Aucune description historique n’est disponible actuellement.',
+                            ),
+                      textAlign: TextAlign.justify,
+                      textDirection: TextDirection.rtl,
                       style: TextStyle(
                         color: secondaryTextColor,
-                        fontSize: 12,
+                        height: 1.8,
+                        fontSize: 13,
                       ),
-                    )
-                  else
-                    ...landmark.sources.map((source) {
-                      final sourceName = source.name.trim();
-                      final sourceUrl = source.url.trim();
-
-                      if (sourceName.isEmpty && sourceUrl.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 9),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: secondaryTextColor.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(13),
+                    ),
+                    if (landmark.chronologicalEvents.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      _sectionHeading(
+                        _tr('المحطات التاريخية', 'Historical timeline', 'Chronologie historique'),
+                        mainTextColor,
+                      ),
+                      const SizedBox(height: 13),
+                      ...landmark.chronologicalEvents.map(
+                        (event) => _buildHistoricalEvent(
+                          event,
+                          mainTextColor,
+                          secondaryTextColor,
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.menu_book_rounded,
-                              color: _gold,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (sourceName.isNotEmpty)
-                                    Text(
-                                      sourceName,
-                                      style: TextStyle(
-                                        color: mainTextColor,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  if (sourceUrl.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    SelectableText(
-                                      sourceUrl,
-                                      textDirection: TextDirection.ltr,
-                                      style: const TextStyle(
-                                        color: _primaryGreen,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                  if (source.publisher?.trim().isNotEmpty ==
-                                      true)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 5),
-                                      child: Text(
-                                        source.publisher!.trim(),
-                                        style: TextStyle(
-                                          color: secondaryTextColor,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ),
-                                  if (source.license?.trim().isNotEmpty ==
-                                      true)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        'الترخيص: ${source.license!.trim()}',
-                                        style: TextStyle(
-                                          color: secondaryTextColor,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                      ),
+                    ],
+                    const SizedBox(height: 22),
+                    _sectionHeading(
+                      _tr('الموقع الجغرافي', 'Geographic location', 'Emplacement géographique'),
+                      mainTextColor,
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      '${landmark.latitude.toStringAsFixed(5)}, ${landmark.longitude.toStringAsFixed(5)}',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: secondaryTextColor,
+                        fontFeatures: const [
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    _sectionHeading(
+                      _tr('المصادر والمراجع', 'Sources and references', 'Sources et références'),
+                      mainTextColor,
+                    ),
+                    const SizedBox(height: 10),
+                    if (landmark.sources.isEmpty)
+                      Text(
+                        _tr(
+                          'لا توجد مراجع مسجلة لهذا المعلم بعد.',
+                          'No references have been registered for this landmark yet.',
+                          'Aucune référence n’est encore enregistrée pour ce monument.',
+                        ),
+                        style: TextStyle(
+                          color: secondaryTextColor,
+                          fontSize: 12,
+                        ),
+                      )
+                    else
+                      ...landmark.sources.map((source) {
+                        final sourceName = source.name.trim();
+                        final sourceUrl = source.url.trim();
+
+                        if (sourceName.isEmpty && sourceUrl.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 9),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: secondaryTextColor.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.menu_book_rounded,
+                                color: _gold,
+                                size: 20,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (sourceName.isNotEmpty)
+                                      Text(
+                                        sourceName,
+                                        style: TextStyle(
+                                          color: mainTextColor,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    if (sourceUrl.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      SelectableText(
+                                        sourceUrl,
+                                        textDirection: TextDirection.ltr,
+                                        style: const TextStyle(
+                                          color: _primaryGreen,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                    if (source.publisher?.trim().isNotEmpty ==
+                                        true)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 5),
+                                        child: Text(
+                                          source.publisher!.trim(),
+                                          style: TextStyle(
+                                            color: secondaryTextColor,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    if (source.license?.trim().isNotEmpty ==
+                                        true)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '${_tr('الترخيص', 'License', 'Licence')}: ${source.license!.trim()}',
+                                          style: TextStyle(
+                                            color: secondaryTextColor,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: Text(
+                          _tr('العودة إلى الأطلس', 'Back to atlas', 'Retour à l’atlas'),
                         ),
-                      );
-                    }),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      label: const Text('العودة إلى الأطلس'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -1073,10 +1162,18 @@ Widget _languageOption(String code, String label) {
 
   String _formatHistoricalYear(int year) {
     if (year < 0) {
-      return 'التاريخ التقريبي: ${year.abs()} ق.م';
+      return _tr(
+        'التاريخ التقريبي: ${year.abs()} ق.م',
+        'Approximate date: ${year.abs()} BCE',
+        'Date approximative : ${year.abs()} av. J.-C.',
+      );
     }
 
-    return 'التاريخ التقريبي: $year م';
+    return _tr(
+      'التاريخ التقريبي: $year م',
+      'Approximate date: $year CE',
+      'Date approximative : $year apr. J.-C.',
+    );
   }
 
   Widget _sectionHeading(String title, Color color) {
@@ -1125,6 +1222,7 @@ Widget _languageOption(String code, String label) {
                 if (dateLabel.isNotEmpty)
                   Text(
                     dateLabel,
+                    textDirection: TextDirection.rtl,
                     style: const TextStyle(
                       color: _historicalColor,
                       fontSize: 11,
@@ -1135,6 +1233,7 @@ Widget _languageOption(String code, String label) {
                   const SizedBox(height: 4),
                   Text(
                     title,
+                    textDirection: TextDirection.rtl,
                     style: TextStyle(
                       color: mainTextColor,
                       fontSize: 13,
@@ -1146,6 +1245,7 @@ Widget _languageOption(String code, String label) {
                   const SizedBox(height: 4),
                   Text(
                     description,
+                    textDirection: TextDirection.rtl,
                     style: TextStyle(
                       color: secondaryTextColor,
                       fontSize: 11,
@@ -1167,9 +1267,7 @@ Widget _languageOption(String code, String label) {
     Color textColor,
     Color secondaryColor,
   ) {
-    if (value.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (value.trim().isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1197,103 +1295,99 @@ Widget _languageOption(String code, String label) {
 
     final backgroundColor =
         isDark ? const Color(0xFF101C18) : _background;
-
     final cardColor =
         isDark ? const Color(0xFF1A2B24) : Colors.white;
-
     final textColor =
         isDark ? Colors.white : const Color(0xFF19382E);
-
     final secondaryColor =
         isDark ? Colors.white70 : Colors.black54;
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        backgroundColor: _primaryGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'قبلة وأطلس',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 19,
+    return Directionality(
+      textDirection: _textDirection,
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: AppBar(
+          backgroundColor: _primaryGreen,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            _tr('قبلة وأطلس', 'Qibla & Atlas', 'Qibla et Atlas'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 19,
+            ),
           ),
+          actions: [
+            IconButton(
+              tooltip: _tr('تغيير اللغة', 'Change language', 'Changer de langue'),
+              onPressed: _showLanguageSelector,
+              icon: const Icon(Icons.language_rounded),
+            ),
+            IconButton(
+              tooltip: _tr('تحديث الموقع', 'Refresh location', 'Actualiser la position'),
+              onPressed: _isRefreshing ? null : () => _loadLocation(),
+              icon: _isRefreshing
+                  ? const SizedBox(
+                      width: 19,
+                      height: 19,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'تحديث الموقع',
-            onPressed: _isRefreshing ? null : () => _loadLocation(),
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 19,
-                    height: 19,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        // الأطلس والمعالم يظلان متاحين حتى عند تعذر GPS.
-        child: RefreshIndicator(
-          color: _primaryGreen,
-          onRefresh: () async {
-            await Future.wait([
-              _loadLocation(),
-              _loadLandmarks(),
-            ]);
-          },
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-            children: [
-              _buildIntro(textColor, secondaryColor),
-              const SizedBox(height: 18),
-              _buildLocationStatus(
-                cardColor,
-                textColor,
-                secondaryColor,
-              ),
-              const SizedBox(height: 22),
-              _buildCompassCard(
-                cardColor: cardColor,
-                textColor: textColor,
-                secondaryColor: secondaryColor,
-              ),
-              const SizedBox(height: 18),
-              _buildInformationCards(
-                cardColor: cardColor,
-                textColor: textColor,
-                secondaryColor: secondaryColor,
-              ),
-              const SizedBox(height: 18),
-              _buildDirectionGuide(
-                cardColor,
-                textColor,
-                secondaryColor,
-              ),
-              const SizedBox(height: 25),
-              _buildAtlasHeader(textColor, secondaryColor),
-              const SizedBox(height: 13),
-              _buildAtlasMap(
-                cardColor,
-                textColor,
-                secondaryColor,
-              ),
-              const SizedBox(height: 22),
-              _buildLandmarkCollection(
-                cardColor,
-                textColor,
-                secondaryColor,
-              ),
-              const SizedBox(height: 18),
-              _buildAccuracyNote(secondaryColor),
-            ],
+        body: SafeArea(
+          child: RefreshIndicator(
+            color: _primaryGreen,
+            onRefresh: () async {
+              await Future.wait([
+                _loadLocation(),
+                _loadLandmarks(),
+              ]);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+              children: [
+                _buildIntro(textColor, secondaryColor),
+                const SizedBox(height: 18),
+                _buildLocationStatus(cardColor, textColor, secondaryColor),
+                const SizedBox(height: 22),
+                _buildCompassCard(
+                  cardColor: cardColor,
+                  textColor: textColor,
+                  secondaryColor: secondaryColor,
+                ),
+                const SizedBox(height: 18),
+                _buildInformationCards(
+                  cardColor: cardColor,
+                  textColor: textColor,
+                  secondaryColor: secondaryColor,
+                ),
+                const SizedBox(height: 18),
+                _buildDirectionGuide(
+                  cardColor,
+                  textColor,
+                  secondaryColor,
+                ),
+                const SizedBox(height: 25),
+                _buildAtlasHeader(textColor, secondaryColor),
+                const SizedBox(height: 13),
+                _buildAtlasMap(cardColor, textColor, secondaryColor),
+                const SizedBox(height: 22),
+                _buildLandmarkCollection(
+                  cardColor,
+                  textColor,
+                  secondaryColor,
+                ),
+                const SizedBox(height: 18),
+                _buildAccuracyNote(secondaryColor),
+              ],
+            ),
           ),
         ),
       ),
@@ -1340,8 +1434,8 @@ Widget _languageOption(String code, String label) {
               children: [
                 Text(
                   hasError
-                      ? 'تعذر تحديد الموقع'
-                      : 'جارٍ تحديد موقعك',
+                      ? _tr('تعذر تحديد الموقع', 'Location unavailable', 'Position indisponible')
+                      : _tr('جارٍ تحديد موقعك', 'Finding your location', 'Recherche de votre position'),
                   style: TextStyle(
                     color: textColor,
                     fontWeight: FontWeight.bold,
@@ -1351,7 +1445,11 @@ Widget _languageOption(String code, String label) {
                 const SizedBox(height: 5),
                 Text(
                   _locationError ??
-                      'يتم تحديد موقعك لحساب اتجاه القبلة. يمكنك استكشاف الأطلس والمعالم أثناء الانتظار.',
+                      _tr(
+                        'يتم تحديد موقعك لحساب اتجاه القبلة. يمكنك استكشاف الأطلس والمعالم أثناء الانتظار.',
+                        'Your location is being determined to calculate the Qibla. You can explore the atlas and landmarks while waiting.',
+                        'Votre position est en cours de détermination pour calculer la Qibla. Vous pouvez explorer l’atlas et les monuments en attendant.',
+                      ),
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 11,
@@ -1368,16 +1466,32 @@ Widget _languageOption(String code, String label) {
                         onPressed: _isRefreshing
                             ? null
                             : () => _loadLocation(),
-                        child: const Text('إعادة المحاولة'),
+                        child: Text(
+                          _tr('إعادة المحاولة', 'Try again', 'Réessayer'),
+                        ),
                       ),
-                      TextButton(
-                        onPressed: _openLocationSettings,
-                        child: const Text('إعدادات الموقع'),
-                      ),
-                      TextButton(
-                        onPressed: _openAppSettings,
-                        child: const Text('صلاحيات التطبيق'),
-                      ),
+                      if (_locationServiceDisabled)
+                        TextButton(
+                          onPressed: _openLocationSettings,
+                          child: Text(
+                            _tr('إعدادات الموقع', 'Location settings', 'Paramètres de localisation'),
+                          ),
+                        ),
+                      if (_locationPermissionPermanentlyDenied)
+                        TextButton(
+                          onPressed: _openAppSettings,
+                          child: Text(
+                            _tr('صلاحيات التطبيق', 'App permissions', 'Autorisations de l’application'),
+                          ),
+                        ),
+                      if (!_locationServiceDisabled &&
+                          !_locationPermissionPermanentlyDenied)
+                        TextButton(
+                          onPressed: _openAppSettings,
+                          child: Text(
+                            _tr('إعدادات الصلاحيات', 'Permission settings', 'Paramètres des autorisations'),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -1399,14 +1513,15 @@ Widget _languageOption(String code, String label) {
   Widget _buildIntro(Color textColor, Color secondaryColor) {
     return Column(
       children: [
-        const Icon(
-          Icons.mosque_rounded,
-          color: _gold,
-          size: 38,
-        ),
+        const Icon(Icons.mosque_rounded, color: _gold, size: 38),
         const SizedBox(height: 9),
         Text(
-          'توجّه نحو بيت الله الحرام',
+          _tr(
+            'توجّه نحو بيت الله الحرام',
+            'Find the direction of the Kaaba',
+            'Orientez-vous vers la Kaaba',
+          ),
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: textColor,
             fontSize: 19,
@@ -1415,7 +1530,11 @@ Widget _languageOption(String code, String label) {
         ),
         const SizedBox(height: 6),
         Text(
-          'احسب اتجاه القبلة واستكشف المعالم الإسلامية والتاريخية حول العالم',
+          _tr(
+            'احسب اتجاه القبلة واستكشف المعالم الإسلامية والتاريخية حول العالم',
+            'Calculate the Qibla direction and explore Islamic and historical landmarks around the world',
+            'Calculez la direction de la Qibla et explorez les monuments islamiques et historiques du monde',
+          ),
           textAlign: TextAlign.center,
           style: TextStyle(
             color: secondaryColor,
@@ -1454,14 +1573,10 @@ Widget _languageOption(String code, String label) {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.explore_rounded,
-                color: _gold,
-                size: 19,
-              ),
+              const Icon(Icons.explore_rounded, color: _gold, size: 19),
               const SizedBox(width: 7),
               Text(
-                'البوصلة الحية',
+                _tr('البوصلة الحية', 'Live compass', 'Boussole en direct'),
                 style: TextStyle(
                   color: textColor,
                   fontWeight: FontWeight.bold,
@@ -1509,19 +1624,27 @@ Widget _languageOption(String code, String label) {
                       _buildCompassTicks(),
                       Positioned(
                         top: 20,
-                        child: _compassLabel('شمال'),
+                        child: _compassLabel(
+                          _tr('شمال', 'N', 'N'),
+                        ),
                       ),
                       Positioned(
                         bottom: 20,
-                        child: _compassLabel('جنوب'),
+                        child: _compassLabel(
+                          _tr('جنوب', 'S', 'S'),
+                        ),
                       ),
                       Positioned(
                         right: 20,
-                        child: _compassLabel('شرق'),
+                        child: _compassLabel(
+                          _tr('شرق', 'E', 'E'),
+                        ),
                       ),
                       Positioned(
                         left: 20,
-                        child: _compassLabel('غرب'),
+                        child: _compassLabel(
+                          _tr('غرب', 'W', 'O'),
+                        ),
                       ),
                       AnimatedRotation(
                         turns: _relativeQiblaAngle! / 360.0,
@@ -1546,10 +1669,7 @@ Widget _languageOption(String code, String label) {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white,
-                          border: Border.all(
-                            color: _gold,
-                            width: 3,
-                          ),
+                          border: Border.all(color: _gold, width: 3),
                         ),
                       ),
                     ],
@@ -1557,7 +1677,11 @@ Widget _languageOption(String code, String label) {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'الانحراف عن اتجاه القبلة',
+                  _tr(
+                    'الانحراف عن اتجاه القبلة',
+                    'Deviation from Qibla direction',
+                    'Écart par rapport à la Qibla',
+                  ),
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 12,
@@ -1570,9 +1694,7 @@ Widget _languageOption(String code, String label) {
                     color: _primaryGreen,
                     fontSize: 29,
                     fontWeight: FontWeight.bold,
-                    fontFeatures: [
-                      FontFeature.tabularFigures(),
-                    ],
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -1611,26 +1733,20 @@ Widget _languageOption(String code, String label) {
       child: Column(
         children: [
           _headingRow(
-            'اتجاه القبلة الجغرافي',
-            _qiblaBearing == null
-                ? '--'
-                : _formatBearing(_qiblaBearing!),
+            _tr('اتجاه القبلة الجغرافي', 'Geographic Qibla bearing', 'Azimut géographique de la Qibla'),
+            _qiblaBearing == null ? '--' : _formatBearing(_qiblaBearing!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
           _headingRow(
-            'اتجاه الهاتف الحقيقي',
-            _trueHeading == null
-                ? '--'
-                : _formatBearing(_trueHeading!),
+            _tr('اتجاه الهاتف الحقيقي', 'True phone heading', 'Cap du téléphone (vrai nord)'),
+            _trueHeading == null ? '--' : _formatBearing(_trueHeading!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
           _headingRow(
-            'قراءة الحساس المغناطيسية',
-            _magneticHeading == null
-                ? '--'
-                : _formatBearing(_magneticHeading!),
+            _tr('قراءة الحساس المغناطيسية', 'Magnetic sensor reading', 'Lecture du capteur magnétique'),
+            _magneticHeading == null ? '--' : _formatBearing(_magneticHeading!),
             secondaryColor,
           ),
         ],
@@ -1648,10 +1764,7 @@ Widget _languageOption(String code, String label) {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              color: secondaryColor,
-              fontSize: 10,
-            ),
+            style: TextStyle(color: secondaryColor, fontSize: 10),
           ),
         ),
         Text(
@@ -1671,9 +1784,7 @@ Widget _languageOption(String code, String label) {
     return SizedBox(
       width: 244,
       height: 244,
-      child: CustomPaint(
-        painter: _CompassTicksPainter(),
-      ),
+      child: CustomPaint(painter: _CompassTicksPainter()),
     );
   }
 
@@ -1696,16 +1807,28 @@ Widget _languageOption(String code, String label) {
     final isAtKaaba = _distanceKm != null && _distanceKm! <= 0.001;
 
     final title = isAtKaaba
-        ? 'أنت عند الكعبة تقريباً'
+        ? _tr('أنت عند الكعبة تقريباً', 'You are near the Kaaba', 'Vous êtes près de la Kaaba')
         : hasQibla
-            ? 'حساس البوصلة غير متاح'
-            : 'اتجاه القبلة غير متاح بعد';
+            ? _tr('حساس البوصلة غير متاح', 'Compass sensor unavailable', 'Capteur de boussole indisponible')
+            : _tr('اتجاه القبلة غير متاح بعد', 'Qibla direction not available yet', 'Direction de la Qibla non disponible');
 
     final message = isAtKaaba
-        ? 'المسافة المحسوبة تشير إلى أنك قريب جداً من الكعبة؛ لذلك لا يكون اتجاه المسار إليها معرفاً.'
+        ? _tr(
+            'المسافة المحسوبة تشير إلى أنك قريب جداً من الكعبة؛ لذلك لا يكون اتجاه المسار إليها معرفاً.',
+            'The calculated distance indicates that you are very close to the Kaaba, so a route direction is not defined.',
+            'La distance calculée indique que vous êtes très proche de la Kaaba ; un azimut de trajet n’est donc pas défini.',
+          )
         : hasQibla
-            ? 'اتجاه القبلة الجغرافي محسوب، لكن التوجيه المباشر يحتاج إلى حساس بوصلة متاح ويقدم قراءة صالحة.'
-            : 'يلزم تحديد موقعك أولاً لحساب اتجاه القبلة. يمكنك استخدام الأطلس والمعالم دون GPS.';
+            ? _tr(
+                'اتجاه القبلة الجغرافي محسوب، لكن التوجيه المباشر يحتاج إلى حساس بوصلة متاح ويقدم قراءة صالحة.',
+                'The geographic Qibla bearing is calculated, but live guidance requires an available compass sensor with a valid reading.',
+                'L’azimut géographique de la Qibla est calculé, mais le guidage en direct nécessite un capteur de boussole disponible avec une lecture valide.',
+              )
+            : _tr(
+                'يلزم تحديد موقعك أولاً لحساب اتجاه القبلة. يمكنك استخدام الأطلس والمعالم دون GPS.',
+                'Your location is required to calculate the Qibla. You can use the atlas and landmarks without GPS.',
+                'Votre position est nécessaire pour calculer la Qibla. Vous pouvez utiliser l’atlas et les monuments sans GPS.',
+              );
 
     return Column(
       children: [
@@ -1721,6 +1844,7 @@ Widget _languageOption(String code, String label) {
         const SizedBox(height: 12),
         Text(
           title,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: textColor,
             fontWeight: FontWeight.bold,
@@ -1741,14 +1865,14 @@ Widget _languageOption(String code, String label) {
           TextButton.icon(
             onPressed: _isRefreshing ? null : () => _loadLocation(),
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('تحديث الموقع'),
+            label: Text(_tr('تحديث الموقع', 'Refresh location', 'Actualiser la position')),
           ),
         ] else if (hasQibla && _isCompassUnavailable) ...[
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: _connectCompass,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('إعادة الاتصال بالحساس'),
+            label: Text(_tr('إعادة الاتصال بالحساس', 'Reconnect sensor', 'Reconnecter le capteur')),
           ),
         ],
         if (hasQibla) ...[
@@ -1768,14 +1892,34 @@ Widget _languageOption(String code, String label) {
     final isAligned = angle != null && angle.abs() <= 3;
 
     final steps = [
-      'أمسك الهاتف أفقياً وبعيداً عن المعادن والمغناطيس.',
-      'انتظر استقرار قراءة البوصلة قبل البدء بالدوران.',
+      _tr(
+        'أمسك الهاتف أفقياً وبعيداً عن المعادن والمغناطيس.',
+        'Hold the phone horizontally and keep it away from metal and magnets.',
+        'Tenez le téléphone horizontalement, loin des métaux et des aimants.',
+      ),
+      _tr(
+        'انتظر استقرار قراءة البوصلة قبل البدء بالدوران.',
+        'Wait for the compass reading to stabilize before turning.',
+        'Attendez que la boussole se stabilise avant de tourner.',
+      ),
       angle == null
-          ? 'انتظر حساب اتجاه القبلة وتوفر قراءة الحساس.'
+          ? _tr(
+              'انتظر حساب اتجاه القبلة وتوفر قراءة الحساس.',
+              'Wait for the Qibla calculation and a valid sensor reading.',
+              'Attendez le calcul de la Qibla et une lecture valide du capteur.',
+            )
           : _directionStep(angle),
       isAligned
-          ? 'ثبّت الهاتف؛ أنت بمحاذاة اتجاه القبلة تقريباً.'
-          : 'واصل التعديل حتى تقترب زاوية الانحراف من الصفر.',
+          ? _tr(
+              'ثبّت الهاتف؛ أنت بمحاذاة اتجاه القبلة تقريباً.',
+              'Hold the phone still; you are approximately aligned with the Qibla.',
+              'Gardez le téléphone immobile ; vous êtes presque aligné avec la Qibla.',
+            )
+          : _tr(
+              'واصل التعديل حتى تقترب زاوية الانحراف من الصفر.',
+              'Keep adjusting until the deviation angle approaches zero.',
+              'Continuez à ajuster jusqu’à ce que l’écart approche zéro.',
+            ),
     ];
 
     return Container(
@@ -1783,9 +1927,7 @@ Widget _languageOption(String code, String label) {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(23),
-        border: Border.all(
-          color: _gold.withValues(alpha: 0.24),
-        ),
+        border: Border.all(color: _gold.withValues(alpha: 0.24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1800,7 +1942,11 @@ Widget _languageOption(String code, String label) {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'خطوات ضبط اتجاه القبلة',
+                  _tr(
+                    'خطوات ضبط اتجاه القبلة',
+                    'How to align with the Qibla',
+                    'Comment vous aligner avec la Qibla',
+                  ),
                   style: TextStyle(
                     color: textColor,
                     fontSize: 15,
@@ -1809,10 +1955,7 @@ Widget _languageOption(String code, String label) {
                 ),
               ),
               if (isAligned)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: _primaryGreen,
-                ),
+                const Icon(Icons.check_circle_rounded, color: _primaryGreen),
             ],
           ),
           const SizedBox(height: 16),
@@ -1838,11 +1981,7 @@ Widget _languageOption(String code, String label) {
                       shape: BoxShape.circle,
                     ),
                     child: completed
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          )
+                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
                         : Text(
                             '${index + 1}',
                             style: TextStyle(
@@ -1872,8 +2011,11 @@ Widget _languageOption(String code, String label) {
           }),
           const Divider(height: 14),
           Text(
-            'ملاحظة: اتجاه الهاتف يعتمد على حساس الجهاز، '
-            'ولا يمكن ضمان دقته من التطبيق وحده.',
+            _tr(
+              'ملاحظة: اتجاه الهاتف يعتمد على حساس الجهاز، ولا يمكن ضمان دقته من التطبيق وحده.',
+              'Note: The phone heading depends on the device sensor. Its accuracy cannot be guaranteed by the app alone.',
+              'Remarque : l’orientation du téléphone dépend du capteur de l’appareil. L’application seule ne peut pas garantir sa précision.',
+            ),
             style: TextStyle(
               color: secondaryColor,
               fontSize: 10,
@@ -1898,7 +2040,7 @@ Widget _languageOption(String code, String label) {
             textColor: textColor,
             secondaryColor: secondaryColor,
             icon: Icons.explore_rounded,
-            title: 'اتجاه القبلة',
+            title: _tr('اتجاه القبلة', 'Qibla bearing', 'Direction de la Qibla'),
             value: _qiblaBearing == null
                 ? '--'
                 : _formatBearing(_qiblaBearing!),
@@ -1911,7 +2053,7 @@ Widget _languageOption(String code, String label) {
             textColor: textColor,
             secondaryColor: secondaryColor,
             icon: Icons.straighten_rounded,
-            title: 'المسافة إلى الكعبة',
+            title: _tr('المسافة إلى الكعبة', 'Distance to Kaaba', 'Distance jusqu’à la Kaaba'),
             value: _distanceKm == null
                 ? '--'
                 : _formatDistance(_distanceKm!),
@@ -1930,10 +2072,7 @@ Widget _languageOption(String code, String label) {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 17,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 17),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -1945,10 +2084,7 @@ Widget _languageOption(String code, String label) {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: secondaryColor,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: secondaryColor, fontSize: 11),
           ),
           const SizedBox(height: 7),
           FittedBox(
@@ -1976,15 +2112,15 @@ Widget _languageOption(String code, String label) {
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.public_rounded,
-              color: _gold,
-              size: 25,
-            ),
+            const Icon(Icons.public_rounded, color: _gold, size: 25),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
-                'أطلس العالم والمعالم التاريخية',
+                _tr(
+                  'أطلس العالم والمعالم التاريخية',
+                  'World atlas and historical landmarks',
+                  'Atlas du monde et monuments historiques',
+                ),
                 style: TextStyle(
                   color: textColor,
                   fontSize: 17,
@@ -1993,10 +2129,7 @@ Widget _languageOption(String code, String label) {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: _primaryGreen.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(20),
@@ -2015,7 +2148,11 @@ Widget _languageOption(String code, String label) {
         ),
         const SizedBox(height: 7),
         Text(
-          'استكشف حدود دول العالم دون إنترنت. هذه خريطة جغرافية عامة وليست خريطة شوارع أو مبانٍ.',
+          _tr(
+            'استكشف حدود دول العالم دون إنترنت. هذه خريطة جغرافية عامة وليست خريطة شوارع أو مبانٍ.',
+            'Explore country borders offline. This is a general geographic map, not a street or building map.',
+            'Explorez les frontières des pays hors ligne. Il s’agit d’une carte géographique générale, pas d’une carte des rues ou des bâtiments.',
+          ),
           style: TextStyle(
             color: secondaryColor,
             fontSize: 11,
@@ -2056,10 +2193,7 @@ Widget _languageOption(String code, String label) {
                 initialScale: 1,
                 onCountrySelected: (country) {
                   if (!mounted) return;
-
-                  setState(() {
-                    _selectedCountry = country;
-                  });
+                  setState(() => _selectedCountry = country);
                 },
               ),
             ),
@@ -2068,21 +2202,14 @@ Widget _languageOption(String code, String label) {
           if (_selectedCountry != null)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 13,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
               decoration: BoxDecoration(
                 color: _primaryGreen.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                    color: _primaryGreen,
-                    size: 20,
-                  ),
+                  const Icon(Icons.location_on_rounded, color: _primaryGreen, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2095,16 +2222,9 @@ Widget _languageOption(String code, String label) {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'مسح التحديد',
-                    onPressed: () {
-                      setState(() {
-                        _selectedCountry = null;
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                    ),
+                    tooltip: _tr('مسح التحديد', 'Clear selection', 'Effacer la sélection'),
+                    onPressed: () => setState(() => _selectedCountry = null),
+                    icon: const Icon(Icons.close_rounded, size: 18),
                   ),
                 ],
               ),
@@ -2112,15 +2232,15 @@ Widget _languageOption(String code, String label) {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.touch_app_rounded,
-                color: _gold,
-                size: 18,
-              ),
+              const Icon(Icons.touch_app_rounded, color: _gold, size: 18),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'اسحب الخريطة للتحريك، واستخدم إصبعين للتكبير والتصغير، واضغط على الدولة لتحديدها.',
+                  _tr(
+                    'اسحب الخريطة للتحريك، واستخدم إصبعين للتكبير والتصغير، واضغط على الدولة لتحديدها.',
+                    'Drag to pan, use two fingers to zoom, and tap a country to select it.',
+                    'Faites glisser pour déplacer, utilisez deux doigts pour zoomer et touchez un pays pour le sélectionner.',
+                  ),
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 10,
@@ -2133,15 +2253,15 @@ Widget _languageOption(String code, String label) {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(
-                Icons.offline_pin_rounded,
-                color: _primaryGreen,
-                size: 18,
-              ),
+              const Icon(Icons.offline_pin_rounded, color: _primaryGreen, size: 18),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'حدود الدول وبيانات الخريطة الأساسية مضمنة في التطبيق ولا تحتاج إلى الإنترنت.',
+                  _tr(
+                    'حدود الدول وبيانات الخريطة الأساسية مضمنة في التطبيق ولا تحتاج إلى الإنترنت.',
+                    'Country borders and basic map data are bundled in the app and do not require internet access.',
+                    'Les frontières et les données cartographiques de base sont intégrées à l’application et ne nécessitent pas Internet.',
+                  ),
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 10,
@@ -2165,9 +2285,7 @@ Widget _languageOption(String code, String label) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
-          child: CircularProgressIndicator(
-            color: _gold,
-          ),
+          child: CircularProgressIndicator(color: _gold),
         ),
       );
     }
@@ -2181,47 +2299,34 @@ Widget _languageOption(String code, String label) {
         ),
         child: Column(
           children: [
-            const Icon(
-              Icons.travel_explore_rounded,
-              color: _gold,
-              size: 35,
-            ),
+            const Icon(Icons.travel_explore_rounded, color: _gold, size: 35),
             const SizedBox(height: 10),
             Text(
-              'لا توجد معالم متاحة حالياً',
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-              ),
+              _tr('لا توجد معالم متاحة حالياً', 'No landmarks available', 'Aucun monument disponible'),
+              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
             ),
             if (_landmarkError != null) ...[
               const SizedBox(height: 8),
               Text(
                 _landmarkError!,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: secondaryColor, fontSize: 11),
               ),
             ],
             TextButton.icon(
               onPressed: _loadLandmarks,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('إعادة تحميل البيانات'),
+              label: Text(_tr('إعادة تحميل البيانات', 'Reload data', 'Recharger les données')),
             ),
           ],
         ),
       );
     }
 
-    final islamicLandmarks = _landmarks
-        .where(_isIslamicLandmark)
-        .toList(growable: false);
-
-    final wonders = _landmarks
-        .where((item) => !_isIslamicLandmark(item))
-        .toList(growable: false);
+    final islamicLandmarks =
+        _landmarks.where(_isIslamicLandmark).toList(growable: false);
+    final wonders =
+        _landmarks.where((item) => !_isIslamicLandmark(item)).toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2229,22 +2334,23 @@ Widget _languageOption(String code, String label) {
         if (_landmarkError != null) ...[
           Text(
             _landmarkError!,
-            style: TextStyle(
-              color: secondaryColor,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: secondaryColor, fontSize: 11),
           ),
           const SizedBox(height: 10),
         ],
         _collectionTitle(
-          'المعالم الإسلامية',
-          '${islamicLandmarks.length} مواقع',
+          _tr('المعالم الإسلامية', 'Islamic landmarks', 'Monuments islamiques'),
+          _tr('${islamicLandmarks.length} مواقع', '${islamicLandmarks.length} places', '${islamicLandmarks.length} lieux'),
           textColor,
         ),
         const SizedBox(height: 11),
         if (islamicLandmarks.isEmpty)
           _emptyCollectionMessage(
-            'ستظهر هنا المساجد والمعالم الإسلامية عند إضافتها إلى قاعدة البيانات.',
+            _tr(
+              'ستظهر هنا المساجد والمعالم الإسلامية عند إضافتها إلى قاعدة البيانات.',
+              'Mosques and Islamic landmarks will appear here when added to the database.',
+              'Les mosquées et monuments islamiques apparaîtront ici lorsqu’ils seront ajoutés à la base de données.',
+            ),
             cardColor,
             secondaryColor,
           )
@@ -2257,14 +2363,18 @@ Widget _languageOption(String code, String label) {
           ),
         const SizedBox(height: 22),
         _collectionTitle(
-          'العجائب والمواقع التاريخية',
-          '${wonders.length} مواقع',
+          _tr('العجائب والمواقع التاريخية', 'Wonders and historic sites', 'Merveilles et sites historiques'),
+          _tr('${wonders.length} مواقع', '${wonders.length} places', '${wonders.length} lieux'),
           textColor,
         ),
         const SizedBox(height: 11),
         if (wonders.isEmpty)
           _emptyCollectionMessage(
-            'لا توجد مواقع تاريخية أخرى متاحة حالياً.',
+            _tr(
+              'لا توجد مواقع تاريخية أخرى متاحة حالياً.',
+              'No other historic sites are currently available.',
+              'Aucun autre site historique n’est disponible actuellement.',
+            ),
             cardColor,
             secondaryColor,
           )
@@ -2338,9 +2448,7 @@ Widget _languageOption(String code, String label) {
     Color textColor,
     Color secondaryColor,
   ) {
-    if (landmarks.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (landmarks.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 158,
@@ -2396,7 +2504,7 @@ Widget _languageOption(String code, String label) {
                       ),
                       const SizedBox(height: 11),
                       Text(
-                        landmark.nameAr,
+                        _localizedLandmarkName(landmark),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -2432,33 +2540,35 @@ Widget _languageOption(String code, String label) {
   Widget _buildAccuracyNote(Color secondaryColor) {
     final accuracy = _position?.accuracy;
 
-    final validAccuracy = accuracy != null &&
-        accuracy.isFinite &&
-        accuracy >= 0;
-
-    String accuracyText;
-
-    if (!validAccuracy) {
-      accuracyText = 'لم تتوفر قراءة صالحة لدقة GPS بعد.';
-    } else if (accuracy <= 10) {
-      accuracyText =
-          'تقدير دقة GPS جيد جداً وفق القراءة الحالية (±${accuracy.toStringAsFixed(1)} متر).';
-    } else if (accuracy <= 30) {
-      accuracyText =
-          'تقدير دقة GPS متوسط (±${accuracy.toStringAsFixed(1)} متر). انتظر قليلاً لتحسين القراءة.';
-    } else {
-      accuracyText =
-          'تقدير دقة GPS منخفض حالياً (±${accuracy.toStringAsFixed(1)} متر). انتقل إلى مكان مفتوح وحاول مجدداً.';
+    // لا نعرض بطاقة دقة GPS عند غياب قراءة صالحة.
+    if (accuracy == null || !accuracy.isFinite || accuracy < 0) {
+      return const SizedBox.shrink();
     }
+
+    final accuracyText = accuracy <= 10
+        ? _tr(
+            'تقدير دقة GPS جيد جداً وفق القراءة الحالية (±${accuracy.toStringAsFixed(1)} متر).',
+            'GPS accuracy estimate is very good (±${accuracy.toStringAsFixed(1)} m).',
+            'La précision GPS estimée est très bonne (±${accuracy.toStringAsFixed(1)} m).',
+          )
+        : accuracy <= 30
+            ? _tr(
+                'تقدير دقة GPS متوسط (±${accuracy.toStringAsFixed(1)} متر). انتظر قليلاً لتحسين القراءة.',
+                'GPS accuracy estimate is moderate (±${accuracy.toStringAsFixed(1)} m). Wait for a better reading.',
+                'La précision GPS estimée est moyenne (±${accuracy.toStringAsFixed(1)} m). Attendez une meilleure lecture.',
+              )
+            : _tr(
+                'تقدير دقة GPS منخفض حالياً (±${accuracy.toStringAsFixed(1)} متر). انتقل إلى مكان مفتوح وحاول مجدداً.',
+                'GPS accuracy is currently low (±${accuracy.toStringAsFixed(1)} m). Move to an open area and try again.',
+                'La précision GPS est actuellement faible (±${accuracy.toStringAsFixed(1)} m). Placez-vous dans un espace ouvert et réessayez.',
+              );
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _gold.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _gold.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: _gold.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2466,11 +2576,7 @@ Widget _languageOption(String code, String label) {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.gps_fixed_rounded,
-                color: _gold,
-                size: 20,
-              ),
+              const Icon(Icons.gps_fixed_rounded, color: _gold, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -2488,18 +2594,15 @@ Widget _languageOption(String code, String label) {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.tips_and_updates_outlined,
-                color: _gold,
-                size: 20,
-              ),
+              const Icon(Icons.tips_and_updates_outlined, color: _gold, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'لتحسين قراءة البوصلة، أبعد الهاتف عن المعادن '
-                  'والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 '
-                  'لمعايرة الحساس عند الحاجة. لا يعرض التطبيق رقماً '
-                  'لدقة البوصلة ما لم توفره واجهة الحساس.',
+                  _tr(
+                    'لتحسين قراءة البوصلة، أبعد الهاتف عن المعادن والأجهزة المغناطيسية، وحرّكه بشكل الرقم 8 لمعايرة الحساس عند الحاجة. لا يعرض التطبيق رقماً لدقة البوصلة ما لم توفره واجهة الحساس.',
+                    'To improve compass readings, keep the phone away from metal and magnetic devices. Move it in a figure-eight pattern to calibrate the sensor if needed. The app does not display a compass accuracy value unless the sensor API provides one.',
+                    'Pour améliorer la lecture de la boussole, éloignez le téléphone des métaux et des appareils magnétiques. Effectuez un mouvement en huit pour calibrer le capteur si nécessaire. L’application n’affiche aucune valeur de précision de la boussole si l’interface du capteur ne la fournit pas.',
+                  ),
                   style: TextStyle(
                     color: secondaryColor,
                     fontSize: 11,
@@ -2544,15 +2647,12 @@ class _CompassTicksPainter extends CustomPainter {
       );
 
       tickPaint.strokeWidth = isMajor ? 2.2 : 1.1;
-
       canvas.drawLine(start, end, tickPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _CompassTicksPainter oldDelegate) {
-    return false;
-  }
+  bool shouldRepaint(covariant _CompassTicksPainter oldDelegate) => false;
 }
 
 class _LocationException implements Exception {
