@@ -341,18 +341,19 @@ Widget _languageOption(String code, String label) {
   }
 
   void _disconnectCompass() {
-  
+  _compassGeneration++;
 
-  void _setCompassUnavailable() {
-    if (!mounted) return;
+  final subscription = _compassSubscription;
+  _compassSubscription = null;
 
-    setState(() {
-      _isCompassUnavailable = true;
-      _magneticHeading = null;
-      _trueHeading = null;
-      _relativeQiblaAngle = null;
-    });
+  if (subscription != null) {
+    unawaited(subscription.cancel());
   }
+
+  _magneticHeading = null;
+  _trueHeading = null;
+  _relativeQiblaAngle = null;
+}
 
   void _onCompassEvent(CompassEvent event) {
     final heading = event.heading;
