@@ -2,77 +2,80 @@
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Provides timezone-safe date and time operations.
+/// Timezone-safe date and time operations.
 ///
-/// Requires an IANA timezone identifier, for example:
+/// Uses IANA timezone identifiers such as:
 /// Africa/Casablanca
 /// Europe/Paris
 /// America/New_York
 ///
-/// This service does not guess a timezone from GPS coordinates.
+/// GPS coordinates are intentionally not converted into timezones here.
 class TimeZoneService {
   TimeZoneService._();
 
-  static final TimeZoneService instance =
-      TimeZoneService._();
+  static final TimeZoneService instance = TimeZoneService._();
 
   static bool _initialized = false;
 
-  /// Initialize the timezone database once.
+  /// Initializes the IANA timezone database exactly once.
   void initialize() {
     if (_initialized) return;
 
     tz_data.initializeTimeZones();
-
     _initialized = true;
   }
 
   bool get isInitialized => _initialized;
 
-  /// Resolve and validate an IANA timezone identifier.
+  /// Resolves and validates an IANA timezone identifier.
   tz.Location getLocation(String timezoneId) {
     _ensureInitialized();
 
     final normalizedId = timezoneId.trim();
 
     if (normalizedId.isEmpty) {
-      throw ArgumentError(
+      throw ArgumentError.value(
+        timezoneId,
+        'timezoneId',
         'Timezone identifier cannot be empty.',
       );
     }
 
     try {
       return tz.getLocation(normalizedId);
-    } catch (_) {
-      throw ArgumentError(
-        'Unknown timezone identifier: $normalizedId',
+    } on Exception {
+      throw ArgumentError.value(
+        normalizedId,
+        'timezoneId',
+        'Unknown IANA timezone identifier.',
       );
     }
   }
 
-  /// Return the current time in the requested timezone.
+  /// Returns the current time in the requested timezone.
   tz.TZDateTime now(String timezoneId) {
-    final location = getLocation(timezoneId);
-
-    return tz.TZDateTime.now(location);
+    return tz.TZDateTime.now(
+      getLocation(timezoneId),
+    );
   }
 
-  /// Convert an absolute DateTime instant into a timezone.
+  /// Converts an absolute instant into the requested timezone.
   ///
-  /// The instant is preserved; only its displayed timezone changes.
+  /// The represented instant remains unchanged.
   tz.TZDateTime convert(
     DateTime instant,
     String timezoneId,
   ) {
-    final location = getLocation(timezoneId);
-
     return tz.TZDateTime.from(
       instant,
-      location,
+      getLocation(timezoneId),
     );
   }
 
-  /// Create a timezone-aware date from calendar components.
+  /// Creates a timezone-aware local date and time.
+  ///
+  /// Note: ambiguous or nonexistent local times during DST transitions
+  /// follow the timezone package's constructor behavior.
   tz.TZDateTime createDateTime({
     required String timezoneId,
     required int year,
@@ -85,27 +88,27 @@ class TimeZoneService {
     final location = getLocation(timezoneId);
 
     if (year < 1 || year > 9999) {
-      throw ArgumentError('Invalid year.');
+      throw ArgumentError.value(year, 'year');
     }
 
     if (month < 1 || month > 12) {
-      throw ArgumentError('Invalid month.');
+      throw ArgumentError.value(month, 'month');
     }
 
-    if (day < 1 || day > 31) {
-      throw ArgumentError('Invalid day.');
+    if (day < 1 || day > _daysInMonth(year, month)) {
+      throw ArgumentError.value(day, 'day');
     }
 
     if (hour < 0 || hour > 23) {
-      throw ArgumentError('Invalid hour.');
+      throw ArgumentError.value(hour, 'hour');
     }
 
     if (minute < 0 || minute > 59) {
-      throw ArgumentError('Invalid minute.');
+      throw ArgumentError.value(minute, 'minute');
     }
 
     if (second < 0 || second > 59) {
-      throw ArgumentError('Invalid second.');
+      throw ArgumentError.value(second, 'second');
     }
 
     final result = tz.TZDateTime(
@@ -118,7 +121,7 @@ class TimeZoneService {
       second,
     );
 
-    // Reject invalid calendar dates such as February 31.
+    // Detect normalization caused by invalid or nonexistent local time.
     if (result.year != year ||
         result.month != month ||
         result.day != day ||
@@ -126,22 +129,20 @@ class TimeZoneService {
         result.minute != minute ||
         result.second != second) {
       throw ArgumentError(
-        'Invalid local calendar date or time.',
+        'The requested local date or time is invalid '
+        'in timezone $timezoneId.',
       );
     }
 
     return result;
   }
 
-  /// Get the beginning of the local calendar day.
+  /// Returns the beginning of the local calendar day.
   tz.TZDateTime startOfDay(
     DateTime instant,
     String timezoneId,
   ) {
-    final local = convert(
-      instant,
-      timezoneId,
-    );
+    final local = convert(instant, timezoneId);
 
     return tz.TZDateTime(
       local.location,
@@ -151,18 +152,14 @@ class TimeZoneService {
     );
   }
 
-  /// Get the beginning of the next local calendar day.
+  /// Returns the beginning of the next local calendar day.
   ///
-  /// This uses calendar arithmetic, not a fixed 24-hour duration.
-  /// Therefore, daylight-saving transitions are respected.
+  /// Uses calendar arithmetic instead of adding 24 hours.
   tz.TZDateTime startOfNextDay(
     DateTime instant,
     String timezoneId,
   ) {
-    final local = convert(
-      instant,
-      timezoneId,
-    );
+    final local = convert(instant, timezoneId);
 
     return tz.TZDateTime(
       local.location,
@@ -172,28 +169,23 @@ class TimeZoneService {
     );
   }
 
-  /// Compare two absolute instants by their local calendar date.
+  /// Compares two instants using their local calendar dates.
   bool isSameLocalDate({
     required DateTime first,
     required DateTime second,
     required String timezoneId,
   }) {
-    final firstLocal = convert(
-      first,
-      timezoneId,
-    );
+    final location = getLocation(timezoneId);
 
-    final secondLocal = convert(
-      second,
-      timezoneId,
-    );
+    final firstLocal = tz.TZDateTime.from(first, location);
+    final secondLocal = tz.TZDateTime.from(second, location);
 
     return firstLocal.year == secondLocal.year &&
         firstLocal.month == secondLocal.month &&
         firstLocal.day == secondLocal.day;
   }
 
-  /// Return the UTC offset at a specific instant.
+  /// Returns the UTC offset at the requested instant.
   Duration utcOffset(
     DateTime instant,
     String timezoneId,
@@ -204,10 +196,20 @@ class TimeZoneService {
     ).timeZoneOffset;
   }
 
+  static int _daysInMonth(int year, int month) {
+    final firstDayOfNextMonth = month == 12
+        ? DateTime(year + 1, 1, 1)
+        : DateTime(year, month + 1, 1);
+
+    return firstDayOfNextMonth
+        .subtract(const Duration(days: 1))
+        .day;
+  }
+
   void _ensureInitialized() {
     if (!_initialized) {
       throw StateError(
-        'TimeZoneService.initialize() must be called first.',
+        'Call TimeZoneService.initialize() before using timezone operations.',
       );
     }
   }
