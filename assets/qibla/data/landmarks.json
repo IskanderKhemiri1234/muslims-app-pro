@@ -1,1 +1,204 @@
-[]
+
+[
+  {
+    "id": "masjid-al-haram",
+    "nameAr": "المسجد الحرام والكعبة المشرفة",
+    "nameEn": "Al-Masjid al-Haram and the Kaaba",
+    "category": "holyMosque",
+    "latitude": 21.4224779,
+    "longitude": 39.8251832,
+    "countryCode": "SA",
+    "cityAr": "مكة المكرمة",
+    "cityEn": "Makkah",
+    "regionAr": "منطقة مكة المكرمة",
+    "regionEn": "Makkah Region",
+    "descriptionAr": "المسجد الحرام في مكة المكرمة، ويضم الكعبة المشرفة التي يتجه إليها المسلمون في صلاتهم. وهو مقصد الحج والعمرة.",
+    "descriptionEn": "The Grand Mosque in Makkah contains the Kaaba, toward which Muslims face in prayer. It is the destination of Hajj and Umrah.",
+    "historicalPeriodAr": "التاريخ الإسلامي",
+    "historicalPeriodEn": "Islamic history",
+    "isFeatured": true,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "google-qibla-kaaba",
+        "name": "Google Qibla Finder",
+        "url": "https://support.google.com/faqs/answer/7364753",
+        "sourceType": "reference",
+        "publisher": "Google",
+        "license": "Reference information; image rights not included"
+      }
+    ]
+  },
+  {
+    "id": "prophets-mosque",
+    "nameAr": "المسجد النبوي",
+    "nameEn": "The Prophet's Mosque",
+    "category": "holyMosque",
+    "latitude": 24.4672,
+    "longitude": 39.6111,
+    "countryCode": "SA",
+    "cityAr": "المدينة المنورة",
+    "cityEn": "Al-Madinah",
+    "regionAr": "منطقة المدينة المنورة",
+    "regionEn": "Al-Madinah Region",
+    "descriptionAr": "المسجد النبوي في المدينة المنورة، بناه النبي محمد ﷺ بعد الهجرة، وشهد توسعات متعاقبة عبر العصور الإسلامية.",
+    "descriptionEn": "The Prophet's Mosque in Al-Madinah was established by Prophet Muhammad after the Hijrah and underwent successive expansions throughout Islamic history.",
+    "historicalPeriodAr": "العصر النبوي والعصور الإسلامية",
+    "historicalPeriodEn": "Prophetic and Islamic periods",
+    "isFeatured": true,
+    "images": [],
+    "historicalEvents": [
+      {
+        "id": "first-expansion-628",
+        "titleAr": "التوسعة الأولى بعد خيبر",
+        "titleEn": "First expansion after Khaybar",
+        "descriptionAr": "تذكر سعوديبيديا أن المسجد شهد توسعته الأولى عام 628م بعد عودة النبي ﷺ من خيبر.",
+        "descriptionEn": "Saudipedia records the mosque's first expansion in 628 CE, after the Prophet's return from Khaybar.",
+        "dateLabelAr": "628م",
+        "dateLabelEn": "628 CE",
+        "sortOrder": 1,
+        "startYear": 628,
+        "endYear": 628,
+        "calendar": "Gregorian",
+        "sourceIds": [
+          "saudipedia-prophets-mosque"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "saudipedia-prophets-mosque",
+        "name": "The Prophet's Mosque",
+        "url": "https://saudipedia.com/en/the-prophet%22s-mosque",
+        "sourceType": "official-reference",
+        "publisher": "Saudipedia",
+        "license": "Reference information; image rights not included"
+      }
+    ]
+  },
+  {
+    "id": "al-aqsa-mosque",
+    "nameAr": "المسجد الأقصى",
+    "nameEn": "Al-Aqsa Mosque",
+    "category": "holyMosque",
+    "latitude": 31.7774917,
+    "longitude": 35.2358083,
+    "countryCode": "PS",
+    "cityAr": "القدس",
+    "cityEn": "Jerusalem",
+    "regionAr": "القدس",
+    "regionEn": "Jerusalem",
+    "descriptionAr": "المسجد الأقصى في البلدة القديمة بالقدس. ويُستخدم اسم المسجد الأقصى أيضاً للدلالة على الحرم الشريف ومرافقه وساحاته ضمن نطاقه التاريخي.",
+    "descriptionEn": "Al-Aqsa Mosque is located in Jerusalem's Old City. The name Al-Aqsa Mosque is also used to refer to the wider historic Al-Haram Ash-Sharif compound and its structures and courtyards.",
+    "historicalPeriodAr": "العصر الإسلامي المبكر",
+    "historicalPeriodEn": "Early Islamic period",
+    "isFeatured": true,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "ircica-al-aqsa",
+        "name": "Al-Aqsa Mosque - Architectural Heritage Inventory",
+        "url": "https://www.islamicarchitecturalheritage.com/listings/al-aqsa-mosque-al-masjid-al-aqsa-al-haram-ash-sharif",
+        "sourceType": "heritage-inventory",
+        "publisher": "IRCICA",
+        "license": "Reference information; image rights not included"
+      },
+      {
+        "id": "unesco-al-aqsa",
+        "name": "Al-Aqsa Mosque / Al-Haram Ash-Sharif",
+        "url": "https://whc.unesco.org/document/221350",
+        "sourceType": "heritage-document",
+        "publisher": "UNESCO",
+        "license": "UNESCO document; image rights must be checked separately"
+      }
+    ]
+  },
+  {
+    "id": "salah-al-din-citadel",
+    "nameAr": "قلعة صلاح الدين الأيوبي بالقاهرة",
+    "nameEn": "Cairo Citadel of Salah al-Din",
+    "category": "historicalSite",
+    "latitude": 30.0294,
+    "longitude": 31.2617,
+    "countryCode": "EG",
+    "cityAr": "القاهرة",
+    "cityEn": "Cairo",
+    "regionAr": "القاهرة",
+    "regionEn": "Cairo",
+    "descriptionAr": "قلعة تاريخية على مرتفعات المقطم بالقاهرة. أمر صلاح الدين الأيوبي بإنشائها سنة 572هـ الموافق 1176م لتكون جزءاً من منظومة الدفاع عن المدينة، واستمر العمل فيها بعد وفاته.",
+    "descriptionEn": "A historic fortress on the Muqattam Hills in Cairo. Salah al-Din ordered its construction in 572 AH / 1176 CE as part of the city's defensive system; work continued after his death.",
+    "historicalPeriodAr": "العصر الأيوبي",
+    "historicalPeriodEn": "Ayyubid period",
+    "establishedYear": 1176,
+    "isFeatured": true,
+    "images": [],
+    "historicalEvents": [
+      {
+        "id": "citadel-construction-1176",
+        "titleAr": "بدء إنشاء القلعة",
+        "titleEn": "Construction of the citadel begins",
+        "descriptionAr": "أمر السلطان صلاح الدين الأيوبي ببدء إنشاء القلعة فوق مرتفعات المقطم سنة 572هـ الموافق 1176م.",
+        "descriptionEn": "Sultan Salah al-Din al-Ayyubi ordered the construction of the citadel on the Muqattam Hills in 572 AH / 1176 CE.",
+        "dateLabelAr": "572هـ / 1176م",
+        "dateLabelEn": "572 AH / 1176 CE",
+        "sortOrder": 1,
+        "startYear": 1176,
+        "endYear": 1176,
+        "calendar": "Gregorian",
+        "sourceIds": [
+          "egypt-ministry-cairo-citadel"
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "egypt-ministry-cairo-citadel",
+        "name": "Cairo Citadel",
+        "url": "https://egymonuments.gov.eg/archaeological-sites/cairo-citadel/",
+        "sourceType": "official-heritage",
+        "publisher": "Egyptian Ministry of Tourism and Antiquities",
+        "license": "Reference information; image rights not included"
+      }
+    ]
+  },
+  {
+    "id": "giza-pyramids",
+    "nameAr": "أهرامات الجيزة",
+    "nameEn": "Pyramids of Giza",
+    "category": "historicalSite",
+    "latitude": 29.9760,
+    "longitude": 31.1304,
+    "countryCode": "EG",
+    "cityAr": "الجيزة",
+    "cityEn": "Giza",
+    "regionAr": "محافظة الجيزة",
+    "regionEn": "Giza Governorate",
+    "descriptionAr": "مجموعة الأهرامات الواقعة على هضبة الجيزة، وهي جزء من موقع ممفيس ومقبرتها المدرج على قائمة التراث العالمي لليونسكو. تضم المنطقة أهرامات الجيزة الثلاثة وأبو الهول.",
+    "descriptionEn": "The pyramid complex on the Giza Plateau forms part of the UNESCO World Heritage property of Memphis and its Necropolis. The area includes the three major Giza pyramids and the Great Sphinx.",
+    "historicalPeriodAr": "مصر القديمة - الدولة القديمة",
+    "historicalPeriodEn": "Ancient Egypt - Old Kingdom",
+    "isFeatured": true,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "unesco-memphis-pyramids",
+        "name": "Memphis and its Necropolis - The Pyramid Fields from Giza to Dahshur",
+        "url": "https://whc.unesco.org/en/list/86/",
+        "sourceType": "world-heritage",
+        "publisher": "UNESCO",
+        "license": "CC-BY-SA IGO 3.0 for the cited UNESCO description; image rights must be checked separately"
+      },
+      {
+        "id": "egypt-ministry-memphis",
+        "name": "Memphis and its Necropolis",
+        "url": "https://egymonuments.gov.eg/world-heritage/memphis-and-its-necropolis/",
+        "sourceType": "official-heritage",
+        "publisher": "Egyptian Ministry of Tourism and Antiquities",
+        "license": "Reference information; image rights not included"
+      }
+    ]
+  }
+]
