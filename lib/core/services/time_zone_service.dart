@@ -1,6 +1,6 @@
 
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 /// Timezone-safe date and time operations.
 ///
