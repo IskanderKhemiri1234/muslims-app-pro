@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
@@ -110,6 +111,9 @@ class PrayerController extends ChangeNotifier
 
   Prayer _nextPrayer = Prayer.none;
 
+  /// Legacy compatibility for existing widgets.
+  ///
+  /// New features should use [globalSchedule].
   PrayerTimes? get prayerTimes => _prayerTimes;
 
   PrayerTimes? get tomorrowPrayerTimes => _tomorrowPrayerTimes;
@@ -122,6 +126,13 @@ class PrayerController extends ChangeNotifier
   Prayer get nextPrayer => _nextPrayer;
 
   DateTime? get nextPrayerTime => _nextPrayerAt;
+
+  /// Indicates whether the authoritative global schedule is available.
+  bool get hasUsableSchedule =>
+      _globalSchedule != null &&
+      _tomorrowGlobalSchedule != null &&
+      _nextPrayerAt != null &&
+      _nextPrayer != Prayer.none;
 
   // --------------------------------------------------
   // CLOCK
@@ -141,6 +152,10 @@ class PrayerController extends ChangeNotifier
   // --------------------------------------------------
 
   bool isLoadingLocation = false;
+
+  /// Indicates that an initialization attempt has completed.
+  ///
+  /// Check [hasUsableSchedule] before relying on prayer data.
   bool isInitialized = false;
 
   String? message;
@@ -229,7 +244,6 @@ class PrayerController extends ChangeNotifier
       if (_disposed) return;
 
       isInitialized = true;
-
       message = 'Unable to initialize prayer times.';
 
       _stopClock();
@@ -450,8 +464,7 @@ class PrayerController extends ChangeNotifier
 
   /// Compatibility schedule for existing widgets.
   ///
-  /// This legacy PrayerTimes object uses the device DateTime
-  /// representation. Global calculations must use globalSchedule.
+  /// The global schedule remains authoritative.
   PrayerTimes _createLegacyPrayerTimes(DateTime date) {
     return _calculationService.calculate(
       latitude: latitude,
@@ -476,24 +489,14 @@ class PrayerController extends ChangeNotifier
     }
 
     final now = DateTime.now();
-
     final localNow = tz.TZDateTime.from(now, timezone);
 
     final todayDate = _dateOnly(localNow);
     final tomorrowDate = _nextCalendarDay(localNow);
 
+    // The global engine is the authoritative calculation source.
     final todayGlobal = _createGlobalSchedule(todayDate);
     final tomorrowGlobal = _createGlobalSchedule(tomorrowDate);
-
-    final todayLegacy = _createLegacyPrayerTimes(localNow);
-
-    final tomorrowLegacy = _createLegacyPrayerTimes(
-      DateTime(
-        tomorrowDate.year,
-        tomorrowDate.month,
-        tomorrowDate.day,
-      ),
-    );
 
     final next = _findNextPrayer(
       today: todayGlobal,
@@ -501,7 +504,26 @@ class PrayerController extends ChangeNotifier
       now: now,
     );
 
-    // Commit only after all calculations succeed.
+    // Legacy compatibility must not invalidate a valid global schedule.
+    PrayerTimes? todayLegacy;
+    PrayerTimes? tomorrowLegacy;
+
+    try {
+      todayLegacy = _createLegacyPrayerTimes(localNow);
+
+      tomorrowLegacy = _createLegacyPrayerTimes(
+        DateTime(
+          tomorrowDate.year,
+          tomorrowDate.month,
+          tomorrowDate.day,
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Legacy prayer calculation error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    // Commit after the authoritative calculations complete.
     _globalSchedule = todayGlobal;
     _tomorrowGlobalSchedule = tomorrowGlobal;
 
@@ -678,10 +700,23 @@ class PrayerController extends ChangeNotifier
   Future<void> updateLocation() async {
     if (_disposed || isLoadingLocation) return;
 
+    // Prevent a location update from racing initialization.
+    final initialization = _initializationTask;
+
+    if (initialization != null) {
+      await initialization;
+
+      if (_disposed) return;
+    }
+
     isLoadingLocation = true;
     message = null;
-
     _notifySafely();
+
+    final oldLatitude = latitude;
+    final oldLongitude = longitude;
+    final oldCity = city;
+    final oldTimezone = _discoveredTimezone;
 
     try {
       final Position position =
@@ -696,30 +731,25 @@ class PrayerController extends ChangeNotifier
         throw StateError('Received invalid location coordinates.');
       }
 
-      final oldLatitude = latitude;
-      final oldLongitude = longitude;
-      final oldCity = city;
-      final oldTimezone = _discoveredTimezone;
+      latitude = newLatitude;
+      longitude = newLongitude;
+      city = 'Current location';
 
       try {
-        latitude = newLatitude;
-        longitude = newLongitude;
-        city = 'Current location';
-
         await _discoverTimezone();
 
         if (_disposed) return;
 
         _calculateSchedule();
-
-        await _saveSettings();
       } catch (_) {
         if (_disposed) return;
 
-        latitude = oldLatitude;
-        longitude = oldLongitude;
-        city = oldCity;
-        _discoveredTimezone = oldTimezone;
+        _restoreLocationState(
+          latitude: oldLatitude,
+          longitude: oldLongitude,
+          city: oldCity,
+          timezone: oldTimezone,
+        );
 
         _calculateSchedule();
 
@@ -728,12 +758,50 @@ class PrayerController extends ChangeNotifier
 
       if (_disposed) return;
 
-      message = 'Location updated successfully.';
+      // A valid new location remains active even if persistence fails.
+      try {
+        await _saveSettings();
+      } catch (error, stackTrace) {
+        debugPrint('Location persistence error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+
+        message = 'Location updated, but saving settings failed.';
+      }
+
+      if (_disposed) return;
+
+      // Restart the clock after successful location calculation.
+      if (_isAppActive) {
+        _startClock();
+      }
+
+      if (message == null) {
+        message = 'Location updated successfully.';
+      }
     } catch (error, stackTrace) {
       debugPrint('Location update error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (_disposed) return;
+
+      _restoreLocationState(
+        latitude: oldLatitude,
+        longitude: oldLongitude,
+        city: oldCity,
+        timezone: oldTimezone,
+      );
+
+      // Attempt to restore the previous schedule safely.
+      try {
+        _calculateSchedule();
+
+        if (_isAppActive) {
+          _startClock();
+        }
+      } catch (rollbackError, rollbackStackTrace) {
+        debugPrint('Location rollback error: $rollbackError');
+        debugPrintStack(stackTrace: rollbackStackTrace);
+      }
 
       message = error
           .toString()
@@ -745,6 +813,18 @@ class PrayerController extends ChangeNotifier
         _notifySafely();
       }
     }
+  }
+
+  void _restoreLocationState({
+    required double latitude,
+    required double longitude,
+    required String city,
+    required DiscoveredTimezone? timezone,
+  }) {
+    this.latitude = latitude;
+    this.longitude = longitude;
+    this.city = city;
+    _discoveredTimezone = timezone;
   }
 
   // --------------------------------------------------
@@ -771,6 +851,8 @@ class PrayerController extends ChangeNotifier
 
     final previousMethod = method;
     final previousMadhab = madhab;
+    final previousHasSavedMethod = _hasSavedMethod;
+    final previousHasSavedMadhab = _hasSavedMadhab;
 
     try {
       if (newMethod != null) {
@@ -804,6 +886,8 @@ class PrayerController extends ChangeNotifier
 
       method = previousMethod;
       madhab = previousMadhab;
+      _hasSavedMethod = previousHasSavedMethod;
+      _hasSavedMadhab = previousHasSavedMadhab;
 
       _recalculateSafely();
 
