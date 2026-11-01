@@ -5,9 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../../domain/models/qibla_landmark.dart';
 
-/// Reads and validates Qibla Atlas landmarks from a bundled JSON asset.
-///
-/// This data source has no network dependency.
 class QiblaLandmarkLocalDataSource {
   QiblaLandmarkLocalDataSource({
     AssetBundle? assetBundle,
@@ -17,14 +14,10 @@ class QiblaLandmarkLocalDataSource {
   final AssetBundle _assetBundle;
   final String assetPath;
 
-  /// Loads all landmarks from the local JSON asset.
-  ///
-  /// Throws [QiblaLandmarkDataException] if the asset is missing,
-  /// malformed, or contains invalid records.
   Future<List<QiblaLandmark>> loadLandmarks() async {
     try {
-      final jsonString = await _assetBundle.loadString(assetPath);
-      final decoded = jsonDecode(jsonString);
+      final String rawJson = await _assetBundle.loadString(assetPath);
+      final dynamic decoded = jsonDecode(rawJson);
 
       if (decoded is! List) {
         throw const QiblaLandmarkDataException(
@@ -32,15 +25,15 @@ class QiblaLandmarkLocalDataSource {
         );
       }
 
-      final landmarks = <QiblaLandmark>[];
-      final identifiers = <String>{};
+      final List<QiblaLandmark> landmarks = [];
+      final Set<String> ids = {};
 
       for (var index = 0; index < decoded.length; index++) {
-        final record = decoded[index];
+        final dynamic record = decoded[index];
 
         if (record is! Map) {
           throw QiblaLandmarkDataException(
-            'Invalid landmark record at index $index.',
+            'Landmark at index $index must be a JSON object.',
           );
         }
 
@@ -49,25 +42,21 @@ class QiblaLandmarkLocalDataSource {
           index,
         );
 
-        if (!identifiers.add(landmark.id)) {
+        if (!ids.add(landmark.id)) {
           throw QiblaLandmarkDataException(
-            'Duplicate landmark identifier: ${landmark.id}.',
+            'Duplicate landmark ID: ${landmark.id}',
           );
         }
 
         landmarks.add(landmark);
       }
 
-      return List<QiblaLandmark>.unmodifiable(landmarks);
+      return List.unmodifiable(landmarks);
     } on QiblaLandmarkDataException {
       rethrow;
-    } on FormatException catch (error) {
+    } catch (error) {
       throw QiblaLandmarkDataException(
-        'Invalid landmarks JSON: ${error.message}',
-      );
-    } on FlutterError catch (error) {
-      throw QiblaLandmarkDataException(
-        'Unable to load local landmarks asset: ${error.message}',
+        'Unable to load landmarks from $assetPath: $error',
       );
     }
   }
@@ -76,66 +65,78 @@ class QiblaLandmarkLocalDataSource {
     Map<String, dynamic> json,
     int index,
   ) {
-    final id = _requiredString(json, 'id', index);
-    final nameAr = _requiredString(json, 'nameAr', index);
-    final nameEn = _requiredString(json, 'nameEn', index);
-    final countryCode = _requiredString(
-      json,
-      'countryCode',
-      index,
-    ).toUpperCase();
+    final String id = _requiredString(json, 'id', index);
+    final String nameAr = _requiredString(json, 'nameAr', index);
+    final String nameEn = _requiredString(json, 'nameEn', index);
+    final String countryCode =
+        _requiredString(json, 'countryCode', index).toUpperCase();
 
     if (!RegExp(r'^[A-Z]{2}$').hasMatch(countryCode)) {
-      throw QiblaLandmarkDataException(
-        'Invalid ISO country code in record $index.',
-      );
+      _fail(index, 'countryCode must contain exactly two letters.');
     }
 
-    final latitude = _requiredDouble(json, 'latitude', index);
-    final longitude = _requiredDouble(json, 'longitude', index);
+    final double latitude = _requiredDouble(json, 'latitude', index);
+    final double longitude = _requiredDouble(json, 'longitude', index);
 
     if (latitude < -90 || latitude > 90) {
-      throw QiblaLandmarkDataException(
-        'Latitude out of range in record $index.',
-      );
+      _fail(index, 'latitude must be between -90 and 90.');
     }
 
     if (longitude < -180 || longitude > 180) {
-      throw QiblaLandmarkDataException(
-        'Longitude out of range in record $index.',
-      );
+      _fail(index, 'longitude must be between -180 and 180.');
     }
 
-    final category = _parseCategory(
-      _requiredString(json, 'category', index),
+    final QiblaLandmarkCategory category =
+        _parseCategory(json['category'], index);
+
+    final List<QiblaLandmarkSource> sources =
+        _parseSources(json['sources'], index);
+
+    final List<QiblaLandmarkImage> images =
+        _parseImages(json['images'], index);
+
+    final List<QiblaLandmarkHistoricalEvent> historicalEvents =
+        _parseHistoricalEvents(
+      json['historicalEvents'],
       index,
     );
 
-    final imageAsset = _optionalString(json, 'imageAsset');
-    if (imageAsset != null &&
-        (!_isLocalAssetPath(imageAsset))) {
-      throw QiblaLandmarkDataException(
-        'Invalid local image asset path in record $index.',
-      );
+    final Set<String> sourceIds =
+        sources.map((source) => source.id).toSet();
+
+    for (final event in historicalEvents) {
+      for (final sourceId in event.sourceIds) {
+        if (!sourceIds.contains(sourceId)) {
+          _fail(
+            index,
+            'Historical event "${event.id}" references '
+            'an unknown source "$sourceId".',
+          );
+        }
+      }
     }
 
-    final sourceUrl = _optionalString(json, 'sourceUrl');
-    if (sourceUrl != null && !_isValidSourceUrl(sourceUrl)) {
-      throw QiblaLandmarkDataException(
-        'Invalid source URL in record $index.',
-      );
-    }
+    final String? imageAsset =
+        _optionalString(json, 'imageAsset', index);
 
-    final lastVerifiedAt = _optionalString(
-      json,
-      'lastVerifiedAt',
-    );
+    final String? sourceName =
+        _optionalString(json, 'sourceName', index);
+
+    final String? sourceUrl =
+        _optionalString(json, 'sourceUrl', index);
+
+    final String? license =
+        _optionalString(json, 'license', index);
+
+    final String? lastVerifiedAt =
+        _optionalString(json, 'lastVerifiedAt', index);
+
+    _validateAssetPath(imageAsset, index);
+    _validateUrl(sourceUrl, index, 'sourceUrl');
 
     if (lastVerifiedAt != null &&
         DateTime.tryParse(lastVerifiedAt) == null) {
-      throw QiblaLandmarkDataException(
-        'Invalid verification date in record $index.',
-      );
+      _fail(index, 'lastVerifiedAt must be a valid ISO date.');
     }
 
     return QiblaLandmark(
@@ -146,19 +147,272 @@ class QiblaLandmarkLocalDataSource {
       latitude: latitude,
       longitude: longitude,
       countryCode: countryCode,
-      descriptionAr: _optionalString(json, 'descriptionAr'),
-      descriptionEn: _optionalString(json, 'descriptionEn'),
+      descriptionAr: _optionalString(json, 'descriptionAr', index),
+      descriptionEn: _optionalString(json, 'descriptionEn', index),
+      cityAr: _optionalString(json, 'cityAr', index),
+      cityEn: _optionalString(json, 'cityEn', index),
+      regionAr: _optionalString(json, 'regionAr', index),
+      regionEn: _optionalString(json, 'regionEn', index),
+      historicalPeriodAr:
+          _optionalString(json, 'historicalPeriodAr', index),
+      historicalPeriodEn:
+          _optionalString(json, 'historicalPeriodEn', index),
+      establishedYear:
+          _optionalInt(json, 'establishedYear', index),
+      images: images,
+      historicalEvents: historicalEvents,
+      sources: sources,
       imageAsset: imageAsset,
-      sourceName: _optionalString(json, 'sourceName'),
+      sourceName: sourceName,
       sourceUrl: sourceUrl,
-      license: _optionalString(json, 'license'),
+      license: license,
       lastVerifiedAt: lastVerifiedAt,
       isFeatured: _optionalBool(
         json,
         'isFeatured',
-        defaultValue: false,
+        false,
+        index,
       ),
     );
+  }
+
+  QiblaLandmarkCategory _parseCategory(
+    dynamic value,
+    int index,
+  ) {
+    if (value is! String || value.trim().isEmpty) {
+      _fail(index, 'category is required.');
+    }
+
+    for (final category in QiblaLandmarkCategory.values) {
+      if (category.name == value) {
+        return category;
+      }
+    }
+
+    _fail(index, 'Unknown category "$value".');
+  }
+
+  List<QiblaLandmarkSource> _parseSources(
+    dynamic value,
+    int index,
+  ) {
+    if (value == null) return const [];
+
+    if (value is! List) {
+      _fail(index, 'sources must be a list.');
+    }
+
+    final result = <QiblaLandmarkSource>[];
+    final ids = <String>{};
+
+    for (final item in value) {
+      if (item is! Map) {
+        _fail(index, 'Each source must be an object.');
+      }
+
+      final json = Map<String, dynamic>.from(item);
+
+      final id = _requiredString(json, 'id', index);
+
+      if (!ids.add(id)) {
+        _fail(index, 'Duplicate source ID "$id".');
+      }
+
+      final url = _requiredString(json, 'url', index);
+      _validateUrl(url, index, 'source.url');
+
+      final accessedAt =
+          _optionalString(json, 'accessedAt', index);
+
+      if (accessedAt != null &&
+          DateTime.tryParse(accessedAt) == null) {
+        _fail(index, 'source.accessedAt must be a valid ISO date.');
+      }
+
+      result.add(
+        QiblaLandmarkSource(
+          id: id,
+          name: _requiredString(json, 'name', index),
+          url: url,
+          sourceType: _requiredString(json, 'sourceType', index),
+          accessedAt: accessedAt,
+          publisher: _optionalString(json, 'publisher', index),
+          license: _optionalString(json, 'license', index),
+        ),
+      );
+    }
+
+    return List.unmodifiable(result);
+  }
+
+  List<QiblaLandmarkImage> _parseImages(
+    dynamic value,
+    int index,
+  ) {
+    if (value == null) return const [];
+
+    if (value is! List) {
+      _fail(index, 'images must be a list.');
+    }
+
+    final result = <QiblaLandmarkImage>[];
+    final paths = <String>{};
+    var primaryCount = 0;
+
+    for (final item in value) {
+      if (item is! Map) {
+        _fail(index, 'Each image must be an object.');
+      }
+
+      final json = Map<String, dynamic>.from(item);
+
+      final assetPath =
+          _requiredString(json, 'assetPath', index);
+
+      _validateAssetPath(assetPath, index);
+
+      if (!paths.add(assetPath)) {
+        _fail(index, 'Duplicate image asset path "$assetPath".');
+      }
+
+      final creator = _requiredString(json, 'creator', index);
+      final sourceName =
+          _requiredString(json, 'sourceName', index);
+      final sourceUrl =
+          _requiredString(json, 'sourceUrl', index);
+      final license = _requiredString(json, 'license', index);
+
+      _validateUrl(sourceUrl, index, 'image.sourceUrl');
+
+      final isPrimary = _optionalBool(
+        json,
+        'isPrimary',
+        false,
+        index,
+      );
+
+      if (isPrimary) primaryCount++;
+
+      result.add(
+        QiblaLandmarkImage(
+          assetPath: assetPath,
+          captionAr: _optionalString(json, 'captionAr', index),
+          captionEn: _optionalString(json, 'captionEn', index),
+          creator: creator,
+          sourceName: sourceName,
+          sourceUrl: sourceUrl,
+          license: license,
+          isPrimary: isPrimary,
+          width: _optionalInt(json, 'width', index),
+          height: _optionalInt(json, 'height', index),
+        ),
+      );
+    }
+
+    if (primaryCount > 1) {
+      _fail(index, 'Only one image can be marked as primary.');
+    }
+
+    return List.unmodifiable(result);
+  }
+
+  List<QiblaLandmarkHistoricalEvent> _parseHistoricalEvents(
+    dynamic value,
+    int index,
+  ) {
+    if (value == null) return const [];
+
+    if (value is! List) {
+      _fail(index, 'historicalEvents must be a list.');
+    }
+
+    final result = <QiblaLandmarkHistoricalEvent>[];
+    final ids = <String>{};
+
+    for (final item in value) {
+      if (item is! Map) {
+        _fail(index, 'Each historical event must be an object.');
+      }
+
+      final json = Map<String, dynamic>.from(item);
+      final id = _requiredString(json, 'id', index);
+
+      if (!ids.add(id)) {
+        _fail(index, 'Duplicate historical event ID "$id".');
+      }
+
+      final startYear =
+          _optionalInt(json, 'startYear', index);
+      final endYear =
+          _optionalInt(json, 'endYear', index);
+
+      if (startYear != null &&
+          endYear != null &&
+          startYear > endYear) {
+        _fail(
+          index,
+          'Historical event "$id" has startYear after endYear.',
+        );
+      }
+
+      final sourceIds = _parseStringList(
+        json['sourceIds'],
+        index,
+        'historicalEvent.sourceIds',
+      );
+
+      result.add(
+        QiblaLandmarkHistoricalEvent(
+          id: id,
+          titleAr: _requiredString(json, 'titleAr', index),
+          titleEn: _requiredString(json, 'titleEn', index),
+          descriptionAr:
+              _requiredString(json, 'descriptionAr', index),
+          descriptionEn:
+              _requiredString(json, 'descriptionEn', index),
+          dateLabelAr:
+              _requiredString(json, 'dateLabelAr', index),
+          dateLabelEn:
+              _requiredString(json, 'dateLabelEn', index),
+          sortOrder: _optionalInt(json, 'sortOrder', index) ?? 0,
+          startYear: startYear,
+          endYear: endYear,
+          calendar: _optionalString(json, 'calendar', index),
+          sourceIds: sourceIds,
+        ),
+      );
+    }
+
+    return List.unmodifiable(result);
+  }
+
+  List<String> _parseStringList(
+    dynamic value,
+    int index,
+    String field,
+  ) {
+    if (value == null) return const [];
+
+    if (value is! List) {
+      _fail(index, '$field must be a list.');
+    }
+
+    final result = <String>[];
+
+    for (final item in value) {
+      if (item is! String || item.trim().isEmpty) {
+        _fail(index, '$field must contain non-empty strings.');
+      }
+
+      if (result.contains(item.trim())) {
+        _fail(index, '$field contains duplicate values.');
+      }
+
+      result.add(item.trim());
+    }
+
+    return List.unmodifiable(result);
   }
 
   String _requiredString(
@@ -169,9 +423,7 @@ class QiblaLandmarkLocalDataSource {
     final value = json[key];
 
     if (value is! String || value.trim().isEmpty) {
-      throw QiblaLandmarkDataException(
-        'Missing or invalid "$key" in record $index.',
-      );
+      _fail(index, '$key is required and must be a non-empty string.');
     }
 
     return value.trim();
@@ -180,19 +432,18 @@ class QiblaLandmarkLocalDataSource {
   String? _optionalString(
     Map<String, dynamic> json,
     String key,
+    int index,
   ) {
     final value = json[key];
 
     if (value == null) return null;
 
     if (value is! String) {
-      throw QiblaLandmarkDataException(
-        'Optional field "$key" must be a string.',
-      );
+      _fail(index, '$key must be a string or null.');
     }
 
-    final normalized = value.trim();
-    return normalized.isEmpty ? null : normalized;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   double _requiredDouble(
@@ -203,64 +454,83 @@ class QiblaLandmarkLocalDataSource {
     final value = json[key];
 
     if (value is! num || !value.toDouble().isFinite) {
-      throw QiblaLandmarkDataException(
-        'Missing or invalid "$key" in record $index.',
-      );
+      _fail(index, '$key must be a finite number.');
     }
 
     return value.toDouble();
   }
 
-  bool _optionalBool(
+  int? _optionalInt(
     Map<String, dynamic> json,
-    String key, {
-    required bool defaultValue,
-  }) {
+    String key,
+    int index,
+  ) {
     final value = json[key];
 
-    if (value == null) return defaultValue;
+    if (value == null) return null;
 
-    if (value is! bool) {
-      throw QiblaLandmarkDataException(
-        'Optional field "$key" must be a boolean.',
-      );
+    if (value is! int) {
+      _fail(index, '$key must be an integer or null.');
     }
 
     return value;
   }
 
-  QiblaLandmarkCategory _parseCategory(
-    String value,
+  bool _optionalBool(
+    Map<String, dynamic> json,
+    String key,
+    bool defaultValue,
     int index,
   ) {
-    for (final category in QiblaLandmarkCategory.values) {
-      if (category.name == value) {
-        return category;
-      }
+    final value = json[key];
+
+    if (value == null) return defaultValue;
+
+    if (value is! bool) {
+      _fail(index, '$key must be a boolean.');
     }
 
-    throw QiblaLandmarkDataException(
-      'Unknown landmark category "$value" in record $index.',
-    );
+    return value;
   }
 
-  bool _isLocalAssetPath(String path) {
-    return path.startsWith('assets/') &&
-        !path.startsWith('/') &&
-        !path.contains('..') &&
-        !path.contains('://');
+  void _validateAssetPath(String? path, int index) {
+    if (path == null) return;
+
+    if (!path.startsWith('assets/') ||
+        path.contains('..') ||
+        path.contains('\\') ||
+        path.startsWith('//')) {
+      _fail(index, 'Invalid local asset path "$path".');
+    }
+
+    if (Uri.tryParse(path)?.hasScheme == true) {
+      _fail(index, 'Image assets must use local paths, not URLs.');
+    }
   }
 
-  bool _isValidSourceUrl(String value) {
+  void _validateUrl(
+    String? value,
+    int index,
+    String field,
+  ) {
+    if (value == null) return;
+
     final uri = Uri.tryParse(value);
 
-    return uri != null &&
-        uri.hasAuthority &&
-        (uri.scheme == 'https' || uri.scheme == 'http');
+    if (uri == null ||
+        !uri.hasAuthority ||
+        (uri.scheme != 'https' && uri.scheme != 'http')) {
+      _fail(index, '$field must be a valid HTTP or HTTPS URL.');
+    }
+  }
+
+  Never _fail(int index, String message) {
+    throw QiblaLandmarkDataException(
+      'Invalid landmark at index $index: $message',
+    );
   }
 }
 
-/// Represents invalid or unavailable local landmark data.
 class QiblaLandmarkDataException implements Exception {
   const QiblaLandmarkDataException(this.message);
 
