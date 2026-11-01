@@ -21,8 +21,8 @@ class PrayerCalculationProfile {
 /// Versioned and validated prayer rules engine.
 ///
 /// Network access is deliberately kept outside this class.
-/// A remote configuration must be fetched by another component
-/// and passed to installConfiguration().
+/// A remote configuration must be fetched and authenticated
+/// by another component before being passed to installConfiguration().
 class PrayerRulesService {
   PrayerRulesService({
     required CalculationMethod fallbackMethod,
@@ -31,7 +31,8 @@ class PrayerRulesService {
         _fallbackMadhab = fallbackMadhab;
 
   static const int supportedSchemaVersion = 1;
-  static const int maximumConfigurationLength = 65536;
+  static const int maximumConfigurationBytes = 65536;
+  static const int maximumProfiles = 100;
 
   final CalculationMethod _fallbackMethod;
   final Madhab _fallbackMadhab;
@@ -44,9 +45,13 @@ class PrayerRulesService {
 
   int get profileCount => _profiles.length;
 
+  /// Indicates whether a configuration has been installed.
+  ///
+  /// This does not establish that the configuration is remote,
+  /// authenticated, or trustworthy.
   bool get hasRemoteConfiguration => _profiles.isNotEmpty;
 
-  /// Return a safe default profile.
+  /// Returns the built-in fallback profile.
   PrayerCalculationProfile get fallbackProfile {
     return PrayerCalculationProfile(
       id: 'built_in_default',
@@ -56,10 +61,12 @@ class PrayerRulesService {
     );
   }
 
-  /// Select the best available profile for a country.
+  /// Selects the best available profile for a country.
   ///
-  /// If no matching country profile exists, use GLOBAL.
-  /// If neither exists, use the built-in default.
+  /// Priority:
+  /// 1. Exact country match.
+  /// 2. GLOBAL profile.
+  /// 3. Built-in fallback.
   PrayerCalculationProfile resolve({
     required String countryCode,
   }) {
@@ -70,13 +77,13 @@ class PrayerRulesService {
         fallbackProfile;
   }
 
-  /// Install a validated JSON configuration.
+  /// Installs a fully validated JSON configuration.
   ///
-  /// The current configuration remains unchanged if validation
-  /// fails. Older versions are rejected.
+  /// The existing configuration remains unchanged if validation fails.
+  /// Configuration versions must increase monotonically.
   void installConfiguration(String jsonSource) {
     if (jsonSource.isEmpty ||
-        jsonSource.length > maximumConfigurationLength) {
+        utf8.encode(jsonSource).length > maximumConfigurationBytes) {
       throw const FormatException(
         'Configuration size is invalid.',
       );
@@ -100,7 +107,8 @@ class PrayerRulesService {
       );
     }
 
-    if (version is! int || version <= _configurationVersion) {
+    if (version is! int ||
+        version <= _configurationVersion) {
       throw const FormatException(
         'Configuration version must be newer.',
       );
@@ -108,7 +116,7 @@ class PrayerRulesService {
 
     if (profilesJson is! List ||
         profilesJson.isEmpty ||
-        profilesJson.length > 100) {
+        profilesJson.length > maximumProfiles) {
       throw const FormatException(
         'Invalid profiles collection.',
       );
@@ -117,6 +125,8 @@ class PrayerRulesService {
     final parsedProfiles =
         <String, PrayerCalculationProfile>{};
 
+    final profileIds = <String>{};
+
     for (final item in profilesJson) {
       if (item is! Map<String, dynamic>) {
         throw const FormatException(
@@ -124,20 +134,20 @@ class PrayerRulesService {
         );
       }
 
-      final id = item['id'];
-      final countryCode = item['countryCode'];
+      final rawId = item['id'];
+      final rawCountryCode = item['countryCode'];
       final methodName = item['method'];
       final madhabName = item['madhab'];
 
-      if (id is! String ||
-          id.trim().isEmpty ||
-          id.length > 64) {
+      if (rawId is! String ||
+          rawId.trim().isEmpty ||
+          rawId.trim().length > 64) {
         throw const FormatException(
           'Invalid profile ID.',
         );
       }
 
-      if (countryCode is! String) {
+      if (rawCountryCode is! String) {
         throw const FormatException(
           'Invalid country code.',
         );
@@ -150,24 +160,30 @@ class PrayerRulesService {
         );
       }
 
-      final normalizedCountry =
-          _normalizeCountryCode(countryCode);
+      final id = rawId.trim();
+      final countryCode =
+          _normalizeCountryCode(rawCountryCode);
 
-      if (normalizedCountry != 'GLOBAL' &&
-          !RegExp(r'^[A-Z]{2}$').hasMatch(normalizedCountry)) {
+      if (countryCode != 'GLOBAL' &&
+          !RegExp(r'^[A-Z]{2}$').hasMatch(countryCode)) {
         throw const FormatException(
           'Country code must be ISO alpha-2 or GLOBAL.',
         );
       }
 
-      if (parsedProfiles.containsKey(normalizedCountry)) {
+      if (!profileIds.add(id)) {
+        throw const FormatException(
+          'Duplicate profile ID.',
+        );
+      }
+
+      if (parsedProfiles.containsKey(countryCode)) {
         throw const FormatException(
           'Duplicate country profile.',
         );
       }
 
       final method = _findMethod(methodName);
-
       final madhab = _findMadhab(madhabName);
 
       if (method == null || madhab == null) {
@@ -176,16 +192,17 @@ class PrayerRulesService {
         );
       }
 
-      parsedProfiles[normalizedCountry] =
+      parsedProfiles[countryCode] =
           PrayerCalculationProfile(
-        id: id.trim(),
-        countryCode: normalizedCountry,
+        id: id,
+        countryCode: countryCode,
         method: method,
         madhab: madhab,
       );
     }
 
-    // Commit only after every profile has passed validation.
+    // Atomic in-memory replacement:
+    // no mutation occurs before all entries are validated.
     _profiles
       ..clear()
       ..addAll(parsedProfiles);
@@ -193,16 +210,18 @@ class PrayerRulesService {
     _configurationVersion = version;
   }
 
-  /// Remove remote profiles and return to built-in defaults.
+  /// Removes installed profiles and restores built-in fallback behavior.
+  ///
+  /// The last accepted version is intentionally preserved.
+  /// This prevents older configurations from being reinstalled.
   void resetToDefaults() {
     _profiles.clear();
-    _configurationVersion = 0;
   }
 
   CalculationMethod? _findMethod(String name) {
-    for (final value in CalculationMethod.values) {
-      if (value.name == name) {
-        return value;
+    for (final method in CalculationMethod.values) {
+      if (method.name == name) {
+        return method;
       }
     }
 
