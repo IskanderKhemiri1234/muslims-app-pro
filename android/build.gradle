@@ -1,0 +1,28 @@
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// Keep all module build outputs under the root build directory.
+rootProject.layout.buildDirectory.set(
+    rootProject.layout.projectDirectory.dir("../build")
+)
+
+subprojects {
+    layout.buildDirectory.set(
+        rootProject.layout.buildDirectory.dir(name)
+    )
+}
+
+// Ensure the app module is evaluated before dependent modules.
+subprojects {
+    evaluationDependsOn(":app")
+}
+
+// Root clean task.
+tasks.register("clean", Delete) {
+    delete rootProject.layout.buildDirectory
+}
