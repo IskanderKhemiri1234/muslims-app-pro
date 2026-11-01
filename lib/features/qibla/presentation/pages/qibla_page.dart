@@ -166,20 +166,20 @@ Widget _languageOption(String code, String label) {
   int _compassGeneration = 0;
 
   @override
-  void initState() {
-    super.initState();
-    unawaited(_loadSavedLanguage());
+void initState() {
+  super.initState();
 
-    WidgetsBinding.instance.addObserver(this);
+  WidgetsBinding.instance.addObserver(this);
 
-    _landmarkRepository = QiblaLandmarkRepositoryImpl(
-      dataSource: QiblaLandmarkLocalDataSource(),
-    );
+  _landmarkRepository = QiblaLandmarkRepositoryImpl(
+    dataSource: QiblaLandmarkLocalDataSource(),
+  );
 
-    unawaited(_connectCompass());
-    unawaited(_loadLandmarks());
-    unawaited(_loadLocation());
-  }
+  unawaited(_connectCompass());
+  unawaited(_loadLandmarks());
+  unawaited(_loadLocation());
+  unawaited(_loadSavedLanguage());
+}
 
   @override
   void dispose() {
