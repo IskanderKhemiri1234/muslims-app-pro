@@ -1,386 +1,358 @@
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:dv_geo_core/dv_geo_core.dart';
 import 'package:dv_map/maps/world/50m.dart';
+import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
-/// Global offline map based on bundled Natural Earth 1:50m data.
+/// Offline world map based on Natural Earth 50m country boundaries.
 ///
-/// No network tiles, map API key, or internet connection are required.
+/// Features:
+/// - Fully offline world map.
+/// - Country selection by tapping.
+/// - Pinch-to-zoom and pan.
+/// - Zoom controls.
+/// - Optional coordinate grid.
+/// - No network tiles or external map requests.
 class OfflineWorldMap extends StatefulWidget {
   const OfflineWorldMap({
     super.key,
-    this.onCountrySelected,
-    this.initialScale = 1.0,
     this.showGrid = true,
+    this.initialScale = 1.0,
+    this.onCountrySelected,
   });
 
-  final ValueChanged<String>? onCountrySelected;
-  final double initialScale;
   final bool showGrid;
+  final double initialScale;
+  final ValueChanged<String>? onCountrySelected;
 
   @override
   State<OfflineWorldMap> createState() => _OfflineWorldMapState();
 }
 
-class _OfflineWorldMapState extends State<OfflineWorldMap>
-    with TickerProviderStateMixin {
-  final TransformationController _transformationController =
-      TransformationController();
+class _OfflineWorldMapState extends State<OfflineWorldMap> {
+  static const Color _backgroundColor = Color(0xFF101B2A);
+  static const Color _landColor = Color(0xFF244C57);
+  static const Color _borderColor = Color(0xFF6F9D9A);
+  static const Color _accentColor = Color(0xFF53D6B2);
+
+  late final TransformationController _transformController;
 
   String? _selectedCountry;
-  late final AnimationController _glowController;
-
-  static const Color _ocean = Color(0xFF071B2B);
-  static const Color _land = Color(0xFF173B4B);
-  static const Color _border = Color(0xFF4D8290);
-  static const Color _accent = Color(0xFFD6B36A);
+  double _zoom = 1.0;
 
   @override
   void initState() {
     super.initState();
 
-    _glowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
+    _zoom = widget.initialScale.clamp(0.5, 6.0).toDouble();
+
+    _transformController = TransformationController(
+      Matrix4.identity()..scale(_zoom),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant OfflineWorldMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.initialScale != widget.initialScale) {
+      _setZoom(widget.initialScale);
+    }
   }
 
   @override
   void dispose() {
-    _transformationController.dispose();
-    _glowController.dispose();
+    _transformController.dispose();
     super.dispose();
   }
 
-  void _selectCountry(String name) {
-    if (!mounted) return;
-
-    setState(() => _selectedCountry = name);
-    widget.onCountrySelected?.call(name);
-  }
-
-  void _resetView() {
-    _transformationController.value = Matrix4.identity();
+  void _setZoom(double value) {
+    final nextZoom = value.clamp(0.5, 8.0).toDouble();
 
     setState(() {
-      _selectedCountry = null;
+      _zoom = nextZoom;
+      _transformController.value = Matrix4.identity()..scale(_zoom);
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: _ocean,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: _accent.withValues(alpha: 0.30),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.28),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment(0, -0.15),
-                      radius: 1.2,
-                      colors: [
-                        Color(0xFF12364B),
-                        Color(0xFF091F31),
-                        Color(0xFF061522),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              if (widget.showGrid)
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _WorldGridPainter(),
-                    ),
-                  ),
-                ),
-
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _glowController,
-                  builder: (context, child) {
-                    final glow = 0.10 + (_glowController.value * 0.08);
-
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.75,
-                          colors: [
-                            _accent.withValues(alpha: glow),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                      child: child,
-                    );
-                  },
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    minScale: 1,
-                    maxScale: 7,
-                    constrained: true,
-                    boundaryMargin: const EdgeInsets.all(70),
-                    clipBehavior: Clip.none,
-                    child: SizedBox(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      child: World50mWidget(
-                        projection: MercatorProjection(),
-                        fillColor: _land,
-                        strokeColor: _border,
-                        strokeWidth: 0.75,
-                        antiAlias: true,
-                        onFeatureTap: (feature, position) {
-                          final properties = feature.properties;
-
-                          final name =
-                              properties?['NAME']?.toString() ??
-                              properties?['name']?.toString() ??
-                              properties?['ADMIN']?.toString() ??
-                              properties?['NAME_EN']?.toString();
-
-                          if (name != null && name.trim().isNotEmpty) {
-                            _selectCountry(name.trim());
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                top: 14,
-                left: 14,
-                child: _MapStatusPill(
-                  icon: Icons.public_rounded,
-                  label: 'WORLD ATLAS',
-                  color: _accent,
-                ),
-              ),
-
-              Positioned(
-                top: 14,
-                right: 14,
-                child: _MapStatusPill(
-                  icon: Icons.wifi_off_rounded,
-                  label: 'OFFLINE',
-                  color: const Color(0xFF8ED6B0),
-                ),
-              ),
-
-              Positioned(
-                right: 14,
-                bottom: 16,
-                child: Column(
-                  children: [
-                    _MapControlButton(
-                      icon: Icons.add_rounded,
-                      onTap: () {
-                        final current = _transformationController.value;
-                        final scale = current.getMaxScaleOnAxis();
-
-                        if (scale >= 7) return;
-
-                        final nextScale = (scale * 1.35).clamp(1.0, 7.0);
-                        _transformationController.value =
-                            Matrix4.identity()..scale(nextScale);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _MapControlButton(
-                      icon: Icons.remove_rounded,
-                      onTap: () {
-                        final current = _transformationController.value;
-                        final scale = current.getMaxScaleOnAxis();
-
-                        if (scale <= 1) {
-                          _resetView();
-                          return;
-                        }
-
-                        final nextScale = (scale / 1.35).clamp(1.0, 7.0);
-                        _transformationController.value =
-                            Matrix4.identity()..scale(nextScale);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _MapControlButton(
-                      icon: Icons.center_focus_strong_rounded,
-                      onTap: _resetView,
-                    ),
-                  ],
-                ),
-              ),
-
-              if (_selectedCountry != null)
-                Positioned(
-                  left: 14,
-                  right: 72,
-                  bottom: 18,
-                  child: _SelectedCountryPanel(
-                    country: _selectedCountry!,
-                    onClose: () {
-                      setState(() => _selectedCountry = null);
-                    },
-                  ),
-                ),
-
-              Positioned(
-                left: 14,
-                bottom: 14,
-                child: IgnorePointer(
-                  child: Text(
-                    'NATURAL EARTH • 1:50m',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.48),
-                      fontSize: 9,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  void _zoomIn() {
+    _setZoom(_zoom + 0.35);
   }
-}
 
-class _MapStatusPill extends StatelessWidget {
-  const _MapStatusPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  void _zoomOut() {
+    _setZoom(_zoom - 0.35);
+  }
 
-  final IconData icon;
-  final String label;
-  final Color color;
+  void _resetZoom() {
+    _setZoom(widget.initialScale);
+  }
+
+  void _handleCountryTap(dynamic feature, dynamic position) {
+    final properties = feature.properties;
+
+    final name = properties?['name']?.toString().trim();
+
+    if (name == null || name.isEmpty) return;
+
+    setState(() {
+      _selectedCountry = name;
+    });
+
+    widget.onCountrySelected?.call(name);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xE6102638),
-        borderRadius: BorderRadius.circular(30),
+        color: _backgroundColor,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: color.withValues(alpha: 0.35),
+          color: Colors.white.withValues(alpha: 0.08),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
         children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
+          _buildMapHeader(),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _buildInteractiveMap(),
+                ),
+                Positioned(
+                  right: 14,
+                  top: 14,
+                  child: _buildZoomControls(),
+                ),
+                if (_selectedCountry != null)
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 14,
+                    child: _buildSelectedCountry(),
+                  ),
+              ],
+            ),
+          ),
+          _buildMapFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.public_rounded,
+              color: _accentColor,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Qibla Atlas',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'WORLD EXPLORER · OFFLINE MAP',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 9,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: _accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.cloud_off_rounded,
+                  color: _accentColor,
+                  size: 13,
+                ),
+                SizedBox(width: 5),
+                Text(
+                  'OFFLINE',
+                  style: TextStyle(
+                    color: _accentColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.7,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _MapControlButton extends StatelessWidget {
-  const _MapControlButton({
-    required this.icon,
-    required this.onTap,
-  });
+  Widget _buildInteractiveMap() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
 
-  final IconData icon;
-  final VoidCallback onTap;
+        return InteractiveViewer(
+          transformationController: _transformController,
+          minScale: 0.5,
+          maxScale: 8.0,
+          constrained: true,
+          boundaryMargin: const EdgeInsets.all(60),
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.showGrid)
+                  CustomPaint(
+                    painter: _CoordinateGridPainter(),
+                  ),
+                World50mWidget(
+                  projection: MercatorProjection(),
+                  fillColor: _landColor,
+                  strokeColor: _borderColor,
+                  strokeWidth: 0.65,
+                  antiAlias: true,
+                  onFeatureTap: _handleCountryTap,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xE6102638),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(13),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.13),
+  Widget _buildZoomControls() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xE8172638),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.10),
         ),
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _zoomButton(
+            icon: Icons.add_rounded,
+            onTap: _zoomIn,
+          ),
+          Container(
+            width: 30,
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
+          _zoomButton(
+            icon: Icons.remove_rounded,
+            onTap: _zoomOut,
+          ),
+          Container(
+            width: 30,
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
+          _zoomButton(
+            icon: Icons.center_focus_strong_rounded,
+            onTap: _resetZoom,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _zoomButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(10),
         child: SizedBox(
           width: 42,
-          height: 42,
+          height: 40,
           child: Icon(
             icon,
-            color: const Color(0xFFE8D5A8),
+            color: Colors.white,
             size: 19,
           ),
         ),
       ),
     );
   }
-}
 
-class _SelectedCountryPanel extends StatelessWidget {
-  const _SelectedCountryPanel({
-    required this.country,
-    required this.onClose,
-  });
-
-  final String country;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSelectedCountry() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 11, 8, 11),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xF0142D40),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xF01A2B3D),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFD6B36A).withValues(alpha: 0.38),
+          color: _accentColor.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.location_on_rounded,
-            color: Color(0xFFD6B36A),
+            color: _accentColor,
             size: 19,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
-              country,
+              _selectedCountry!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -390,13 +362,50 @@ class _SelectedCountryPanel extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onClose,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCountry = null;
+              });
+            },
+            child: const Icon(
               Icons.close_rounded,
-              color: Colors.white70,
+              color: Colors.white60,
               size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapFooter() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.touch_app_rounded,
+            color: _accentColor,
+            size: 15,
+          ),
+          const SizedBox(width: 7),
+          const Expanded(
+            child: Text(
+              'Tap a country · Pinch to zoom · Drag to explore',
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            '${(_zoom * 100).round()}%',
+            style: const TextStyle(
+              color: _accentColor,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -405,27 +414,26 @@ class _SelectedCountryPanel extends StatelessWidget {
   }
 }
 
-class _WorldGridPainter extends CustomPainter {
-  const _WorldGridPainter();
-
+class _CoordinateGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF8CB6C2).withValues(alpha: 0.075)
+      ..color = Colors.white.withValues(alpha: 0.055)
       ..strokeWidth = 0.6
       ..style = PaintingStyle.stroke;
 
-    for (int i = 1; i < 8; i++) {
-      final x = size.width * i / 8;
+    const divisions = 12;
+
+    for (var i = 1; i < divisions; i++) {
+      final x = size.width * i / divisions;
+      final y = size.height * i / divisions;
+
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
         paint,
       );
-    }
 
-    for (int i = 1; i < 6; i++) {
-      final y = size.height * i / 6;
       canvas.drawLine(
         Offset(0, y),
         Offset(size.width, y),
@@ -433,17 +441,29 @@ class _WorldGridPainter extends CustomPainter {
       );
     }
 
-    final horizonPaint = Paint()
-      ..color = const Color(0xFFD6B36A).withValues(alpha: 0.12)
-      ..strokeWidth = 1;
+    final equatorPaint = Paint()
+      ..color = const Color(0xFF53D6B2).withValues(alpha: 0.20)
+      ..strokeWidth = 0.9;
 
     canvas.drawLine(
       Offset(0, size.height / 2),
       Offset(size.width, size.height / 2),
-      horizonPaint,
+      equatorPaint,
+    );
+
+    final centerPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..strokeWidth = 0.7;
+
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      math.min(size.width, size.height) * 0.015,
+      centerPaint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant _WorldGridPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _CoordinateGridPainter oldDelegate) {
+    return false;
+  }
 }
