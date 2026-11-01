@@ -44,3 +44,4 @@ flutter:
     - assets/quran_madina/assets/img/
     - assets/quran_madina/dist/
     - assets/qibla/data/landmarks.json
+    - assets/qibla/images/wonders/
