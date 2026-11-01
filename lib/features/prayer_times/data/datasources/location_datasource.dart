@@ -3,6 +3,33 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 
+/// أنواع الأخطاء التي يمكن أن تنتج عن عملية تحديد الموقع.
+enum LocationDataSourceFailure {
+  serviceDisabled,
+  permissionDenied,
+  permissionDeniedForever,
+  permissionUnavailable,
+  acquisitionTimeout,
+  invalidCoordinates,
+  stalePosition,
+  poorAccuracy,
+  acquisitionFailed,
+}
+
+/// خطأ واضح يمكن للطبقات الأعلى التعامل معه.
+class LocationDataSourceException implements Exception {
+  const LocationDataSourceException({
+    required this.failure,
+    required this.message,
+  });
+
+  final LocationDataSourceFailure failure;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class LocationDataSource {
   LocationDataSource({
     this.maximumCurrentAccuracy = 250,
@@ -14,17 +41,31 @@ class LocationDataSource {
         assert(maximumCachedAge > Duration.zero),
         assert(locationTimeout > Duration.zero);
 
-  /// Maximum accepted GPS uncertainty for a fresh location, in meters.
+  /// أقصى هامش خطأ مقبول للموقع الحالي بالمتر.
   final double maximumCurrentAccuracy;
 
-  /// Maximum accepted uncertainty for a cached location, in meters.
+  /// أقصى هامش خطأ مقبول للموقع المخزن بالمتر.
   final double maximumCachedAccuracy;
 
-  /// Maximum accepted age of a cached location.
+  /// أقصى عمر مقبول للموقع المخزن.
   final Duration maximumCachedAge;
 
-  /// Maximum total time for service checks, permissions and GPS acquisition.
+  /// المهلة القصوى لعملية تحديد الموقع.
   final Duration locationTimeout;
+
+  // --------------------------------------------------
+  // ERROR FACTORY
+  // --------------------------------------------------
+
+  LocationDataSourceException _failure(
+    LocationDataSourceFailure failure,
+    String message,
+  ) {
+    return LocationDataSourceException(
+      failure: failure,
+      message: message,
+    );
+  }
 
   // --------------------------------------------------
   // LOCATION SERVICE
@@ -33,6 +74,24 @@ class LocationDataSource {
   Future<bool> isLocationServiceEnabled() async {
     try {
       return await Geolocator.isLocationServiceEnabled();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// يفتح إعدادات خدمة الموقع في الجهاز.
+  Future<bool> openLocationSettings() async {
+    try {
+      return await Geolocator.openLocationSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// يفتح إعدادات التطبيق لإدارة الأذونات.
+  Future<bool> openAppSettings() async {
+    try {
+      return await Geolocator.openAppSettings();
     } catch (_) {
       return false;
     }
@@ -51,14 +110,15 @@ class LocationDataSource {
 
     switch (permission) {
       case LocationPermission.denied:
-        throw Exception(
-          'لم يتم منح إذن الوصول إلى الموقع.',
+        throw _failure(
+          LocationDataSourceFailure.permissionDenied,
+          'لم يتم منح إذن الوصول إلى الموقع. يرجى السماح به للمتابعة.',
         );
 
       case LocationPermission.deniedForever:
-        throw Exception(
-          'إذن الموقع مرفوض نهائياً. '
-          'يرجى تفعيله من إعدادات التطبيق.',
+        throw _failure(
+          LocationDataSourceFailure.permissionDeniedForever,
+          'إذن الموقع مرفوض نهائياً. يرجى تفعيله من إعدادات التطبيق.',
         );
 
       case LocationPermission.whileInUse:
@@ -66,7 +126,8 @@ class LocationDataSource {
         return permission;
 
       case LocationPermission.unableToDetermine:
-        throw Exception(
+        throw _failure(
+          LocationDataSourceFailure.permissionUnavailable,
           'تعذر تحديد حالة إذن الموقع.',
         );
     }
@@ -105,16 +166,12 @@ class LocationDataSource {
   }) {
     final age = DateTime.now().difference(position.timestamp);
 
-    // Allow a small clock synchronization difference.
+    // السماح بفارق بسيط بسبب اختلاف ساعة الجهاز.
     if (age < const Duration(minutes: -2)) {
       return false;
     }
 
-    if (age > maximumAge) {
-      return false;
-    }
-
-    return true;
+    return age <= maximumAge;
   }
 
   bool _isUsablePosition(
@@ -137,10 +194,9 @@ class LocationDataSource {
   // CACHED LOCATION
   // --------------------------------------------------
 
-  /// Reads the last known position without requesting permission.
+  /// قراءة آخر موقع معروف دون طلب إذن جديد.
   ///
-  /// Returns null when the cached position is unavailable
-  /// or does not satisfy the validation rules.
+  /// يعيد null إذا لم يكن الموقع متاحاً أو غير صالح.
   Future<Position?> getLastKnownLocation() async {
     try {
       final enabled = await Geolocator.isLocationServiceEnabled();
@@ -158,15 +214,17 @@ class LocationDataSource {
 
       if (position == null) return null;
 
-      return _isUsablePosition(
+      if (!_isUsablePosition(
         position,
         maximumAccuracy: maximumCachedAccuracy,
         maximumAge: maximumCachedAge,
-      )
-          ? position
-          : null;
+      )) {
+        return null;
+      }
+
+      return position;
     } catch (_) {
-      // Cached location is optional.
+      // الموقع المخزن اختياري ولا يجب أن يمنع استمرار التطبيق.
       return null;
     }
   }
@@ -179,19 +237,29 @@ class LocationDataSource {
     try {
       return await _acquireCurrentLocation().timeout(
         locationTimeout,
+        onTimeout: () {
+          throw _failure(
+            LocationDataSourceFailure.acquisitionTimeout,
+            'انتهت مهلة تحديد الموقع. تحقق من GPS وحاول مرة أخرى.',
+          );
+        },
       );
-    } on TimeoutException {
-      throw Exception(
-        'انتهت مهلة تحديد الموقع. '
-        'تحقق من GPS وحاول مرة أخرى.',
-      );
+    } on LocationDataSourceException {
+      rethrow;
     } on LocationServiceDisabledException {
-      throw Exception(
+      throw _failure(
+        LocationDataSourceFailure.serviceDisabled,
         'خدمة الموقع متوقفة. يرجى تفعيل GPS.',
       );
     } on PermissionDeniedException {
-      throw Exception(
+      throw _failure(
+        LocationDataSourceFailure.permissionDenied,
         'تم رفض إذن الموقع. تحقق من إعدادات التطبيق.',
+      );
+    } catch (_) {
+      throw _failure(
+        LocationDataSourceFailure.acquisitionFailed,
+        'تعذر الحصول على موقعك حالياً. يرجى المحاولة مرة أخرى.',
       );
     }
   }
@@ -200,9 +268,9 @@ class LocationDataSource {
     final enabled = await Geolocator.isLocationServiceEnabled();
 
     if (!enabled) {
-      throw Exception(
-        'خدمة الموقع متوقفة. '
-        'يرجى تفعيل GPS والمحاولة مجدداً.',
+      throw _failure(
+        LocationDataSourceFailure.serviceDisabled,
+        'خدمة الموقع متوقفة. يرجى تفعيل GPS والمحاولة مجدداً.',
       );
     }
 
@@ -215,9 +283,9 @@ class LocationDataSource {
     );
 
     if (!_hasValidCoordinates(position)) {
-      throw Exception(
-        'الإحداثيات المستلمة غير صالحة. '
-        'حاول تحديد الموقع مجدداً.',
+      throw _failure(
+        LocationDataSourceFailure.invalidCoordinates,
+        'الإحداثيات المستلمة غير صالحة. حاول تحديد الموقع مجدداً.',
       );
     }
 
@@ -225,9 +293,9 @@ class LocationDataSource {
       position,
       maximumAge: const Duration(minutes: 2),
     )) {
-      throw Exception(
-        'بيانات الموقع قديمة أو غير متزامنة. '
-        'حاول مرة أخرى.',
+      throw _failure(
+        LocationDataSourceFailure.stalePosition,
+        'بيانات الموقع قديمة أو غير متزامنة. حاول مرة أخرى.',
       );
     }
 
@@ -235,9 +303,9 @@ class LocationDataSource {
       position,
       maximumAccuracy: maximumCurrentAccuracy,
     )) {
-      throw Exception(
-        'دقة تحديد الموقع ضعيفة. '
-        'انتقل إلى مكان مفتوح وحاول مجدداً.',
+      throw _failure(
+        LocationDataSourceFailure.poorAccuracy,
+        'دقة تحديد الموقع ضعيفة. انتقل إلى مكان مفتوح وحاول مجدداً.',
       );
     }
 
