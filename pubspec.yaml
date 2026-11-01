@@ -24,15 +24,26 @@ dependencies:
   timezone: ^0.11.2
   timezone_finder: ^1.0.1
 
+  # Compass and location
   flutter_compass: ^0.8.1
+  geomag: ^0.3.0
+  geolocator: ^13.0.2
+
+  # Offline world map - Natural Earth
+  dv_map: ^1.1.0
+  dv_geo_core: ^1.1.0
+
+  # Existing map utilities
   flutter_map: ^8.3.2
   latlong2: ^0.9.1
-  geomag: ^0.3.0
+
+  # Networking
   http: ^1.5.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^4.0.0
 
 flutter:
@@ -43,5 +54,7 @@ flutter:
     - assets/quran_madina/assets/db/v2/Madina-1441H/
     - assets/quran_madina/assets/img/
     - assets/quran_madina/dist/
+
+    # Qibla Atlas data
     - assets/qibla/data/landmarks.json
     - assets/qibla/images/wonders/
