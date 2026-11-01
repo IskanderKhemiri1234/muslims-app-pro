@@ -70,11 +70,11 @@ class PrayerSettingsPage extends StatelessWidget {
 
     final labels = names[method];
 
-    if (labels == null) {
-      return method.name;
+    if (labels != null) {
+      return labels[isArabic ? 0 : 1];
     }
 
-    return labels[isArabic ? 0 : 1];
+    return method.name;
   }
 
   @override
@@ -105,9 +105,7 @@ class PrayerSettingsPage extends StatelessWidget {
                 35,
               ),
               children: [
-                _SettingsIntro(
-                  isArabic: isArabic,
-                ),
+                _SettingsIntro(isArabic: isArabic),
 
                 const SizedBox(height: 28),
 
@@ -126,6 +124,9 @@ class PrayerSettingsPage extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<CalculationMethod>(
+                  key: ValueKey(
+                    'method_${controller.method.name}',
+                  ),
                   initialValue: controller.method,
                   isExpanded: true,
                   decoration: _inputDecoration(
@@ -143,11 +144,13 @@ class PrayerSettingsPage extends StatelessWidget {
                       ),
                     );
                   }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.changeMethod(value);
-                    }
-                  },
+                  onChanged: controller.isLoadingLocation
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            controller.changeMethod(value);
+                          }
+                        },
                 ),
 
                 const SizedBox(height: 30),
@@ -167,6 +170,9 @@ class PrayerSettingsPage extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<Madhab>(
+                  key: ValueKey(
+                    'madhab_${controller.madhab.name}',
+                  ),
                   initialValue: controller.madhab,
                   isExpanded: true,
                   decoration: _inputDecoration(
@@ -190,11 +196,13 @@ class PrayerSettingsPage extends StatelessWidget {
                       ),
                     ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.changeMadhab(value);
-                    }
-                  },
+                  onChanged: controller.isLoadingLocation
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            controller.changeMadhab(value);
+                          }
+                        },
                 ),
 
                 const SizedBox(height: 28),
@@ -206,6 +214,14 @@ class PrayerSettingsPage extends StatelessWidget {
                     'Prayer times vary according to geographical location and calculation method. For accurate results, choose the method recommended by a trusted Islamic authority in your region.',
                   ),
                 ),
+
+                if (controller.timezoneId != null) ...[
+                  const SizedBox(height: 18),
+                  _TimezoneCard(
+                    timezoneId: controller.timezoneId!,
+                    isArabic: isArabic,
+                  ),
+                ],
 
                 if (controller.message != null) ...[
                   const SizedBox(height: 18),
@@ -277,7 +293,6 @@ class _SettingsIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Container(
       padding: const EdgeInsets.all(21),
       decoration: BoxDecoration(
@@ -444,6 +459,67 @@ class _InformationCard extends StatelessWidget {
                 height: 1.7,
                 fontSize: 12,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimezoneCard extends StatelessWidget {
+  const _TimezoneCard({
+    required this.timezoneId,
+    required this.isArabic,
+  });
+
+  final String timezoneId;
+  final bool isArabic;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.emerald.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.emerald.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.public_rounded,
+            color: AppColors.gold,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic
+                      ? 'المنطقة الزمنية المكتشفة'
+                      : 'Detected timezone',
+                  style: TextStyle(
+                    color: textColor.withValues(alpha: 0.65),
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timezoneId,
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
