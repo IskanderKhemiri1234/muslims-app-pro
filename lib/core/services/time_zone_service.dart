@@ -1,6 +1,5 @@
-
 import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Timezone-safe date and time operations.
 ///
@@ -18,6 +17,8 @@ class TimeZoneService {
   static bool _initialized = false;
 
   /// Initializes the IANA timezone database exactly once.
+  ///
+  /// This operation is synchronous and safe to call more than once.
   void initialize() {
     if (_initialized) return;
 
@@ -74,7 +75,7 @@ class TimeZoneService {
 
   /// Creates a timezone-aware local date and time.
   ///
-  /// Note: ambiguous or nonexistent local times during DST transitions
+  /// Ambiguous or nonexistent local times during DST transitions
   /// follow the timezone package's constructor behavior.
   tz.TZDateTime createDateTime({
     required String timezoneId,
@@ -121,7 +122,7 @@ class TimeZoneService {
       second,
     );
 
-    // Detect normalization caused by invalid or nonexistent local time.
+    // Detect normalization of invalid or nonexistent local times.
     if (result.year != year ||
         result.month != month ||
         result.day != day ||
@@ -177,8 +178,15 @@ class TimeZoneService {
   }) {
     final location = getLocation(timezoneId);
 
-    final firstLocal = tz.TZDateTime.from(first, location);
-    final secondLocal = tz.TZDateTime.from(second, location);
+    final firstLocal = tz.TZDateTime.from(
+      first,
+      location,
+    );
+
+    final secondLocal = tz.TZDateTime.from(
+      second,
+      location,
+    );
 
     return firstLocal.year == secondLocal.year &&
         firstLocal.month == secondLocal.month &&
@@ -209,7 +217,8 @@ class TimeZoneService {
   void _ensureInitialized() {
     if (!_initialized) {
       throw StateError(
-        'Call TimeZoneService.initialize() before using timezone operations.',
+        'Call TimeZoneService.initialize() before '
+        'using timezone operations.',
       );
     }
   }
