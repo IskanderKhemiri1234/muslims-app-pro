@@ -369,5 +369,283 @@
       }
     ],
     "isFeatured": true
+  },
+  {
+    "id": "islamic-masjid-al-haram-makkah",
+    "nameAr": "المسجد الحرام والكعبة المشرفة",
+    "nameEn": "Al-Masjid Al-Haram",
+    "category": "historicalSite",
+    "latitude": 21.422487,
+    "longitude": 39.826206,
+    "countryCode": "SA",
+    "cityAr": "مكة المكرمة",
+    "cityEn": "Makkah",
+    "regionAr": "منطقة مكة المكرمة",
+    "regionEn": "Makkah Region",
+    "descriptionAr": "أقدس مسجد في الإسلام، تتوسطه الكعبة المشرفة قبلة المسلمين. يرتبط المسجد بتاريخ طويل من العبادة والتوسعات المعمارية المتعاقبة، ويحتضن شعائر الحج والعمرة.",
+    "descriptionEn": "The holiest mosque in Islam, centred around the Kaaba, the direction of prayer for Muslims. The complex has a long history of worship and successive architectural expansions and is the focal point of Hajj and Umrah.",
+    "historicalPeriodAr": "التاريخ الإسلامي والعصور المتعاقبة",
+    "historicalPeriodEn": "Islamic history and successive eras",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "haram-official-ar",
+        "name": "المسجد الحرام - الهيئة العامة للعناية بشؤون الحرمين",
+        "url": "https://alharamain.gov.sa/public/?page=masjid-haram-ar",
+        "sourceType": "official",
+        "publisher": "الهيئة العامة للعناية بشؤون المسجد الحرام والمسجد النبوي",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "haram-ircica",
+        "name": "Al-Masjid Al-Haram - IRCICA",
+        "url": "https://www.islamicarchitecturalheritage.com/listings/al-masjid-al-haram",
+        "sourceType": "academic",
+        "publisher": "IRCICA",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-prophet-mosque-madinah",
+    "nameAr": "المسجد النبوي الشريف",
+    "nameEn": "Prophet's Mosque",
+    "category": "historicalSite",
+    "latitude": 24.4672,
+    "longitude": 39.6111,
+    "countryCode": "SA",
+    "cityAr": "المدينة المنورة",
+    "cityEn": "Madinah",
+    "regionAr": "منطقة المدينة المنورة",
+    "regionEn": "Al Madinah Region",
+    "descriptionAr": "المسجد الذي أسسه النبي محمد ﷺ بعد الهجرة إلى المدينة المنورة في السنة الأولى للهجرة. شهد توسعات متتابعة في العهد النبوي والخلافات الإسلامية والعصور اللاحقة، ويضم الحجرة النبوية والروضة الشريفة.",
+    "descriptionEn": "Founded by Prophet Muhammad after his migration to Madinah in the first year of the Hijrah. The mosque underwent successive expansions during the Prophetic era, the early caliphates and later periods. It includes the Prophet's Chamber and the Rawdah.",
+    "historicalPeriodAr": "العصر النبوي والعصور الإسلامية اللاحقة",
+    "historicalPeriodEn": "Prophetic era and later Islamic periods",
+    "establishedYear": 622,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "nabawi-official-history",
+        "name": "تطور عمارة المسجد النبوي",
+        "url": "https://alharamain.gov.sa/public/?page=nabawi-architecture-en",
+        "sourceType": "official",
+        "publisher": "الهيئة العامة للعناية بشؤون المسجد الحرام والمسجد النبوي",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "nabawi-visit-saudi",
+        "name": "The Prophet's Mosque - Visit Saudi",
+        "url": "https://www.visitsaudi.com/en/madinah/attractions/the-prophet-mosque",
+        "sourceType": "official",
+        "publisher": "Saudi Tourism Authority",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-al-aqsa-jerusalem",
+    "nameAr": "المسجد الأقصى المبارك",
+    "nameEn": "Al-Aqsa Mosque",
+    "category": "historicalSite",
+    "latitude": 31.7779,
+    "longitude": 35.2354,
+    "countryCode": "PS",
+    "cityAr": "القدس",
+    "cityEn": "Jerusalem",
+    "regionAr": "القدس",
+    "regionEn": "Jerusalem",
+    "descriptionAr": "المسجد الأقصى والحرم الشريف في البلدة القديمة بالقدس، وهو أولى القبلتين وثالث الحرمين الشريفين. يضم مجمعاً واسعاً من المساجد والمصليات والساحات والمباني التاريخية التي تعود إلى عصور إسلامية متعددة.",
+    "descriptionEn": "Al-Aqsa Mosque and Al-Haram Al-Sharif are located in Jerusalem's Old City. The sacred compound includes mosques, prayer halls, courtyards and historic structures from several Islamic periods.",
+    "historicalPeriodAr": "العصر الإسلامي المبكر والعصور الأموية والعباسية والأيوبية والمملوكية والعثمانية",
+    "historicalPeriodEn": "Early Islamic, Umayyad, Abbasid, Ayyubid, Mamluk and Ottoman periods",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "aqsa-ircica",
+        "name": "Al-Aqsa Mosque - IRCICA",
+        "url": "https://www.islamicarchitecturalheritage.com/listings/al-aqsa-mosque-al-masjid-al-aqsa-al-haram-ash-sharif",
+        "sourceType": "academic",
+        "publisher": "IRCICA",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "aqsa-islamic-art",
+        "name": "Aqsa Mosque - Discover Islamic Art",
+        "url": "https://islamicart.museumwnf.org/database_item.php?id=monuments%3BISL%3Bpa%3BMon01%3B3%3Ben",
+        "sourceType": "academic",
+        "publisher": "Museum With No Frontiers",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "aqsa-unesco-old-city",
+        "name": "Old City of Jerusalem and its Walls - UNESCO",
+        "url": "https://whc.unesco.org/en/list/148",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-saladin-citadel-cairo",
+    "nameAr": "قلعة صلاح الدين الأيوبي",
+    "nameEn": "Saladin Citadel",
+    "category": "historicalSite",
+    "latitude": 30.0294,
+    "longitude": 31.2612,
+    "countryCode": "EG",
+    "cityAr": "القاهرة",
+    "cityEn": "Cairo",
+    "regionAr": "القاهرة",
+    "regionEn": "Cairo Governorate",
+    "descriptionAr": "قلعة تاريخية على تلال المقطم أمر صلاح الدين الأيوبي بإنشائها لتدعيم دفاعات القاهرة. أصبحت مقراً لحكام مصر لقرون، وتضم منشآت معمارية متعددة من بينها مسجد محمد علي ومسجد الناصر محمد.",
+    "descriptionEn": "A historic fortress on the Muqattam Hills commissioned by Saladin to strengthen Cairo's defences. It later served as a seat of Egyptian rulers for centuries and contains several architectural monuments, including the Mosque of Muhammad Ali and the Mosque of Sultan al-Nasir Muhammad.",
+    "historicalPeriodAr": "العصر الأيوبي والعصور المملوكية والعثمانية والحديثة",
+    "historicalPeriodEn": "Ayyubid, Mamluk, Ottoman and modern periods",
+    "establishedYear": 1176,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "saladin-citadel-egypt-ministry",
+        "name": "قلعة صلاح الدين - وزارة السياحة والآثار المصرية",
+        "url": "https://egymonuments.gov.eg/archaeological-sites/cairo-citadel/",
+        "sourceType": "official",
+        "publisher": "وزارة السياحة والآثار المصرية",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "saladin-citadel-cairo-governorate",
+        "name": "Saladin Citadel - Cairo Governorate",
+        "url": "https://www.cairo.gov.eg/en/culture/cairo-history/ancient-landmarks/salah-el-din-citadel/",
+        "sourceType": "official",
+        "publisher": "Cairo Governorate",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-great-mosque-kairouan",
+    "nameAr": "جامع عقبة بن نافع - الجامع الكبير بالقيروان",
+    "nameEn": "Great Mosque of Kairouan",
+    "category": "historicalSite",
+    "latitude": 35.6817,
+    "longitude": 10.1033,
+    "countryCode": "TN",
+    "cityAr": "القيروان",
+    "cityEn": "Kairouan",
+    "regionAr": "ولاية القيروان",
+    "regionEn": "Kairouan Governorate",
+    "descriptionAr": "من أبرز المعالم الإسلامية في المغرب العربي، يرتبط تأسيس القيروان بعام 670 ميلادي، وازدهر الجامع الكبير في صورته المعمارية التاريخية خلال العصر الأغلبي في القرن التاسع. كان له أثر مهم في تطور عمارة المساجد في المنطقة.",
+    "descriptionEn": "One of the most significant Islamic monuments in the Maghreb. Kairouan was founded in 670 CE, and the Great Mosque developed into its historic architectural form during the Aghlabid period in the ninth century. It influenced mosque architecture across the region.",
+    "historicalPeriodAr": "العصر الإسلامي المبكر والعصر الأغلبي",
+    "historicalPeriodEn": "Early Islamic and Aghlabid periods",
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "kairouan-unesco-ar",
+        "name": "القيروان - مركز التراث العالمي",
+        "url": "https://whc.unesco.org/ar/list/499",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "kairouan-unesco-en",
+        "name": "Kairouan - UNESCO World Heritage Centre",
+        "url": "https://whc.unesco.org/en/list/499",
+        "sourceType": "unesco",
+        "publisher": "UNESCO",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-great-mosque-algiers",
+    "nameAr": "جامع الجزائر الأعظم",
+    "nameEn": "Great Mosque of Algiers - Djamaa El Djazair",
+    "category": "historicalSite",
+    "latitude": 36.7375,
+    "longitude": 3.1870,
+    "countryCode": "DZ",
+    "cityAr": "المحمدية - الجزائر العاصمة",
+    "cityEn": "Mohammadia, Algiers",
+    "regionAr": "ولاية الجزائر",
+    "regionEn": "Algiers Province",
+    "descriptionAr": "صرح ديني وثقافي وعلمي حديث في الجزائر العاصمة، افتتح رسمياً في 25 فبراير 2024. يتميز بمئذنته الشاهقة ومجمعه الذي يضم مرافق دينية وثقافية وتعليمية.",
+    "descriptionEn": "A major contemporary religious, cultural and scientific complex in Algiers, officially inaugurated on 25 February 2024. It is distinguished by its monumental minaret and facilities for religious, cultural and educational activities.",
+    "historicalPeriodAr": "العمارة الإسلامية المعاصرة",
+    "historicalPeriodEn": "Contemporary Islamic architecture",
+    "establishedYear": 2024,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "djamaa-el-djazair-algerian-presidency",
+        "name": "Official Inauguration of Djamaa El-Djazair",
+        "url": "https://embpretoria.mfa.gov.dz/news-and-press-releases/president-of-the-republic-chairs-official-inauguration-of-djamaa-el-djazair",
+        "sourceType": "official",
+        "publisher": "Algerian Ministry of Foreign Affairs",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "djamaa-el-djazair-official-report",
+        "name": "Inauguration of Djamaa El-Djazair",
+        "url": "https://www.mdn.dz/site_principal/sommaire/revues/images/EldjeichMar2024Fr.pdf",
+        "sourceType": "official",
+        "publisher": "Algerian Ministry of National Defence",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
+  },
+  {
+    "id": "islamic-hassan-ii-mosque-casablanca",
+    "nameAr": "مسجد الحسن الثاني",
+    "nameEn": "Hassan II Mosque",
+    "category": "historicalSite",
+    "latitude": 33.6084,
+    "longitude": -7.6326,
+    "countryCode": "MA",
+    "cityAr": "الدار البيضاء",
+    "cityEn": "Casablanca",
+    "regionAr": "جهة الدار البيضاء سطات",
+    "regionEn": "Casablanca-Settat",
+    "descriptionAr": "معلم ديني ومعماري بارز في الدار البيضاء، وضع الملك الحسن الثاني حجر أساسه في 11 يوليو 1986. يجمع تصميمه بين عناصر العمارة المغربية التقليدية والتقنيات المعمارية الحديثة، ويطل على المحيط الأطلسي.",
+    "descriptionEn": "A major religious and architectural landmark in Casablanca. King Hassan II laid its foundation stone on 11 July 1986. Its design combines traditional Moroccan architectural elements with modern construction techniques and overlooks the Atlantic Ocean.",
+    "historicalPeriodAr": "العمارة المغربية الإسلامية المعاصرة",
+    "historicalPeriodEn": "Contemporary Moroccan Islamic architecture",
+    "establishedYear": 1986,
+    "images": [],
+    "historicalEvents": [],
+    "sources": [
+      {
+        "id": "hassan-ii-mosque-foundation",
+        "name": "History - Hassan II Mosque Foundation",
+        "url": "https://www.fmh2.ma/en/mosque/hassan-2-mosque",
+        "sourceType": "official",
+        "publisher": "Hassan II Mosque Foundation",
+        "accessedAt": "2026-11-01"
+      },
+      {
+        "id": "hassan-ii-mosque-agency",
+        "name": "History - Mosquée Hassan 2",
+        "url": "https://www.aat.ac.ma/en/history",
+        "sourceType": "official",
+        "publisher": "Agence d'Aménagement de la Vallée du Bouregreg",
+        "accessedAt": "2026-11-01"
+      }
+    ],
+    "isFeatured": true
   }
 ]
