@@ -6,15 +6,15 @@ import 'package:dv_geo_core/dv_geo_core.dart';
 import 'package:dv_map/maps/world/50m.dart';
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
-/// Offline world map based on Natural Earth 50m country boundaries.
+/// Offline world atlas using Natural Earth 50m country boundaries.
 ///
 /// Features:
-/// - Fully offline world map.
-/// - Country selection by tapping.
+/// - Offline world map without network tiles.
+/// - Country selection.
 /// - Pinch-to-zoom and pan.
 /// - Zoom controls.
+/// - Live zoom percentage.
 /// - Optional coordinate grid.
-/// - No network tiles or external map requests.
 class OfflineWorldMap extends StatefulWidget {
   const OfflineWorldMap({
     super.key,
@@ -37,6 +37,10 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   static const Color _borderColor = Color(0xFF6F9D9A);
   static const Color _accentColor = Color(0xFF53D6B2);
 
+  static const double _minZoom = 0.5;
+  static const double _maxZoom = 8.0;
+  static const double _zoomStep = 0.35;
+
   late final TransformationController _transformController;
 
   String? _selectedCountry;
@@ -46,11 +50,15 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   void initState() {
     super.initState();
 
-    _zoom = widget.initialScale.clamp(0.5, 6.0).toDouble();
+    _zoom = widget.initialScale
+        .clamp(_minZoom, _maxZoom)
+        .toDouble();
 
     _transformController = TransformationController(
       Matrix4.identity()..scale(_zoom),
     );
+
+    _transformController.addListener(_handleTransformChanged);
   }
 
   @override
@@ -58,49 +66,80 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.initialScale != widget.initialScale) {
-      _setZoom(widget.initialScale);
+      final nextZoom = widget.initialScale
+          .clamp(_minZoom, _maxZoom)
+          .toDouble();
+
+      _zoom = nextZoom;
+
+      _transformController.value = Matrix4.identity()
+        ..scale(nextZoom);
     }
   }
 
   @override
   void dispose() {
+    _transformController.removeListener(_handleTransformChanged);
     _transformController.dispose();
     super.dispose();
   }
 
-  void _setZoom(double value) {
-    final nextZoom = value.clamp(0.5, 8.0).toDouble();
+  void _handleTransformChanged() {
+    final currentZoom = _transformController.value
+        .getMaxScaleOnAxis()
+        .clamp(_minZoom, _maxZoom)
+        .toDouble();
+
+    if ((_zoom - currentZoom).abs() < 0.01) return;
+
+    if (!mounted) return;
 
     setState(() {
-      _zoom = nextZoom;
-      _transformController.value = Matrix4.identity()..scale(_zoom);
+      _zoom = currentZoom;
     });
   }
 
+  void _setZoom(double value) {
+    final nextZoom = value.clamp(_minZoom, _maxZoom).toDouble();
+
+    _transformController.value = Matrix4.identity()
+      ..scale(nextZoom);
+  }
+
   void _zoomIn() {
-    _setZoom(_zoom + 0.35);
+    _setZoom(_zoom + _zoomStep);
   }
 
   void _zoomOut() {
-    _setZoom(_zoom - 0.35);
+    _setZoom(_zoom - _zoomStep);
   }
 
   void _resetZoom() {
     _setZoom(widget.initialScale);
   }
 
-  void _handleCountryTap(dynamic feature, dynamic position) {
+  void _handleCountryTap(
+    GeoJsonFeature feature,
+    math.Point position,
+  ) {
     final properties = feature.properties;
-
     final name = properties?['name']?.toString().trim();
 
     if (name == null || name.isEmpty) return;
+
+    if (!mounted) return;
 
     setState(() {
       _selectedCountry = name;
     });
 
     widget.onCountrySelected?.call(name);
+  }
+
+  void _clearSelectedCountry() {
+    setState(() {
+      _selectedCountry = null;
+    });
   }
 
   @override
@@ -237,8 +276,8 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
 
         return InteractiveViewer(
           transformationController: _transformController,
-          minScale: 0.5,
-          maxScale: 8.0,
+          minScale: _minZoom,
+          maxScale: _maxZoom,
           constrained: true,
           boundaryMargin: const EdgeInsets.all(60),
           clipBehavior: Clip.hardEdge,
@@ -363,11 +402,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
             ),
           ),
           GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedCountry = null;
-              });
-            },
+            onTap: _clearSelectedCountry,
             child: const Icon(
               Icons.close_rounded,
               color: Colors.white60,
