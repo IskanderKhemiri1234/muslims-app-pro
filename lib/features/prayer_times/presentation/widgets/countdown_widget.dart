@@ -43,6 +43,13 @@ class CountdownWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    final animationDuration = reduceMotion
+        ? Duration.zero
+        : _animationDuration;
+
     return RepaintBoundary(
       child: ValueListenableBuilder<DateTime>(
         valueListenable: controller.clockListenable,
@@ -51,10 +58,10 @@ class CountdownWidget extends StatelessWidget {
 
           final difference = target?.difference(now);
 
-          final duration = difference == null ||
-                  difference.isNegative
-              ? Duration.zero
-              : difference;
+          final duration =
+              difference == null || difference.isNegative
+                  ? Duration.zero
+                  : difference;
 
           final hasTarget = target != null;
 
@@ -64,8 +71,10 @@ class CountdownWidget extends StatelessWidget {
 
           final hourValue =
               hasTarget ? _twoDigits(hours) : '--';
+
           final minuteValue =
               hasTarget ? _twoDigits(minutes) : '--';
+
           final secondValue =
               hasTarget ? _twoDigits(seconds) : '--';
 
@@ -84,20 +93,20 @@ class CountdownWidget extends StatelessWidget {
                   _TimeUnit(
                     value: hourValue,
                     label: isArabic ? 'س' : 'HRS',
-                    duration: _animationDuration,
+                    duration: animationDuration,
                   ),
                   const _TimeSeparator(),
                   _TimeUnit(
                     value: minuteValue,
                     label: isArabic ? 'د' : 'MIN',
-                    duration: _animationDuration,
+                    duration: animationDuration,
                   ),
                   const _TimeSeparator(),
                   _TimeUnit(
                     value: secondValue,
                     label: isArabic ? 'ث' : 'SEC',
                     highlighted: true,
-                    duration: _animationDuration,
+                    duration: animationDuration,
                   ),
                 ],
               ),
@@ -125,7 +134,7 @@ class _TimeUnit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 48,
+      width: 54,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -182,8 +191,8 @@ class _TimeSeparator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(
+    return const Padding(
+      padding: EdgeInsets.only(
         left: 8,
         right: 8,
         bottom: 13,
