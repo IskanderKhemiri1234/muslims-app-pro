@@ -3,48 +3,60 @@ import '../../domain/models/qibla_landmark.dart';
 import '../../domain/repositories/qibla_landmark_repository.dart';
 import '../datasources/qibla_landmark_local_data_source.dart';
 
-/// Local implementation of the Qibla landmark repository.
 class QiblaLandmarkRepositoryImpl
     implements QiblaLandmarkRepository {
   QiblaLandmarkRepositoryImpl({
-    required QiblaLandmarkLocalDataSource localDataSource,
-  }) : _localDataSource = localDataSource;
+    required QiblaLandmarkLocalDataSource dataSource,
+  }) : _dataSource = dataSource;
 
-  final QiblaLandmarkLocalDataSource _localDataSource;
+  final QiblaLandmarkLocalDataSource _dataSource;
 
-  List<QiblaLandmark>? _cachedLandmarks;
+  Future<List<QiblaLandmark>>? _cachedFuture;
 
-  /// Loads landmarks once and reuses the in-memory result.
-  Future<List<QiblaLandmark>> _getLandmarks() async {
-    return _cachedLandmarks ??= await _localDataSource.loadLandmarks();
+  /// Loads landmarks once and shares the same pending operation
+  /// between simultaneous callers.
+  Future<List<QiblaLandmark>> _getCachedLandmarks() async {
+    final existingFuture = _cachedFuture;
+
+    if (existingFuture != null) {
+      return existingFuture;
+    }
+
+    final pendingFuture = _dataSource.loadLandmarks();
+    _cachedFuture = pendingFuture;
+
+    try {
+      return await pendingFuture;
+    } catch (_) {
+      // Allow a later request to retry after a failed load.
+      if (identical(_cachedFuture, pendingFuture)) {
+        _cachedFuture = null;
+      }
+
+      rethrow;
+    }
   }
 
   @override
   Future<List<QiblaLandmark>> getAll() async {
-    final landmarks = await _getLandmarks();
-
-    return List<QiblaLandmark>.unmodifiable(landmarks);
+    return _getCachedLandmarks();
   }
 
   @override
   Future<List<QiblaLandmark>> getFeatured() async {
-    final landmarks = await _getLandmarks();
+    final landmarks = await _getCachedLandmarks();
 
-    return List<QiblaLandmark>.unmodifiable(
+    return List.unmodifiable(
       landmarks.where((landmark) => landmark.isFeatured),
     );
   }
 
   @override
   Future<QiblaLandmark?> getById(String id) async {
-    final normalizedId = id.trim();
-
-    if (normalizedId.isEmpty) return null;
-
-    final landmarks = await _getLandmarks();
+    final landmarks = await _getCachedLandmarks();
 
     for (final landmark in landmarks) {
-      if (landmark.id == normalizedId) {
+      if (landmark.id == id) {
         return landmark;
       }
     }
@@ -56,9 +68,9 @@ class QiblaLandmarkRepositoryImpl
   Future<List<QiblaLandmark>> getByCategory(
     QiblaLandmarkCategory category,
   ) async {
-    final landmarks = await _getLandmarks();
+    final landmarks = await _getCachedLandmarks();
 
-    return List<QiblaLandmark>.unmodifiable(
+    return List.unmodifiable(
       landmarks.where(
         (landmark) => landmark.category == category,
       ),
@@ -70,42 +82,56 @@ class QiblaLandmarkRepositoryImpl
     required String query,
     required bool isArabic,
   }) async {
-    final normalizedQuery = _normalizeSearchText(query);
+    final normalizedQuery = _normalize(query);
 
     if (normalizedQuery.isEmpty) {
-      return const <QiblaLandmark>[];
+      return const [];
     }
 
-    final landmarks = await _getLandmarks();
+    final landmarks = await _getCachedLandmarks();
 
     final results = landmarks.where((landmark) {
-      final name = landmark.nameForLocale(isArabic: isArabic);
-      final description =
-          landmark.descriptionForLocale(isArabic: isArabic);
+      final name = landmark.nameForLocale(
+        isArabic: isArabic,
+      );
 
-      final normalizedName = _normalizeSearchText(name);
-      final normalizedDescription =
-          _normalizeSearchText(description ?? '');
+      final description = landmark.descriptionForLocale(
+        isArabic: isArabic,
+      );
 
-      return normalizedName.contains(normalizedQuery) ||
-          normalizedDescription.contains(normalizedQuery);
+      final city = isArabic
+          ? landmark.cityAr
+          : landmark.cityEn;
+
+      final region = isArabic
+          ? landmark.regionAr
+          : landmark.regionEn;
+
+      final searchableText = _normalize([
+        name,
+        description ?? '',
+        city ?? '',
+        region ?? '',
+        landmark.countryCode,
+      ].join(' '));
+
+      return searchableText.contains(normalizedQuery);
     });
 
-    return List<QiblaLandmark>.unmodifiable(results);
-  }
-
-  /// Normalizes whitespace and letter case for search.
-  String _normalizeSearchText(String value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), ' ');
+    return List.unmodifiable(results);
   }
 
   /// Clears the in-memory cache.
   ///
-  /// Useful when the local data source is replaced or refreshed.
+  /// The next repository request will reload the local JSON asset.
   void clearCache() {
-    _cachedLandmarks = null;
+    _cachedFuture = null;
+  }
+
+  String _normalize(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ');
   }
 }
