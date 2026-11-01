@@ -277,69 +277,71 @@ Widget _languageOption(String code, String label) {
   }
 
   Future<void> _connectCompass() async {
-    if (!mounted || !_isAppActive) return;
+  if (!mounted || !_isAppActive) return;
 
-    final generation = ++_compassGeneration;
+  // لا تنشئ اشتراكاً جديداً إذا كان الاشتراك الحالي موجوداً.
+  if (_compassSubscription != null) return;
 
-    final previous = _compassSubscription;
-    _compassSubscription = null;
+  final generation = ++_compassGeneration;
 
-    if (previous != null) {
-      await previous.cancel();
+  try {
+    final stream = FlutterCompass.events;
+
+    if (stream == null) {
+      _setCompassUnavailable();
+      return;
     }
+
+    final subscription = stream.listen(
+      (event) {
+        if (!mounted ||
+            !_isAppActive ||
+            generation != _compassGeneration) {
+          return;
+        }
+
+        _onCompassEvent(event);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!mounted ||
+            generation != _compassGeneration) {
+          return;
+        }
+
+        _setCompassUnavailable();
+      },
+      cancelOnError: false,
+    );
 
     if (!mounted ||
         !_isAppActive ||
         generation != _compassGeneration) {
+      await subscription.cancel();
       return;
     }
 
-    try {
-      final stream = FlutterCompass.events;
+    // الحماية من أي اشتراك أحدث.
+    if (_compassSubscription != null) {
+      await subscription.cancel();
+      return;
+    }
 
-      if (stream == null) {
-        _setCompassUnavailable();
-        return;
-      }
+    _compassSubscription = subscription;
 
-      final subscription = stream.listen(
-        _onCompassEvent,
-        onError: (Object error, StackTrace stackTrace) {
-          if (!mounted || generation != _compassGeneration) return;
-          _setCompassUnavailable();
-        },
-        cancelOnError: false,
-      );
-
-      if (!mounted ||
-          !_isAppActive ||
-          generation != _compassGeneration) {
-        await subscription.cancel();
-        return;
-      }
-
-      _compassSubscription = subscription;
-
-      if (_isCompassUnavailable && mounted) {
-        setState(() {
-          _isCompassUnavailable = false;
-        });
-      }
-    } catch (_) {
+    if (_isCompassUnavailable) {
+      setState(() {
+        _isCompassUnavailable = false;
+      });
+    }
+  } catch (_) {
+    if (mounted && generation == _compassGeneration) {
       _setCompassUnavailable();
     }
   }
+  }
 
   void _disconnectCompass() {
-    _compassGeneration++;
-
-    final subscription = _compassSubscription;
-    _compassSubscription = null;
-
-    if (subscription != null) {
-      unawaited(subscription.cancel());
-    }
-  }
+  
 
   void _setCompassUnavailable() {
     if (!mounted) return;
