@@ -23,37 +23,35 @@ class PrayerHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final nextPrayer = controller.nextPrayer;
-        final nextTime = controller.nextPrayerTime;
-
-        return TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.97, end: 1),
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 550),
-          curve: Curves.easeOutCubic,
-          builder: (context, scale, child) {
-            return Transform.scale(
-              scale: scale,
-              child: child,
-            );
-          },
-          child: _HeroSurface(
-            nextPrayer: nextPrayer,
-            nextTime: nextTime,
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.97, end: 1),
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 550),
+      curve: Curves.easeOutCubic,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          return _HeroSurface(
+            nextPrayer: controller.nextPrayer,
+            nextTime: controller.nextPrayerTime,
             isArabic: isArabic,
             prayerName: prayerName,
             formatTime: formatTime,
             controller: controller,
             reduceMotion: reduceMotion,
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -135,7 +133,9 @@ class _HeroSurface extends StatelessWidget {
                   );
                 },
                 child: SizedBox(
-                  key: ValueKey('${nextPrayer.name}_${nextTime?.millisecondsSinceEpoch}'),
+                  key: ValueKey<String>(
+                    '${nextPrayer.name}_${nextTime?.millisecondsSinceEpoch}',
+                  ),
                   width: double.infinity,
                   child: Text(
                     prayerLabel,
