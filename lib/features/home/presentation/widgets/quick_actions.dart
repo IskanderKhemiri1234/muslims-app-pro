@@ -60,8 +60,7 @@ class QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = _actions;
-    final isRtl =
-        Directionality.of(context) == TextDirection.rtl;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return SizedBox(
       height: _itemHeight,
@@ -79,7 +78,7 @@ class QuickActions extends StatelessWidget {
           return SizedBox(
             width: _itemWidth,
             child: _QuickActionTile(
-              key: ValueKey(action.id),
+              key: ValueKey<String>(action.id),
               action: action,
               onTap: () => onAction(action.id),
               animationDelay: index * 70,
@@ -107,9 +106,8 @@ class _QuickActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final foreground = theme.colorScheme.onSurface;
-
     final reduceMotion =
-        MediaQuery.disableAnimationsOf(context);
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     final duration = reduceMotion
         ? Duration.zero
@@ -122,6 +120,12 @@ class _QuickActionTile extends StatelessWidget {
       ),
       duration: duration,
       curve: Curves.easeOutCubic,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
       child: Semantics(
         button: true,
         label: action.semanticLabel,
@@ -134,52 +138,52 @@ class _QuickActionTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             splashColor: action.color.withValues(alpha: 0.12),
             highlightColor: action.color.withValues(alpha: 0.06),
-            child: GlassContainer(
-              radius: 22,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 43,
-                    height: 43,
-                    decoration: BoxDecoration(
-                      color: action.color.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Icon(
-                      action.icon,
-                      color: action.color,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      action.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: foreground,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: GlassContainer(
+                radius: 22,
+                enableBlur: false,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 43,
+                      height: 43,
+                      decoration: BoxDecoration(
+                        color: action.color.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(
+                        action.icon,
+                        color: action.color,
+                        size: 22,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 9),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        action.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: foreground,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
     );
   }
 }
