@@ -1,3 +1,4 @@
+
 import 'app_event_schema_registry.dart';
 
 /// Defines the supported structural data types.
@@ -9,6 +10,10 @@ enum AppSchemaValueType {
   object,
   array,
   nullValue,
+
+  /// No explicit type was declared by the registry.
+  /// The field is still checked for presence and declaration.
+  any,
 }
 
 /// Describes the validation severity of a schema violation.
@@ -71,7 +76,7 @@ final class AppSchemaFieldConstraints {
     this.maximumLength,
     this.pattern,
     this.format,
-    this.allowedValues,
+    Iterable<Object?>? allowedValues,
     this.uniqueItems = false,
     this.minimumItems,
     this.maximumItems,
@@ -79,7 +84,9 @@ final class AppSchemaFieldConstraints {
     this.allowNull = false,
   }) : allowedValues = allowedValues == null
             ? null
-            : List<Object?>.unmodifiable(allowedValues) {
+            : List<Object?>.unmodifiable(
+                allowedValues.map(_freezeValue),
+              ) {
     _validate();
   }
 
@@ -96,7 +103,61 @@ final class AppSchemaFieldConstraints {
   final int? maximumDecimalPlaces;
   final bool allowNull;
 
+  static Object? _freezeValue(Object? value) {
+    if (value == null || value is String || value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      if (!value.isFinite) {
+        throw ArgumentError.value(
+          value,
+          'allowedValues',
+          'Numeric allowed values must be finite.',
+        );
+      }
+
+      return value;
+    }
+
+    if (value is List) {
+      return List<Object?>.unmodifiable(
+        value.map(_freezeValue),
+      );
+    }
+
+    if (value is Map) {
+      final result = <String, Object?>{};
+
+      for (final entry in value.entries) {
+        if (entry.key is! String) {
+          throw ArgumentError(
+            'Allowed object value keys must be strings.',
+          );
+        }
+
+        result[entry.key as String] = _freezeValue(entry.value);
+      }
+
+      return Map<String, Object?>.unmodifiable(result);
+    }
+
+    throw ArgumentError.value(
+      value,
+      'allowedValues',
+      'Allowed values must contain JSON-compatible data.',
+    );
+  }
+
   void _validate() {
+    if (minimum != null && !minimum!.isFinite) {
+      throw ArgumentError('Minimum numeric value must be finite.');
+    }
+
+    if (maximum != null && !maximum!.isFinite) {
+      throw ArgumentError('Maximum numeric value must be finite.');
+    }
+
     if (minimum != null && maximum != null && minimum! > maximum!) {
       throw ArgumentError(
         'Minimum numeric value cannot exceed maximum.',
@@ -180,14 +241,15 @@ final class AppSchemaFieldDefinition {
     Map<String, AppSchemaFieldDefinition> properties = const {},
     this.items,
     this.allowUnknownProperties = false,
-  }) : properties = Map<String, AppSchemaFieldDefinition>.unmodifiable(
-          properties,
-        ) {
-    if (type != AppSchemaValueType.object && properties.isNotEmpty) {
+  }) : properties = _immutableProperties(properties) {
+    if (type != AppSchemaValueType.object && this.properties.isNotEmpty) {
       throw ArgumentError(
         'Properties can only be declared for object fields.',
       );
     }
+
+    // An array without an item definition is allowed.
+    // Its items have no declared nested structural constraints.
 
     if (type != AppSchemaValueType.array && items != null) {
       throw ArgumentError(
@@ -195,24 +257,10 @@ final class AppSchemaFieldDefinition {
       );
     }
 
-    if (type == AppSchemaValueType.array && items == null) {
-      throw ArgumentError(
-        'Array fields must declare an item definition.',
-      );
-    }
-
     if (description != null && description!.trim().isEmpty) {
       throw ArgumentError(
         'Field description cannot be empty.',
       );
-    }
-
-    for (final key in this.properties.keys) {
-      if (key.trim().isEmpty) {
-        throw ArgumentError(
-          'Nested property names cannot be empty.',
-        );
-      }
     }
   }
 
@@ -223,6 +271,34 @@ final class AppSchemaFieldDefinition {
   final Map<String, AppSchemaFieldDefinition> properties;
   final AppSchemaFieldDefinition? items;
   final bool allowUnknownProperties;
+
+  static Map<String, AppSchemaFieldDefinition> _immutableProperties(
+    Map<String, AppSchemaFieldDefinition> source,
+  ) {
+    final result = <String, AppSchemaFieldDefinition>{};
+
+    for (final entry in source.entries) {
+      final key = entry.key.trim();
+
+      if (key.isEmpty) {
+        throw ArgumentError(
+          'Nested property names cannot be empty.',
+        );
+      }
+
+      if (result.containsKey(key)) {
+        throw ArgumentError.value(
+          key,
+          'properties',
+          'Duplicate property names after normalization.',
+        );
+      }
+
+      result[key] = entry.value;
+    }
+
+    return Map<String, AppSchemaFieldDefinition>.unmodifiable(result);
+  }
 }
 
 /// Describes the complete structural validation result.
@@ -283,6 +359,13 @@ final class AppEventSchemaValidator {
   final int maximumNestingDepth;
 
   /// Validates a payload against its registered event schema.
+  ///
+  /// This validator performs the complete validation pass.
+  /// It intentionally does not call Registry.validatePayload(),
+  /// which would duplicate required/unknown/type checks.
+  ///
+  /// Validation never mutates the supplied payload and never applies
+  /// migration defaults automatically.
   AppEventSchemaValidationReport validate({
     required String eventType,
     required int schemaVersion,
@@ -312,22 +395,6 @@ final class AppEventSchemaValidator {
       );
     }
 
-    final registryResult = _registry.validatePayload(
-      eventType: eventType,
-      version: schemaVersion,
-      payload: payload,
-    );
-
-    for (final error in registryResult.errors) {
-      violations.add(
-        AppSchemaViolation(
-          code: _classifyRegistryError(error),
-          path: r'$',
-          message: error,
-        ),
-      );
-    }
-
     _validateObject(
       value: payload,
       properties: _buildRootProperties(definition),
@@ -344,34 +411,51 @@ final class AppEventSchemaValidator {
     );
   }
 
+  /// Builds the root field definitions from the Registry.
+  ///
+  /// Missing fieldTypes means "any declared value", not "object".
+  /// Registry object fields have no nested property declarations,
+  /// so their internal keys are not rejected at this layer.
   Map<String, AppSchemaFieldDefinition> _buildRootProperties(
     AppEventSchemaDefinition definition,
   ) {
     final properties = <String, AppSchemaFieldDefinition>{};
 
     for (final field in definition.requiredFields) {
+      final type = _convertRegistryType(
+        definition.fieldTypes[field],
+      );
+
       properties[field] = AppSchemaFieldDefinition(
-        type: _convertRegistryType(
-          definition.fieldTypes[field],
-        ),
+        type: type,
         required: true,
+        allowUnknownProperties: type == AppSchemaValueType.object,
       );
     }
 
     for (final field in definition.optionalFields) {
+      final type = _convertRegistryType(
+        definition.fieldTypes[field],
+      );
+
       properties[field] = AppSchemaFieldDefinition(
-        type: _convertRegistryType(
-          definition.fieldTypes[field],
-        ),
+        type: type,
         required: false,
+        allowUnknownProperties: type == AppSchemaValueType.object,
       );
     }
 
-    return properties;
+    return Map<String, AppSchemaFieldDefinition>.unmodifiable(
+      properties,
+    );
   }
 
+  /// Converts Registry type identifiers without guessing unknown types.
   AppSchemaValueType _convertRegistryType(String? type) {
     switch (type) {
+      case null:
+        return AppSchemaValueType.any;
+
       case 'string':
         return AppSchemaValueType.string;
 
@@ -394,7 +478,12 @@ final class AppEventSchemaValidator {
         return AppSchemaValueType.nullValue;
 
       default:
-        return AppSchemaValueType.object;
+        // The Registry should reject unknown identifiers.
+        // Keep this defensive branch strict instead of converting
+        // unknown identifiers into object.
+        throw StateError(
+          'Unsupported Registry field type "$type".',
+        );
     }
   }
 
@@ -474,6 +563,7 @@ final class AppEventSchemaValidator {
 
     if (value == null) {
       if (definition.type != AppSchemaValueType.nullValue &&
+          definition.type != AppSchemaValueType.any &&
           constraints?.allowNull != true) {
         violations.add(
           AppSchemaViolation(
@@ -482,6 +572,18 @@ final class AppEventSchemaValidator {
             message: 'Null is not allowed for this field.',
           ),
         );
+      }
+
+      if (definition.type == AppSchemaValueType.nullValue ||
+          constraints?.allowNull == true) {
+        if (constraints != null) {
+          _validateConstraints(
+            value: value,
+            constraints: constraints,
+            path: path,
+            violations: violations,
+          );
+        }
       }
 
       return;
@@ -511,14 +613,33 @@ final class AppEventSchemaValidator {
     }
 
     if (definition.type == AppSchemaValueType.object) {
-      _validateObject(
-        value: Map<String, Object?>.from(value as Map),
-        properties: definition.properties,
-        allowUnknownProperties: definition.allowUnknownProperties,
-        path: path,
-        depth: depth,
-        violations: violations,
-      );
+      final objectValue = value as Map;
+
+      if (objectValue.keys.any((key) => key is! String)) {
+        violations.add(
+          AppSchemaViolation(
+            code: AppSchemaViolationCode.invalidType,
+            path: path,
+            message: 'Object keys must all be strings.',
+            expected: 'Map<String, Object?>',
+            actual: value.runtimeType.toString(),
+          ),
+        );
+
+        return;
+      }
+
+      if (definition.properties.isNotEmpty ||
+          !definition.allowUnknownProperties) {
+        _validateObject(
+          value: Map<String, Object?>.from(objectValue),
+          properties: definition.properties,
+          allowUnknownProperties: definition.allowUnknownProperties,
+          path: path,
+          depth: depth,
+          violations: violations,
+        );
+      }
     }
 
     if (definition.type == AppSchemaValueType.array) {
@@ -533,7 +654,7 @@ final class AppEventSchemaValidator {
   }
 
   void _validateConstraints({
-    required Object value,
+    required Object? value,
     required AppSchemaFieldConstraints constraints,
     required String path,
     required List<AppSchemaViolation> violations,
@@ -637,15 +758,26 @@ final class AppEventSchemaValidator {
         );
       }
 
-      if (constraints.pattern != null &&
-          !RegExp(constraints.pattern!).hasMatch(value)) {
-        violations.add(
-          AppSchemaViolation(
-            code: AppSchemaViolationCode.invalidStringPattern,
-            path: path,
-            message: 'String does not match the required pattern.',
-          ),
-        );
+      if (constraints.pattern != null) {
+        try {
+          if (!RegExp(constraints.pattern!).hasMatch(value)) {
+            violations.add(
+              AppSchemaViolation(
+                code: AppSchemaViolationCode.invalidStringPattern,
+                path: path,
+                message: 'String does not match the required pattern.',
+              ),
+            );
+          }
+        } on FormatException {
+          violations.add(
+            AppSchemaViolation(
+              code: AppSchemaViolationCode.invalidConstraint,
+              path: path,
+              message: 'The configured regular expression is invalid.',
+            ),
+          );
+        }
       }
 
       if (constraints.format != null &&
@@ -709,12 +841,16 @@ final class AppEventSchemaValidator {
   }) {
     final itemDefinition = definition.items;
 
+    // Registry array fields do not carry nested item schemas.
+    // In that case, array-level constraints still apply, but no
+    // unsupported item type is guessed.
     if (itemDefinition == null) {
       return;
     }
 
     for (var index = 0; index < value.length; index++) {
       final itemPath = '$path[$index]';
+
       final beforeCount = violations.length;
 
       _validateValue(
@@ -750,7 +886,7 @@ final class AppEventSchemaValidator {
         return value is int;
 
       case AppSchemaValueType.number:
-        return value is num;
+        return value is num && value.isFinite;
 
       case AppSchemaValueType.boolean:
         return value is bool;
@@ -764,6 +900,9 @@ final class AppEventSchemaValidator {
 
       case AppSchemaValueType.nullValue:
         return false;
+
+      case AppSchemaValueType.any:
+        return true;
     }
   }
 
@@ -804,7 +943,6 @@ final class AppEventSchemaValidator {
     }
   }
 
-  /// Validates an ISO calendar date without accepting normalized dates.
   bool _isValidDate(String value) {
     final match = RegExp(
       r'^(\d{4})-(\d{2})-(\d{2})$',
@@ -822,61 +960,52 @@ final class AppEventSchemaValidator {
       return false;
     }
 
-    final parsed = DateTime.tryParse(value);
+    final leapYear =
+        year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
 
-    if (parsed == null) {
-      return false;
-    }
+    final daysInMonth = switch (month) {
+      1 || 3 || 5 || 7 || 8 || 10 || 12 => 31,
+      4 || 6 || 9 || 11 => 30,
+      2 => leapYear ? 29 : 28,
+      _ => 0,
+    };
 
-    return parsed.year == year &&
-        parsed.month == month &&
-        parsed.day == day;
+    return day <= daysInMonth;
   }
 
-  /// Validates an ISO date-time value.
   bool _isValidDateTime(String value) {
-    if (!RegExp(
-      r'^\d{4}-\d{2}-\d{2}T'
-      r'\d{2}:\d{2}:\d{2}'
-      r'(?:\.\d+)?'
-      r'(?:Z|[+-]\d{2}:\d{2})?$',
-    ).hasMatch(value)) {
+    final match = RegExp(
+      r'^(\d{4}-\d{2}-\d{2})T'
+      r'(\d{2}):(\d{2}):(\d{2})'
+      r'(?:\.(\d+))?'
+      r'(Z|([+-])(\d{2}):(\d{2}))?$',
+    ).firstMatch(value);
+
+    if (match == null || !_isValidDate(match.group(1)!)) {
       return false;
     }
 
-    final datePart = value.substring(0, 10);
+    final hour = int.parse(match.group(2)!);
+    final minute = int.parse(match.group(3)!);
+    final second = int.parse(match.group(4)!);
 
-    if (!_isValidDate(datePart)) {
+    if (hour > 23 || minute > 59 || second > 59) {
       return false;
     }
 
-    final parsed = DateTime.tryParse(value);
+    final offsetHour = match.group(9);
+    final offsetMinute = match.group(10);
 
-    if (parsed == null) {
-      return false;
+    if (offsetHour != null && offsetMinute != null) {
+      final parsedOffsetHour = int.parse(offsetHour);
+      final parsedOffsetMinute = int.parse(offsetMinute);
+
+      if (parsedOffsetHour > 23 || parsedOffsetMinute > 59) {
+        return false;
+      }
     }
 
-    final timePart = value.substring(11, 19);
-    final components = timePart.split(':');
-
-    if (components.length != 3) {
-      return false;
-    }
-
-    final hour = int.tryParse(components[0]);
-    final minute = int.tryParse(components[1]);
-    final second = int.tryParse(components[2]);
-
-    if (hour == null ||
-        minute == null ||
-        second == null ||
-        hour > 23 ||
-        minute > 59 ||
-        second > 59) {
-      return false;
-    }
-
-    return true;
+    return DateTime.tryParse(value) != null;
   }
 
   bool _containsDuplicates(List values) {
@@ -934,7 +1063,6 @@ final class AppEventSchemaValidator {
     return first == second;
   }
 
-  /// Calculates decimal precision, including scientific notation.
   int _decimalPlaces(double value) {
     final text = value.toString().toLowerCase();
     final exponentIndex = text.indexOf('e');
@@ -955,24 +1083,7 @@ final class AppEventSchemaValidator {
 
     final decimalCount = mantissa.length - decimalIndex - 1;
 
-    // clamp returns num; toInt preserves the declared return type.
     return (decimalCount - exponent).clamp(0, 1000).toInt();
-  }
-
-  AppSchemaViolationCode _classifyRegistryError(String error) {
-    if (error.startsWith('Required field')) {
-      return AppSchemaViolationCode.missingRequiredField;
-    }
-
-    if (error.startsWith('Undeclared field')) {
-      return AppSchemaViolationCode.unknownField;
-    }
-
-    if (error.contains('does not match type')) {
-      return AppSchemaViolationCode.invalidType;
-    }
-
-    return AppSchemaViolationCode.invalidConstraint;
   }
 
   List<AppSchemaViolation> _removeDuplicateViolations(
