@@ -14,7 +14,6 @@ enum AppEventSchemaCompatibility {
   none,
 }
 
-/// Describes the result of a schema compatibility check.
 enum AppEventSchemaCompatibilityStatus {
   compatible,
   incompatible,
@@ -22,7 +21,6 @@ enum AppEventSchemaCompatibilityStatus {
   unsupportedVersion,
 }
 
-/// Describes the direction of a schema migration.
 enum AppEventSchemaMigrationDirection {
   upgrade,
   downgrade,
@@ -52,6 +50,7 @@ final class AppEventSchemaDefinition {
     _validateEventType(eventType);
     _validateVersion(version);
     _validateSchemaName(schemaName);
+
     _validateFieldDefinitions(
       this.requiredFields,
       this.optionalFields,
@@ -68,10 +67,8 @@ final class AppEventSchemaDefinition {
   final Set<String> requiredFields;
   final Set<String> optionalFields;
 
-  /// Maps field names to logical type identifiers.
-  ///
-  /// Supported identifiers are:
-  /// string, integer, number, boolean, object, array, and null.
+  /// Supported identifiers:
+  /// string, integer, number, boolean, object, array, null.
   final Map<String, String> fieldTypes;
 
   /// Default values used by migration operations when explicitly requested.
@@ -161,6 +158,14 @@ final class AppEventSchemaDefinition {
         );
       }
 
+      if (result.containsKey(key)) {
+        throw ArgumentError.value(
+          key,
+          'fieldTypes',
+          'Duplicate field type keys after normalization.',
+        );
+      }
+
       if (!supportedFieldTypes.contains(value)) {
         throw ArgumentError.value(
           value,
@@ -189,14 +194,35 @@ final class AppEventSchemaDefinition {
         );
       }
 
+      if (result.containsKey(key)) {
+        throw ArgumentError.value(
+          key,
+          'defaultValues',
+          'Duplicate default value keys after normalization.',
+        );
+      }
+
       result[key] = _freezeValue(entry.value);
     }
 
     return Map<String, Object?>.unmodifiable(result);
   }
 
+  /// Recursively freezes JSON-compatible values.
   static Object? _freezeValue(Object? value) {
-    if (value == null || value is String || value is bool || value is num) {
+    if (value == null || value is String || value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      if (!value.isFinite) {
+        throw ArgumentError.value(
+          value,
+          'defaultValues',
+          'Numeric default values must be finite.',
+        );
+      }
+
       return value;
     }
 
@@ -216,7 +242,17 @@ final class AppEventSchemaDefinition {
           );
         }
 
-        result[entry.key as String] = _freezeValue(entry.value);
+        final key = entry.key as String;
+
+        if (result.containsKey(key)) {
+          throw ArgumentError.value(
+            key,
+            'defaultValues',
+            'Duplicate object keys are not allowed.',
+          );
+        }
+
+        result[key] = _freezeValue(entry.value);
       }
 
       return Map<String, Object?>.unmodifiable(result);
@@ -235,7 +271,9 @@ final class AppEventSchemaDefinition {
     Map<String, String> fieldTypes,
     Map<String, Object?> defaultValues,
   ) {
-    final overlappingFields = requiredFields.intersection(optionalFields);
+    final overlappingFields = requiredFields.intersection(
+      optionalFields,
+    );
 
     if (overlappingFields.isNotEmpty) {
       throw ArgumentError(
@@ -244,7 +282,7 @@ final class AppEventSchemaDefinition {
       );
     }
 
-    final declaredFields = {
+    final declaredFields = <String>{
       ...requiredFields,
       ...optionalFields,
     };
@@ -298,7 +336,7 @@ final class AppEventSchemaCompatibilityResult {
       status == AppEventSchemaCompatibilityStatus.compatible;
 }
 
-/// Describes a migration from one schema version to another.
+/// Describes a migration between two schema versions.
 abstract interface class AppEventSchemaMigration {
   String get eventType;
 
@@ -306,7 +344,6 @@ abstract interface class AppEventSchemaMigration {
 
   int get targetVersion;
 
-  /// Converts an event payload from the source version to the target version.
   Map<String, Object?> migrate(Map<String, Object?> payload);
 }
 
@@ -317,12 +354,25 @@ final class AppEventSchemaMigrationResult {
     required this.sourceVersion,
     required this.targetVersion,
     required Map<String, Object?> payload,
-  }) : payload = Map<String, Object?>.unmodifiable(payload);
+  }) : payload = _freezePayload(payload);
 
   final String eventType;
   final int sourceVersion;
   final int targetVersion;
   final Map<String, Object?> payload;
+
+  static Map<String, Object?> _freezePayload(
+    Map<String, Object?> source,
+  ) {
+    final result = <String, Object?>{};
+
+    for (final entry in source.entries) {
+      result[entry.key] =
+          AppEventSchemaDefinition._freezeValue(entry.value);
+    }
+
+    return Map<String, Object?>.unmodifiable(result);
+  }
 }
 
 /// Registry responsible for event schema definitions and migrations.
@@ -368,8 +418,6 @@ final class AppEventSchemaRegistry {
   }
 
   /// Registers a schema definition.
-  ///
-  /// Duplicate event type and version combinations are rejected.
   void registerDefinition(AppEventSchemaDefinition definition) {
     final versions = _definitions.putIfAbsent(
       definition.eventType,
@@ -388,8 +436,7 @@ final class AppEventSchemaRegistry {
 
   /// Registers a migration between two different schema versions.
   ///
-  /// Each source version can have only one direct migration for a given
-  /// event type. The migration target must already be registered.
+  /// Each source version can have only one direct migration for an event.
   void registerMigration(AppEventSchemaMigration migration) {
     _validateMigrationDeclaration(migration);
 
@@ -450,21 +497,19 @@ final class AppEventSchemaRegistry {
       return null;
     }
 
-    return findDefinition(
-      eventType,
-      versions.last,
-    );
+    return findDefinition(eventType, versions.last);
   }
 
   /// Checks whether an event type and schema version are registered.
-  bool supportsVersion(
-    String eventType,
-    int version,
-  ) {
+  bool supportsVersion(String eventType, int version) {
     return findDefinition(eventType, version) != null;
   }
 
-  /// Validates a payload against its registered schema definition.
+  /// Validates the basic payload structure against a registered schema.
+  ///
+  /// Detailed nested constraints and field rules belong to
+  /// AppEventSchemaValidator. Do not run both validation layers
+  /// redundantly for the same payload.
   AppEventSchemaValidationResult validatePayload({
     required String eventType,
     required int version,
@@ -489,7 +534,7 @@ final class AppEventSchemaRegistry {
       }
     }
 
-    final declaredFields = {
+    final declaredFields = <String>{
       ...definition.requiredFields,
       ...definition.optionalFields,
     };
@@ -520,9 +565,6 @@ final class AppEventSchemaRegistry {
   }
 
   /// Assesses compatibility between two registered schema versions.
-  ///
-  /// This is a declared compatibility policy, not a substitute for
-  /// payload validation or an executable migration.
   AppEventSchemaCompatibilityResult checkCompatibility({
     required String eventType,
     required int sourceVersion,
@@ -551,17 +593,14 @@ final class AppEventSchemaRegistry {
       );
     }
 
-    final sourcePolicy = source.compatibility;
-    final targetPolicy = target.compatibility;
-
     final sourceCanReadTarget = _canRead(
-      sourcePolicy,
+      source.compatibility,
       sourceVersion,
       targetVersion,
     );
 
     final targetCanReadSource = _canRead(
-      targetPolicy,
+      target.compatibility,
       targetVersion,
       sourceVersion,
     );
@@ -586,10 +625,6 @@ final class AppEventSchemaRegistry {
   }
 
   /// Migrates a payload through a complete chain of registered migrations.
-  ///
-  /// The source and target schemas must both be registered. Every
-  /// intermediate migration must exist and its output is validated
-  /// against the next schema before continuing.
   AppEventSchemaMigrationResult migratePayload({
     required String eventType,
     required int sourceVersion,
@@ -620,7 +655,8 @@ final class AppEventSchemaRegistry {
 
     if (!initialValidation.isValid) {
       throw StateError(
-        'Source payload is invalid: ${initialValidation.errors.join('; ')}',
+        'Source payload is invalid: '
+        '${initialValidation.errors.join('; ')}',
       );
     }
 
@@ -640,6 +676,9 @@ final class AppEventSchemaRegistry {
     var currentVersion = sourceVersion;
     var currentPayload = Map<String, Object?>.from(payload);
 
+    // Prevent accidental infinite loops from invalid migration chains.
+    final visitedVersions = <int>{sourceVersion};
+
     while (currentVersion != targetVersion) {
       final migration = _migrations[eventType]?[currentVersion];
 
@@ -651,17 +690,27 @@ final class AppEventSchemaRegistry {
 
       final nextVersion = migration.targetVersion;
 
-      if (direction == AppEventSchemaMigrationDirection.upgrade &&
-          nextVersion <= currentVersion) {
-        throw StateError(
-          'Upgrade migration must move to a higher schema version.',
-        );
+      if (direction == AppEventSchemaMigrationDirection.upgrade) {
+        if (nextVersion <= currentVersion ||
+            nextVersion > targetVersion) {
+          throw StateError(
+            'Upgrade migration must move forward without exceeding '
+            'the target version.',
+          );
+        }
+      } else {
+        if (nextVersion >= currentVersion ||
+            nextVersion < targetVersion) {
+          throw StateError(
+            'Downgrade migration must move backward without going '
+            'below the target version.',
+          );
+        }
       }
 
-      if (direction == AppEventSchemaMigrationDirection.downgrade &&
-          nextVersion >= currentVersion) {
+      if (!visitedVersions.add(nextVersion)) {
         throw StateError(
-          'Downgrade migration must move to a lower schema version.',
+          'A migration cycle was detected at version $nextVersion.',
         );
       }
 
@@ -703,7 +752,8 @@ final class AppEventSchemaRegistry {
       );
     }
 
-    if (migration.sourceVersion < 1 || migration.targetVersion < 1) {
+    if (migration.sourceVersion < 1 ||
+        migration.targetVersion < 1) {
       throw ArgumentError(
         'Migration schema versions must be positive.',
       );
@@ -720,19 +770,28 @@ final class AppEventSchemaRegistry {
     switch (expectedType) {
       case 'string':
         return value is String;
+
       case 'integer':
         return value is int;
+
       case 'number':
         return value is num && value.isFinite;
+
       case 'boolean':
         return value is bool;
+
       case 'object':
-        return value is Map;
+        return value is Map &&
+            value.keys.every((key) => key is String);
+
       case 'array':
         return value is List;
+
       case 'null':
         return value == null;
+
       default:
+        // Unknown schema types must never silently pass.
         return false;
     }
   }
@@ -751,10 +810,12 @@ final class AppEventSchemaRegistry {
         return true;
 
       case AppEventSchemaCompatibility.backward:
-        return dataVersion < readerVersion;
+        // Older reader can read newer data.
+        return readerVersion < dataVersion;
 
       case AppEventSchemaCompatibility.forward:
-        return dataVersion > readerVersion;
+        // Newer reader can read older data.
+        return readerVersion > dataVersion;
 
       case AppEventSchemaCompatibility.none:
         return false;
