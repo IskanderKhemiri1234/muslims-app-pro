@@ -34,6 +34,11 @@ abstract interface class AppEventSchemaMigrationAuditIdGenerator {
   String nextId();
 }
 
+/// Generates sequential identifiers within this generator instance.
+///
+/// The generator does not persist its counter. A shared instance should be
+/// supplied by the composition root when identifiers must remain unique
+/// across multiple audit logger operations during the application's lifetime.
 final class SequentialAppEventSchemaMigrationAuditIdGenerator
     implements AppEventSchemaMigrationAuditIdGenerator {
   SequentialAppEventSchemaMigrationAuditIdGenerator({
@@ -75,12 +80,13 @@ final class SequentialAppEventSchemaMigrationAuditIdGenerator
   }
 }
 
+/// Immutable audit record describing an authorization or execution event.
 final class AppEventSchemaMigrationAuditRecord {
   AppEventSchemaMigrationAuditRecord({
     required this.auditId,
     required this.operationId,
     required this.recordType,
-    required this.timestamp,
+    required DateTime timestamp,
     required this.eventType,
     required this.sourceVersion,
     required this.targetVersion,
@@ -90,21 +96,14 @@ final class AppEventSchemaMigrationAuditRecord {
     required this.policyCode,
     required this.executionStatus,
     required this.migrationCount,
-    required this.appliedVersions,
+    required List<int> appliedVersions,
     required this.durationMilliseconds,
     required this.executionStage,
   }) {
-    if (auditId.trim().isEmpty) {
-      throw ArgumentError.value(auditId, 'auditId');
-    }
-
-    if (operationId.trim().isEmpty) {
-      throw ArgumentError.value(operationId, 'operationId');
-    }
-
-    if (eventType.trim().isEmpty) {
-      throw ArgumentError.value(eventType, 'eventType');
-    }
+    _validateRequiredIdentifier(auditId, 'auditId');
+    _validateRequiredIdentifier(operationId, 'operationId');
+    _validateRequiredIdentifier(eventType, 'eventType');
+    _validateRequiredIdentifier(guardCode, 'guardCode');
 
     if (sourceVersion < 1) {
       throw ArgumentError.value(sourceVersion, 'sourceVersion');
@@ -129,6 +128,20 @@ final class AppEventSchemaMigrationAuditRecord {
       throw ArgumentError.value(executionStage, 'executionStage');
     }
 
+    if (policyCode != null && policyCode!.trim().isEmpty) {
+      throw ArgumentError.value(policyCode, 'policyCode');
+    }
+
+    for (final version in appliedVersions) {
+      if (version < 1) {
+        throw ArgumentError.value(
+          appliedVersions,
+          'appliedVersions',
+          'Every applied version must be greater than zero.',
+        );
+      }
+    }
+
     this.timestamp = timestamp.toUtc();
     this.appliedVersions = List<int>.unmodifiable(appliedVersions);
   }
@@ -150,6 +163,15 @@ final class AppEventSchemaMigrationAuditRecord {
   final int? durationMilliseconds;
   final String? executionStage;
 
+  static void _validateRequiredIdentifier(
+    String value,
+    String fieldName,
+  ) {
+    if (value.trim().isEmpty) {
+      throw ArgumentError.value(value, fieldName);
+    }
+  }
+
   bool get isAuthorizationRecord =>
       recordType == AppEventSchemaMigrationAuditRecordType.authorization;
 
@@ -163,6 +185,9 @@ final class AppEventSchemaMigrationAuditRecord {
       executionStatus ==
       AppEventSchemaMigrationAuditExecutionStatus.succeeded;
 
+  /// Returns an immutable, serialization-friendly representation.
+  ///
+  /// This method does not expose mutable internal collections.
   Map<String, Object?> toSafeMap() {
     return Map<String, Object?>.unmodifiable({
       'auditId': auditId,
@@ -185,10 +210,15 @@ final class AppEventSchemaMigrationAuditRecord {
   }
 }
 
+/// Defines the append-only audit sink contract.
 abstract interface class AppEventSchemaMigrationAuditSink {
   Future<void> append(AppEventSchemaMigrationAuditRecord record);
 }
 
+/// In-memory bounded audit sink.
+///
+/// The sink owns its in-memory queue. It does not own any external resource
+/// and therefore does not require a dispose operation.
 final class InMemoryAppEventSchemaMigrationAuditSink
     implements AppEventSchemaMigrationAuditSink {
   InMemoryAppEventSchemaMigrationAuditSink({
@@ -196,6 +226,7 @@ final class InMemoryAppEventSchemaMigrationAuditSink
   }) : _maximumRecords = _validateMaximumRecords(maximumRecords);
 
   final int _maximumRecords;
+
   final Queue<AppEventSchemaMigrationAuditRecord> _records =
       Queue<AppEventSchemaMigrationAuditRecord>();
 
@@ -211,6 +242,7 @@ final class InMemoryAppEventSchemaMigrationAuditSink
     return value;
   }
 
+  /// Returns an immutable snapshot of the current records.
   List<AppEventSchemaMigrationAuditRecord> get records =>
       List<AppEventSchemaMigrationAuditRecord>.unmodifiable(_records);
 
@@ -220,6 +252,8 @@ final class InMemoryAppEventSchemaMigrationAuditSink
 
   bool get isNotEmpty => _records.isNotEmpty;
 
+  /// Appends a record and removes the oldest records when the capacity
+  /// limit is exceeded.
   @override
   Future<void> append(AppEventSchemaMigrationAuditRecord record) async {
     _records.addLast(record);
@@ -229,11 +263,18 @@ final class InMemoryAppEventSchemaMigrationAuditSink
     }
   }
 
+  /// Removes all currently retained records.
+  ///
+  /// This operation does not dispose the sink.
   void clear() {
     _records.clear();
   }
 }
 
+/// Creates audit records and forwards them to an injected sink.
+///
+/// The logger does not own or dispose the sink, clock, or ID generator.
+/// Lifecycle ownership remains with the component that supplied them.
 final class AppEventSchemaMigrationAuditLogger {
   AppEventSchemaMigrationAuditLogger({
     required AppEventSchemaMigrationAuditSink sink,
@@ -248,16 +289,21 @@ final class AppEventSchemaMigrationAuditLogger {
   final AppClock _clock;
   final AppEventSchemaMigrationAuditIdGenerator _idGenerator;
 
+  /// Records the result of an authorization decision.
+  ///
+  /// A new operation identifier is generated for this authorization event.
+  /// A separate audit identifier identifies the resulting record.
   Future<AppEventSchemaMigrationAuditRecord> recordAuthorization({
     required AppEventSchemaMigrationGuardResult result,
     required bool allowed,
   }) async {
     final operationId = _idGenerator.nextId();
+    final auditId = _idGenerator.nextId();
 
     final policyCode = result.policyDecision?.code.name;
 
     final record = AppEventSchemaMigrationAuditRecord(
-      auditId: _idGenerator.nextId(),
+      auditId: auditId,
       operationId: operationId,
       recordType: AppEventSchemaMigrationAuditRecordType.authorization,
       timestamp: _clock.utcNow,
@@ -282,9 +328,11 @@ final class AppEventSchemaMigrationAuditLogger {
     );
 
     await _sink.append(record);
+
     return record;
   }
 
+  /// Records a successfully completed migration execution.
   Future<AppEventSchemaMigrationAuditRecord> recordExecutionSuccess({
     required String operationId,
     required AppEventSchemaMigrationPermit permit,
@@ -329,9 +377,11 @@ final class AppEventSchemaMigrationAuditLogger {
     );
 
     await _sink.append(record);
+
     return record;
   }
 
+  /// Records a failed migration execution.
   Future<AppEventSchemaMigrationAuditRecord> recordExecutionFailure({
     required String operationId,
     required AppEventSchemaMigrationPermit permit,
@@ -382,6 +432,7 @@ final class AppEventSchemaMigrationAuditLogger {
     );
 
     await _sink.append(record);
+
     return record;
   }
 
