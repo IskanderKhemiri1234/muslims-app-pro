@@ -29,15 +29,17 @@ enum AppEventSchemaMigrationDirection {
 /// Immutable definition of an event schema version.
 final class AppEventSchemaDefinition {
   AppEventSchemaDefinition({
-    required this.eventType,
+    required String eventType,
     required this.version,
-    required this.schemaName,
+    required String schemaName,
     required this.compatibility,
     Iterable<String> requiredFields = const [],
     Iterable<String> optionalFields = const [],
     Map<String, String> fieldTypes = const {},
     Map<String, Object?> defaultValues = const {},
-  })  : requiredFields = _immutableFieldSet(
+  })  : eventType = _normalizeRequiredName(eventType, 'eventType'),
+        schemaName = _normalizeRequiredName(schemaName, 'schemaName'),
+        requiredFields = _immutableFieldSet(
           requiredFields,
           'requiredFields',
         ),
@@ -47,9 +49,7 @@ final class AppEventSchemaDefinition {
         ),
         fieldTypes = _immutableStringMap(fieldTypes),
         defaultValues = _immutableValueMap(defaultValues) {
-    _validateEventType(eventType);
     _validateVersion(version);
-    _validateSchemaName(schemaName);
 
     _validateFieldDefinitions(
       this.requiredFields,
@@ -69,9 +69,18 @@ final class AppEventSchemaDefinition {
 
   /// Supported identifiers:
   /// string, integer, number, boolean, object, array, null.
+  ///
+  /// object means a Map with String keys.
+  /// array means a List.
+  ///
+  /// This registry does not define nested object properties
+  /// or array item schemas.
   final Map<String, String> fieldTypes;
 
   /// Default values used by migration operations when explicitly requested.
+  ///
+  /// Defaults are only allowed for optional fields and must match
+  /// the declared field type when one is provided.
   final Map<String, Object?> defaultValues;
 
   static const Set<String> supportedFieldTypes = {
@@ -84,14 +93,21 @@ final class AppEventSchemaDefinition {
     'null',
   };
 
-  static void _validateEventType(String value) {
-    if (value.trim().isEmpty) {
+  static String _normalizeRequiredName(
+    String value,
+    String parameterName,
+  ) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
       throw ArgumentError.value(
         value,
-        'eventType',
-        'Event type cannot be empty.',
+        parameterName,
+        '$parameterName cannot be empty.',
       );
     }
+
+    return normalized;
   }
 
   static void _validateVersion(int value) {
@@ -100,16 +116,6 @@ final class AppEventSchemaDefinition {
         value,
         'version',
         'Schema version must be greater than zero.',
-      );
-    }
-  }
-
-  static void _validateSchemaName(String value) {
-    if (value.trim().isEmpty) {
-      throw ArgumentError.value(
-        value,
-        'schemaName',
-        'Schema name cannot be empty.',
       );
     }
   }
@@ -135,7 +141,7 @@ final class AppEventSchemaDefinition {
         throw ArgumentError.value(
           value,
           parameterName,
-          'Duplicate field names are not allowed.',
+          'Duplicate field names are not allowed after normalization.',
         );
       }
     }
@@ -170,7 +176,7 @@ final class AppEventSchemaDefinition {
         throw ArgumentError.value(
           value,
           'fieldTypes',
-          'Unsupported schema field type.',
+          'Unsupported schema field type: $value.',
         );
       }
 
@@ -219,7 +225,7 @@ final class AppEventSchemaDefinition {
         throw ArgumentError.value(
           value,
           'defaultValues',
-          'Numeric default values must be finite.',
+          'Numeric values must be finite.',
         );
       }
 
@@ -228,7 +234,7 @@ final class AppEventSchemaDefinition {
 
     if (value is List) {
       return List<Object?>.unmodifiable(
-        value.map(_freezeValue),
+        value.map<Object?>(_freezeValue),
       );
     }
 
@@ -295,12 +301,57 @@ final class AppEventSchemaDefinition {
       }
     }
 
-    for (final field in defaultValues.keys) {
+    for (final entry in defaultValues.entries) {
+      final field = entry.key;
+
       if (!optionalFields.contains(field)) {
         throw ArgumentError(
           'Default values can only be assigned to optional fields: $field',
         );
       }
+
+      final declaredType = fieldTypes[field];
+
+      if (declaredType != null &&
+          !_matchesDeclaredType(entry.value, declaredType)) {
+        throw ArgumentError.value(
+          entry.value,
+          'defaultValues.$field',
+          'Default value does not match declared type "$declaredType".',
+        );
+      }
+    }
+  }
+
+  static bool _matchesDeclaredType(
+    Object? value,
+    String expectedType,
+  ) {
+    switch (expectedType) {
+      case 'string':
+        return value is String;
+
+      case 'integer':
+        return value is int;
+
+      case 'number':
+        return value is num && value.isFinite;
+
+      case 'boolean':
+        return value is bool;
+
+      case 'object':
+        return value is Map &&
+            value.keys.every((key) => key is String);
+
+      case 'array':
+        return value is List;
+
+      case 'null':
+        return value == null;
+
+      default:
+        return false;
     }
   }
 }
@@ -367,7 +418,23 @@ final class AppEventSchemaMigrationResult {
     final result = <String, Object?>{};
 
     for (final entry in source.entries) {
-      result[entry.key] =
+      final key = entry.key.trim();
+
+      if (key.isEmpty) {
+        throw ArgumentError(
+          'Migration payload field names cannot be empty.',
+        );
+      }
+
+      if (result.containsKey(key)) {
+        throw ArgumentError.value(
+          key,
+          'payload',
+          'Duplicate payload keys after normalization.',
+        );
+      }
+
+      result[key] =
           AppEventSchemaDefinition._freezeValue(entry.value);
     }
 
@@ -477,12 +544,13 @@ final class AppEventSchemaRegistry {
     String eventType,
     int version,
   ) {
-    return _definitions[eventType]?[version];
+    return _definitions[eventType.trim()]?[version];
   }
 
   /// Returns all registered versions of an event schema.
   List<int> registeredVersions(String eventType) {
-    final versions = _definitions[eventType]?.keys.toList() ?? <int>[];
+    final versions =
+        _definitions[eventType.trim()]?.keys.toList() ?? <int>[];
 
     versions.sort();
 
@@ -505,11 +573,13 @@ final class AppEventSchemaRegistry {
     return findDefinition(eventType, version) != null;
   }
 
-  /// Validates the basic payload structure against a registered schema.
+  /// Performs basic payload validation against a registered schema.
   ///
   /// Detailed nested constraints and field rules belong to
-  /// AppEventSchemaValidator. Do not run both validation layers
-  /// redundantly for the same payload.
+  /// AppEventSchemaValidator.
+  ///
+  /// Keep this method for callers that need registry-level validation.
+  /// Do not call it redundantly from AppEventSchemaValidator.
   AppEventSchemaValidationResult validatePayload({
     required String eventType,
     required int version,
@@ -521,7 +591,8 @@ final class AppEventSchemaRegistry {
       return AppEventSchemaValidationResult(
         isValid: false,
         errors: [
-          'No schema is registered for $eventType version $version.',
+          'No schema is registered for '
+              '${eventType.trim()} version $version.',
         ],
       );
     }
@@ -570,13 +641,22 @@ final class AppEventSchemaRegistry {
     required int sourceVersion,
     required int targetVersion,
   }) {
-    final source = findDefinition(eventType, sourceVersion);
-    final target = findDefinition(eventType, targetVersion);
+    final normalizedEventType = eventType.trim();
+
+    final source = findDefinition(
+      normalizedEventType,
+      sourceVersion,
+    );
+
+    final target = findDefinition(
+      normalizedEventType,
+      targetVersion,
+    );
 
     if (source == null || target == null) {
       return AppEventSchemaCompatibilityResult(
         status: AppEventSchemaCompatibilityStatus.unknownSchema,
-        eventType: eventType,
+        eventType: normalizedEventType,
         sourceVersion: sourceVersion,
         targetVersion: targetVersion,
         reason: 'Source or target schema is not registered.',
@@ -586,7 +666,7 @@ final class AppEventSchemaRegistry {
     if (sourceVersion == targetVersion) {
       return AppEventSchemaCompatibilityResult(
         status: AppEventSchemaCompatibilityStatus.compatible,
-        eventType: eventType,
+        eventType: normalizedEventType,
         sourceVersion: sourceVersion,
         targetVersion: targetVersion,
         reason: 'Both versions identify the same registered schema.',
@@ -608,7 +688,7 @@ final class AppEventSchemaRegistry {
     if (sourceCanReadTarget && targetCanReadSource) {
       return AppEventSchemaCompatibilityResult(
         status: AppEventSchemaCompatibilityStatus.compatible,
-        eventType: eventType,
+        eventType: normalizedEventType,
         sourceVersion: sourceVersion,
         targetVersion: targetVersion,
       );
@@ -616,7 +696,7 @@ final class AppEventSchemaRegistry {
 
     return AppEventSchemaCompatibilityResult(
       status: AppEventSchemaCompatibilityStatus.incompatible,
-      eventType: eventType,
+      eventType: normalizedEventType,
       sourceVersion: sourceVersion,
       targetVersion: targetVersion,
       reason: 'The declared compatibility policies do not permit '
@@ -631,13 +711,15 @@ final class AppEventSchemaRegistry {
     required int targetVersion,
     required Map<String, Object?> payload,
   }) {
+    final normalizedEventType = eventType.trim();
+
     final sourceDefinition = findDefinition(
-      eventType,
+      normalizedEventType,
       sourceVersion,
     );
 
     final targetDefinition = findDefinition(
-      eventType,
+      normalizedEventType,
       targetVersion,
     );
 
@@ -648,7 +730,7 @@ final class AppEventSchemaRegistry {
     }
 
     final initialValidation = validatePayload(
-      eventType: eventType,
+      eventType: normalizedEventType,
       version: sourceVersion,
       payload: payload,
     );
@@ -662,7 +744,7 @@ final class AppEventSchemaRegistry {
 
     if (sourceVersion == targetVersion) {
       return AppEventSchemaMigrationResult(
-        eventType: eventType,
+        eventType: normalizedEventType,
         sourceVersion: sourceVersion,
         targetVersion: targetVersion,
         payload: payload,
@@ -676,19 +758,26 @@ final class AppEventSchemaRegistry {
     var currentVersion = sourceVersion;
     var currentPayload = Map<String, Object?>.from(payload);
 
-    // Prevent accidental infinite loops from invalid migration chains.
     final visitedVersions = <int>{sourceVersion};
 
     while (currentVersion != targetVersion) {
-      final migration = _migrations[eventType]?[currentVersion];
+      final migration =
+          _migrations[normalizedEventType]?[currentVersion];
 
       if (migration == null) {
         throw StateError(
-          'Missing migration for $eventType version $currentVersion.',
+          'Missing migration for $normalizedEventType '
+          'version $currentVersion.',
         );
       }
 
       final nextVersion = migration.targetVersion;
+
+      if (migration.eventType.trim() != normalizedEventType) {
+        throw StateError(
+          'Migration event type does not match the registered event type.',
+        );
+      }
 
       if (direction == AppEventSchemaMigrationDirection.upgrade) {
         if (nextVersion <= currentVersion ||
@@ -719,7 +808,7 @@ final class AppEventSchemaRegistry {
       );
 
       final validation = validatePayload(
-        eventType: eventType,
+        eventType: normalizedEventType,
         version: nextVersion,
         payload: nextPayload,
       );
@@ -736,7 +825,7 @@ final class AppEventSchemaRegistry {
     }
 
     return AppEventSchemaMigrationResult(
-      eventType: eventType,
+      eventType: normalizedEventType,
       sourceVersion: sourceVersion,
       targetVersion: targetVersion,
       payload: currentPayload,
@@ -746,9 +835,19 @@ final class AppEventSchemaRegistry {
   void _validateMigrationDeclaration(
     AppEventSchemaMigration migration,
   ) {
-    if (migration.eventType.trim().isEmpty) {
+    final normalizedEventType = migration.eventType.trim();
+
+    if (normalizedEventType.isEmpty) {
       throw ArgumentError(
         'Migration event type cannot be empty.',
+      );
+    }
+
+    if (migration.eventType != normalizedEventType) {
+      throw ArgumentError.value(
+        migration.eventType,
+        'eventType',
+        'Migration event type must not contain leading or trailing spaces.',
       );
     }
 
@@ -791,7 +890,6 @@ final class AppEventSchemaRegistry {
         return value == null;
 
       default:
-        // Unknown schema types must never silently pass.
         return false;
     }
   }
