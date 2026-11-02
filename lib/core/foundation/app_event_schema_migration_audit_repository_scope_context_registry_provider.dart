@@ -1,11 +1,17 @@
 
 import 'app_event_schema_migration_audit_repository_scope_context_registry.dart';
 
-/// Provides access to an explicitly injected scope context registry.
+/// Provides controlled access to an externally managed scope context
+/// registry.
 ///
-/// This provider is a dependency access boundary only.
-/// It does not create, register, unregister, or dispose registries.
-/// It does not own providers, scopes, or repositories.
+/// This provider is an access boundary only.
+///
+/// It does not:
+/// - Create or dispose the registry.
+/// - Register or unregister scope providers.
+/// - Own scope contexts.
+/// - Own repositories.
+/// - Prevent the external registry owner from disposing the registry.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistry _registry;
 
@@ -13,8 +19,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Creates an access provider around an externally managed registry.
   ///
-  /// The registry must be created and managed by the composition root or
-  /// another explicitly designated lifecycle owner.
+  /// The registry must be created and managed by the composition root
+  /// or another explicitly designated lifecycle owner.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistry
         registry,
@@ -27,7 +33,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Returns the injected registry after validating both lifecycle states.
   ///
-  /// The registry remains externally owned.
+  /// Throws a provider exception if either the provider or registry
+  /// is no longer available.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistry get registry {
     _ensureProviderActive();
     _ensureRegistryActive();
@@ -37,8 +44,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Provides a registered context through the injected registry.
   ///
-  /// The registry performs provider lookup, scope identity verification,
-  /// and active-context validation.
+  /// The registry remains responsible for:
+  /// - Scope provider lookup.
+  /// - Scope identity verification.
+  /// - Active-context validation.
   AppEventSchemaMigrationAuditRepositoryScopeContext provideContext({
     required String scopeId,
   }) {
@@ -50,7 +59,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Executes a synchronous operation using the injected registry.
   ///
-  /// The registry is validated immediately before the callback is invoked.
+  /// Both lifecycle states are validated immediately before the callback
+  /// is invoked.
+  ///
   /// This method does not transfer ownership of the registry.
   T execute<T>(
     T Function(
@@ -64,9 +75,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Executes an asynchronous operation using the injected registry.
   ///
-  /// The registry is validated before the callback starts. This provider
-  /// does not lock the registry or prevent its external owner from disposing
-  /// it while the asynchronous operation is pending.
+  /// The provider and registry are validated before the callback starts.
+  ///
+  /// This method does not lock the registry and does not prevent its
+  /// external owner from disposing it while the asynchronous operation
+  /// is pending.
   Future<T> executeAsync<T>(
     Future<T> Function(
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistry registry,
@@ -79,9 +92,15 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Disables further access through this provider.
   ///
+  /// This operation is idempotent.
+  ///
   /// The injected registry and all resources reachable through it remain
   /// owned by their original lifecycle owner.
   void dispose() {
+    if (_isDisposed) {
+      return;
+    }
+
     _isDisposed = true;
   }
 
