@@ -1,87 +1,54 @@
-
 import 'app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_configuration.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_executor.dart';
-import 'app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_service.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_result.dart';
 
-/// Validation findings for the factory service configuration.
-enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationIssue {
-  executorIdentityMismatch,
-  factoryConfigurationMismatch,
-}
-
-/// Immutable validation report for the factory service configuration.
-final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationReport {
-  final List<
-      AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationIssue>
-      issues;
-
-  const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationReport({
-    required this.issues,
-  });
-
-  bool get isValid => issues.isEmpty;
-
-  bool get hasIssues => issues.isNotEmpty;
-
-  int get issueCount => issues.length;
-}
-
-/// Describes the dependencies and compatibility requirements of the
-/// initialization guard provider factory service.
+/// Coordinates validation requests for an initialization guard provider
+/// factory configuration.
 ///
-/// This object is descriptive and validation-only. It does not:
-/// - Create a service, executor, factory, provider, or guard.
-/// - Invoke the factory or executor.
-/// - Take ownership of any supplied dependency.
-/// - Dispose or disable external resources.
+/// This service is intentionally limited to delegating validation to an
+/// externally supplied executor and returning its unified result.
+///
+/// It does not:
+/// - Create or invoke a provider factory.
+/// - Create, replace, or own a provider or initialization guard.
 /// - Request or consume initialization permits.
-/// - Initialize modules or coordinate concurrent operations.
-final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfiguration {
-  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryService
-      service;
-
+/// - Initialize, disable, or dispose external resources.
+/// - Coordinate concurrent operations across the Composition Root.
+final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryService {
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryExecutor
-      executor;
+      _executor;
 
-  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryConfiguration
-      factoryConfiguration;
-
-  const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfiguration({
-    required this.service,
-    required this.executor,
-    required this.factoryConfiguration,
-  });
-
-  /// Validates the service's executor identity.
+  /// Creates the service with an externally supplied executor.
   ///
-  /// The service must reference the exact executor supplied to this
-  /// configuration.
-  ///
-  /// The factory configuration is retained as the intended configuration
-  /// context. The service API does not expose its internal configuration
-  /// because it receives that configuration as an argument per operation.
-  ///
-  /// Consequently, this method cannot prove that the service has previously
-  /// processed, or will process, [factoryConfiguration].
-  ///
-  /// No service method or executor operation is invoked.
-  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationReport
-      validate() {
-    final issues = <
-        AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationIssue>[];
+  /// The service does not own the executor or manage its lifecycle.
+  const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryService({
+    required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryExecutor
+        executor,
+  }) : _executor = executor;
 
-    if (!identical(service.executor, executor)) {
-      issues.add(
-        AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationIssue
-            .executorIdentityMismatch,
-      );
-    }
+  /// Exposes the injected executor for identity validation.
+  ///
+  /// This does not transfer ownership.
+  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryExecutor
+      get executor => _executor;
 
-    return AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationReport(
-      issues: List<
-          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceConfigurationIssue>.unmodifiable(
-        issues,
-      ),
+  /// Validates the supplied factory configuration.
+  ///
+  /// Returns a unified validation result.
+  ///
+  /// A successful result means only that no validation issues were found
+  /// during this operation. It does not indicate that a provider was
+  /// created or that a module is initialized.
+  ///
+  /// Unexpected exceptions from the executor are deliberately propagated
+  /// to the caller.
+  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryResult
+      validateConfiguration({
+    required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryConfiguration
+        configuration,
+  }) {
+    return _executor.execute(
+      configuration: configuration,
     );
   }
 }
