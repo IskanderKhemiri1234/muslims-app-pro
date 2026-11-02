@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'app_event_schema_migration_audit_repository_scope_context_registry_configuration.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_provider.dart';
-import 'app_event_schema_migration_audit_repository_scope_context_registry_scope_context.dart';
+import 'app_event_schema_migration_audit_repository_scope_context.dart';
 
 /// Lifecycle states of the scope context registry module.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState {
