@@ -3,9 +3,6 @@ import 'app_event.dart';
 
 /// Contract for an independently reusable application event filter.
 abstract interface class AppEventFilter {
-  /// Returns true when [event] satisfies this filter.
-  bool matches(AppEvent event);
-
   /// Combines this filter with another filter using logical AND.
   AppEventFilter and(AppEventFilter other) {
     return AppEventAndFilter(<AppEventFilter>[
@@ -26,10 +23,13 @@ abstract interface class AppEventFilter {
   AppEventFilter negate() {
     return AppEventNotFilter(this);
   }
+
+  /// Returns true when [event] satisfies this filter.
+  bool matches(AppEvent event);
 }
 
 /// Matches events by their exact event type.
-final class AppEventTypeFilter implements AppEventFilter {
+final class AppEventTypeFilter extends AppEventFilter {
   AppEventTypeFilter(String eventType)
       : eventType = _validateEventType(eventType);
 
@@ -56,7 +56,7 @@ final class AppEventTypeFilter implements AppEventFilter {
 }
 
 /// Matches events originating from one specific source.
-final class AppEventSourceFilter implements AppEventFilter {
+final class AppEventSourceFilter extends AppEventFilter {
   const AppEventSourceFilter(this.source);
 
   final AppEventSource source;
@@ -68,7 +68,7 @@ final class AppEventSourceFilter implements AppEventFilter {
 }
 
 /// Matches events whose type is included in a predefined collection.
-final class AppEventTypesFilter implements AppEventFilter {
+final class AppEventTypesFilter extends AppEventFilter {
   AppEventTypesFilter(Iterable<String> eventTypes)
       : eventTypes = _normalizeEventTypes(eventTypes);
 
@@ -109,7 +109,7 @@ final class AppEventTypesFilter implements AppEventFilter {
 }
 
 /// Matches events originating from any source in a predefined collection.
-final class AppEventSourcesFilter implements AppEventFilter {
+final class AppEventSourcesFilter extends AppEventFilter {
   AppEventSourcesFilter(Iterable<AppEventSource> sources)
       : sources = _normalizeSources(sources);
 
@@ -136,7 +136,7 @@ final class AppEventSourcesFilter implements AppEventFilter {
 }
 
 /// Matches events using a custom predicate.
-final class AppEventPredicateFilter implements AppEventFilter {
+final class AppEventPredicateFilter extends AppEventFilter {
   AppEventPredicateFilter(this._predicate);
 
   final bool Function(AppEvent event) _predicate;
@@ -150,7 +150,7 @@ final class AppEventPredicateFilter implements AppEventFilter {
 /// Matches an event only when every child filter matches.
 ///
 /// Logical operation: AND.
-final class AppEventAndFilter implements AppEventFilter {
+final class AppEventAndFilter extends AppEventFilter {
   AppEventAndFilter(Iterable<AppEventFilter> filters)
       : filters = _validateFilters(filters);
 
@@ -185,7 +185,7 @@ final class AppEventAndFilter implements AppEventFilter {
 /// Matches an event when at least one child filter matches.
 ///
 /// Logical operation: OR.
-final class AppEventOrFilter implements AppEventFilter {
+final class AppEventOrFilter extends AppEventFilter {
   AppEventOrFilter(Iterable<AppEventFilter> filters)
       : filters = _validateFilters(filters);
 
@@ -220,7 +220,7 @@ final class AppEventOrFilter implements AppEventFilter {
 /// Matches an event when its child filter does not match.
 ///
 /// Logical operation: NOT.
-final class AppEventNotFilter implements AppEventFilter {
+final class AppEventNotFilter extends AppEventFilter {
   const AppEventNotFilter(this.filter);
 
   final AppEventFilter filter;
@@ -288,14 +288,14 @@ abstract final class AppEventFilters {
   }
 }
 
-final class _MatchAllAppEventFilter implements AppEventFilter {
+final class _MatchAllAppEventFilter extends AppEventFilter {
   const _MatchAllAppEventFilter();
 
   @override
   bool matches(AppEvent event) => true;
 }
 
-final class _MatchNoAppEventFilter implements AppEventFilter {
+final class _MatchNoAppEventFilter extends AppEventFilter {
   const _MatchNoAppEventFilter();
 
   @override
