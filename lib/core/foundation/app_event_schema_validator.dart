@@ -1,4 +1,3 @@
-
 import 'app_event_schema_registry.dart';
 
 /// Defines the supported structural data types.
@@ -144,7 +143,8 @@ final class AppSchemaFieldConstraints {
       );
     }
 
-    if (maximumDecimalPlaces != null && maximumDecimalPlaces! < 0) {
+    if (maximumDecimalPlaces != null &&
+        maximumDecimalPlaces! < 0) {
       throw ArgumentError(
         'Maximum decimal places cannot be negative.',
       );
@@ -153,19 +153,24 @@ final class AppSchemaFieldConstraints {
     if (pattern != null) {
       try {
         RegExp(pattern!);
-      } catch (error) {
+      } on FormatException catch (error) {
         throw ArgumentError(
           'Invalid regular expression pattern: $error',
         );
       }
     }
+
+    if (format != null && format!.trim().isEmpty) {
+      throw ArgumentError.value(
+        format,
+        'format',
+        'String format cannot be empty.',
+      );
+    }
   }
 }
 
 /// Defines the structural contract of one schema field.
-///
-/// Nested object fields and array item definitions can be expressed
-/// recursively through [properties] and [items].
 final class AppSchemaFieldDefinition {
   AppSchemaFieldDefinition({
     required this.type,
@@ -242,13 +247,11 @@ final class AppEventSchemaValidationReport {
         (violation) => violation.isWarning,
       );
 
-  int get errorCount => violations
-      .where((violation) => violation.isError)
-      .length;
+  int get errorCount =>
+      violations.where((violation) => violation.isError).length;
 
-  int get warningCount => violations
-      .where((violation) => violation.isWarning)
-      .length;
+  int get warningCount =>
+      violations.where((violation) => violation.isWarning).length;
 
   List<AppSchemaViolation> get errors =>
       List<AppSchemaViolation>.unmodifiable(
@@ -262,15 +265,11 @@ final class AppEventSchemaValidationReport {
 }
 
 /// Performs advanced structural validation of registered event schemas.
-///
-/// This validator reads schema definitions from AppEventSchemaRegistry.
-/// It does not register definitions, execute migrations, serialize payloads,
-/// deserialize events, or publish messages.
 final class AppEventSchemaValidator {
   AppEventSchemaValidator({
     required AppEventSchemaRegistry registry,
     this.maximumNestingDepth = 32,
-  })  : _registry = registry {
+  }) : _registry = registry {
     if (maximumNestingDepth < 1) {
       throw ArgumentError.value(
         maximumNestingDepth,
@@ -375,18 +374,25 @@ final class AppEventSchemaValidator {
     switch (type) {
       case 'string':
         return AppSchemaValueType.string;
+
       case 'integer':
         return AppSchemaValueType.integer;
+
       case 'number':
         return AppSchemaValueType.number;
+
       case 'boolean':
         return AppSchemaValueType.boolean;
+
       case 'object':
         return AppSchemaValueType.object;
+
       case 'array':
         return AppSchemaValueType.array;
+
       case 'null':
         return AppSchemaValueType.nullValue;
+
       default:
         return AppSchemaValueType.object;
     }
@@ -585,17 +591,20 @@ final class AppEventSchemaValidator {
       }
 
       if (value is double &&
-          constraints.maximumDecimalPlaces != null &&
-          _decimalPlaces(value) > constraints.maximumDecimalPlaces!) {
-        violations.add(
-          AppSchemaViolation(
-            code: AppSchemaViolationCode.numericPrecisionExceeded,
-            path: path,
-            message: 'Numeric value exceeds the permitted decimal precision.',
-            expected: constraints.maximumDecimalPlaces.toString(),
-            actual: _decimalPlaces(value).toString(),
-          ),
-        );
+          constraints.maximumDecimalPlaces != null) {
+        final decimalPlaces = _decimalPlaces(value);
+
+        if (decimalPlaces > constraints.maximumDecimalPlaces!) {
+          violations.add(
+            AppSchemaViolation(
+              code: AppSchemaViolationCode.numericPrecisionExceeded,
+              path: path,
+              message: 'Numeric value exceeds the permitted decimal precision.',
+              expected: constraints.maximumDecimalPlaces.toString(),
+              actual: decimalPlaces.toString(),
+            ),
+          );
+        }
       }
     }
 
@@ -706,7 +715,6 @@ final class AppEventSchemaValidator {
 
     for (var index = 0; index < value.length; index++) {
       final itemPath = '$path[$index]';
-
       final beforeCount = violations.length;
 
       _validateValue(
@@ -737,17 +745,23 @@ final class AppEventSchemaValidator {
     switch (expected) {
       case AppSchemaValueType.string:
         return value is String;
+
       case AppSchemaValueType.integer:
         return value is int;
+
       case AppSchemaValueType.number:
         return value is num;
+
       case AppSchemaValueType.boolean:
         return value is bool;
+
       case AppSchemaValueType.object:
         return value is Map &&
             value.keys.every((key) => key is String);
+
       case AppSchemaValueType.array:
         return value is List;
+
       case AppSchemaValueType.nullValue:
         return false;
     }
@@ -765,16 +779,16 @@ final class AppEventSchemaValidator {
 
       case 'uri':
         final uri = Uri.tryParse(value);
-        return uri != null && uri.hasScheme;
+
+        return uri != null &&
+            uri.hasScheme &&
+            uri.scheme.isNotEmpty;
 
       case 'date':
-        final parsed = DateTime.tryParse(value);
-        return parsed != null &&
-            RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value);
+        return _isValidDate(value);
 
       case 'date-time':
-        final parsed = DateTime.tryParse(value);
-        return parsed != null && value.contains('T');
+        return _isValidDateTime(value);
 
       case 'uuid':
         return RegExp(
@@ -790,9 +804,86 @@ final class AppEventSchemaValidator {
     }
   }
 
+  /// Validates an ISO calendar date without accepting normalized dates.
+  bool _isValidDate(String value) {
+    final match = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})$',
+    ).firstMatch(value);
+
+    if (match == null) {
+      return false;
+    }
+
+    final year = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+
+    if (month < 1 || month > 12 || day < 1) {
+      return false;
+    }
+
+    final parsed = DateTime.tryParse(value);
+
+    if (parsed == null) {
+      return false;
+    }
+
+    return parsed.year == year &&
+        parsed.month == month &&
+        parsed.day == day;
+  }
+
+  /// Validates an ISO date-time value.
+  bool _isValidDateTime(String value) {
+    if (!RegExp(
+      r'^\d{4}-\d{2}-\d{2}T'
+      r'\d{2}:\d{2}:\d{2}'
+      r'(?:\.\d+)?'
+      r'(?:Z|[+-]\d{2}:\d{2})?$',
+    ).hasMatch(value)) {
+      return false;
+    }
+
+    final datePart = value.substring(0, 10);
+
+    if (!_isValidDate(datePart)) {
+      return false;
+    }
+
+    final parsed = DateTime.tryParse(value);
+
+    if (parsed == null) {
+      return false;
+    }
+
+    final timePart = value.substring(11, 19);
+    final components = timePart.split(':');
+
+    if (components.length != 3) {
+      return false;
+    }
+
+    final hour = int.tryParse(components[0]);
+    final minute = int.tryParse(components[1]);
+    final second = int.tryParse(components[2]);
+
+    if (hour == null ||
+        minute == null ||
+        second == null ||
+        hour > 23 ||
+        minute > 59 ||
+        second > 59) {
+      return false;
+    }
+
+    return true;
+  }
+
   bool _containsDuplicates(List values) {
     for (var first = 0; first < values.length; first++) {
-      for (var second = first + 1; second < values.length; second++) {
+      for (var second = first + 1;
+          second < values.length;
+          second++) {
         if (_deepEquals(values[first], values[second])) {
           return true;
         }
@@ -843,6 +934,7 @@ final class AppEventSchemaValidator {
     return first == second;
   }
 
+  /// Calculates decimal precision, including scientific notation.
   int _decimalPlaces(double value) {
     final text = value.toString().toLowerCase();
     final exponentIndex = text.indexOf('e');
@@ -863,7 +955,8 @@ final class AppEventSchemaValidator {
 
     final decimalCount = mantissa.length - decimalIndex - 1;
 
-    return (decimalCount - exponent).clamp(0, 1000);
+    // clamp returns num; toInt preserves the declared return type.
+    return (decimalCount - exponent).clamp(0, 1000).toInt();
   }
 
   AppSchemaViolationCode _classifyRegistryError(String error) {
