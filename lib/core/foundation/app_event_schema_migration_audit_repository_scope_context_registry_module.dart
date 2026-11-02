@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'app_event_schema_migration_audit_repository_scope_context_registry_configuration.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_provider.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_scope_context.dart';
 
 /// Lifecycle states of the scope context registry module.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState {
@@ -70,6 +71,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
   Future<void>? _initializationFuture;
 
+  Future<void>? _disposalFuture;
+
+  bool _disposeRequested = false;
+
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryConfiguration
         configuration,
@@ -91,10 +96,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
           .disposed;
 
+  /// Whether disposal has been requested.
+  ///
+  /// Once disposal is requested, new initialization and provider access
+  /// operations are rejected, even while pending initialization is finishing.
+  bool get isDisposalRequested => _disposeRequested;
+
   /// Initializes the module.
   ///
   /// Concurrent initialization requests share the same future.
   /// A failed initialization may be retried while the module is active.
+  ///
+  /// Initialization cannot be restarted after disposal has been requested.
   Future<void> initialize() {
     _ensureNotDisposed();
 
@@ -117,7 +130,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
         AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
             .initializing;
 
-    _initializeInternal(completer);
+    unawaited(_initializeInternal(completer));
 
     return completer.future;
   }
@@ -174,46 +187,61 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
   /// Disables this module and its owned access provider.
   ///
+  /// Concurrent disposal requests share the same future.
+  ///
+  /// Pending initialization is allowed to finish or fail before the owned
+  /// provider is disposed.
+  ///
   /// The externally managed registry and all resources reachable through it
   /// remain untouched.
-  Future<void> dispose() async {
+  ///
+  /// Once this method is called, new initialization and provider access
+  /// operations are rejected immediately.
+  Future<void> dispose() {
     if (isDisposed) {
-      return;
+      return Future<void>.value();
     }
 
-    final pendingInitialization = _initializationFuture;
+    final pendingDisposal = _disposalFuture;
 
-    if (pendingInitialization != null) {
-      try {
-        await pendingInitialization;
-      } catch (_) {
-        // Initialization failure is handled by initialize().
-      }
+    if (pendingDisposal != null) {
+      return pendingDisposal;
     }
 
-    if (isDisposed) {
-      return;
-    }
+    _disposeRequested = true;
 
-    final currentProvider = _provider;
+    final completer = Completer<void>();
 
-    _provider = null;
-    _initializationFuture = null;
+    _disposalFuture = completer.future;
 
-    currentProvider?.dispose();
+    unawaited(_disposeInternal(completer));
 
-    _state =
-        AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
-            .disposed;
+    return completer.future;
   }
 
   Future<void> _initializeInternal(Completer<void> completer) async {
     try {
+      if (_disposeRequested) {
+        throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
+          code:
+              AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
+                  .moduleDisposed,
+        );
+      }
+
       _configuration.validate();
+
+      if (_disposeRequested) {
+        throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
+          code:
+              AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
+                  .moduleDisposed,
+        );
+      }
 
       final createdProvider = _configuration.createProvider();
 
-      if (isDisposed) {
+      if (_disposeRequested || isDisposed) {
         createdProvider.dispose();
 
         throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
@@ -229,28 +257,32 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
           AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
               .initialized;
 
-      completer.complete();
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     } catch (error, stackTrace) {
       final currentProvider = _provider;
 
       _provider = null;
-      currentProvider?.dispose();
 
-      if (!isDisposed) {
+      try {
+        currentProvider?.dispose();
+      } catch (_) {
+        // Provider cleanup is best-effort.
+        // The external registry is never disposed here.
+      }
+
+      if (!_disposeRequested && !isDisposed) {
         _state =
             AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
                 .failed;
       }
 
-      completer.completeError(
-        AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
-          code:
-              AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
-                  .initializationFailed,
-          cause: error,
-        ),
-        stackTrace,
-      );
+      final failure = _createInitializationFailure(error);
+
+      if (!completer.isCompleted) {
+        completer.completeError(failure, stackTrace);
+      }
     } finally {
       if (identical(_initializationFuture, completer.future)) {
         _initializationFuture = null;
@@ -258,7 +290,83 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
     }
   }
 
+  Future<void> _disposeInternal(Completer<void> completer) async {
+    try {
+      final pendingInitialization = _initializationFuture;
+
+      if (pendingInitialization != null) {
+        try {
+          await pendingInitialization;
+        } catch (_) {
+          // Initialization failure does not prevent disposal.
+        }
+      }
+
+      final currentProvider = _provider;
+
+      _provider = null;
+
+      _state =
+          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
+              .disposed;
+
+      try {
+        currentProvider?.dispose();
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+
+        return;
+      }
+
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    } catch (error, stackTrace) {
+      _provider = null;
+
+      _state =
+          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
+              .disposed;
+
+      if (!completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+      }
+    }
+  }
+
+  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException
+      _createInitializationFailure(Object error) {
+    if (error
+        is AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException) {
+      if (error.code ==
+          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
+              .moduleDisposed) {
+        return error;
+      }
+    }
+
+    if (_disposeRequested || isDisposed) {
+      return AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
+        code:
+            AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
+                .moduleDisposed,
+        cause: error,
+      );
+    }
+
+    return AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
+      code:
+          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
+              .initializationFailed,
+      cause: error,
+    );
+  }
+
   void _validateInitializedResources() {
+    _ensureNotDisposed();
+
     final currentProvider = _provider;
 
     if (currentProvider == null || currentProvider.isDisposed) {
@@ -282,7 +390,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   }
 
   void _ensureNotDisposed() {
-    if (isDisposed) {
+    if (_disposeRequested || isDisposed) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
         code:
             AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
