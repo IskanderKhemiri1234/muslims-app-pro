@@ -10,8 +10,8 @@
 abstract interface class AppClock {
   /// Returns the current civil time.
   ///
-  /// The returned DateTime is expected to represent the system's
-  /// current local civil time.
+  /// The returned DateTime represents the system's current local
+  /// civil time for production clocks.
   DateTime get now;
 
   /// Returns the current UTC instant.
@@ -39,6 +39,13 @@ final class SystemAppClock implements AppClock {
 
   @override
   DateTime get now => DateTime.now();
+
+  /// Returns the current instant in UTC.
+  ///
+  /// Explicitly implemented because this class uses `implements`
+  /// rather than inheriting the default interface implementation.
+  @override
+  DateTime get utcNow => now.toUtc();
 
   @override
   int get monotonicNow => _stopwatch.elapsedMicroseconds;
@@ -69,6 +76,10 @@ final class FixedAppClock implements AppClock {
 
   @override
   DateTime get now => _currentTime;
+
+  /// Returns the current simulated instant in UTC.
+  @override
+  DateTime get utcNow => now.toUtc();
 
   @override
   int get monotonicNow => _monotonicMicroseconds;
