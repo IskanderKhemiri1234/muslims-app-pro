@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'app_event_schema_migration_audit_repository_scope_context_registry_configuration.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_provider.dart';
 
@@ -49,12 +51,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleExce
 
 /// Initializes and exposes a registry access provider.
 ///
-/// The module owns only the provider instance it creates.
-/// It does not own the injected configuration's registry, its registered
-/// providers, scopes, or repositories.
-///
-/// Disposing this module disables its access provider but never disposes
-/// the externally managed registry.
+/// Ownership:
+/// - This module owns the provider instance it creates.
+/// - The configuration and registry remain externally owned.
+/// - Registered providers, scopes, and repositories remain externally owned.
+/// - Disposing this module never disposes the external registry.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryConfiguration
       _configuration;
@@ -78,7 +79,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
       get state => _state;
 
-  /// Whether the module has completed initialization successfully.
+  /// Whether initialization completed successfully.
   bool get isInitialized =>
       _state ==
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -93,7 +94,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   /// Initializes the module.
   ///
   /// Concurrent initialization requests share the same future.
-  /// A failed initialization may be retried while the module remains active.
+  /// A failed initialization may be retried while the module is active.
   Future<void> initialize() {
     _ensureNotDisposed();
 
@@ -109,6 +110,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
     }
 
     final completer = Completer<void>();
+
     _initializationFuture = completer.future;
 
     _state =
@@ -122,7 +124,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
   /// Returns the initialized access provider.
   ///
-  /// The provider and the external registry are validated on every access.
+  /// The provider and its registry are validated on every access.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider
       get provider {
     _ensureNotDisposed();
@@ -160,23 +162,14 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   }
 
   /// Provides a context through the initialized access provider.
+  ///
+  /// Errors from the provider and registry are intentionally preserved,
+  /// so callers can distinguish missing providers, invalid scope identities,
+  /// and other registry-level failures.
   AppEventSchemaMigrationAuditRepositoryScopeContext provideContext({
     required String scopeId,
   }) {
-    try {
-      return provider.provideContext(scopeId: scopeId);
-    } catch (error) {
-      if (isDisposed) {
-        rethrow;
-      }
-
-      throw AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
-        code:
-            AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
-                .providerUnavailable,
-        cause: error,
-      );
-    }
+    return provider.provideContext(scopeId: scopeId);
   }
 
   /// Disables this module and its owned access provider.
@@ -202,9 +195,12 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
       return;
     }
 
-    _provider?.dispose();
+    final currentProvider = _provider;
+
     _provider = null;
     _initializationFuture = null;
+
+    currentProvider?.dispose();
 
     _state =
         AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -235,8 +231,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
       completer.complete();
     } catch (error, stackTrace) {
-      _provider?.dispose();
+      final currentProvider = _provider;
+
       _provider = null;
+      currentProvider?.dispose();
 
       if (!isDisposed) {
         _state =
