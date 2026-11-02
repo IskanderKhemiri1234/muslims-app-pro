@@ -24,19 +24,24 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleN
 
   final DateTime occurredAt;
 
+  /// Whether this notification represents an accepted transition.
   bool get isAccepted =>
       type ==
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationType
           .transitionAccepted;
 
+  /// Whether this notification represents a rejected transition.
   bool get isRejected => !isAccepted;
 
+  /// State before the attempted transition.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
       get previousState => snapshot.previousState;
 
+  /// State after the attempted transition.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
       get currentState => snapshot.currentState;
 
+  /// Revision associated with the lifecycle snapshot.
   int get revision => snapshot.revision;
 }
 
@@ -134,10 +139,24 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscription?
       subscription;
 
-  bool get isSubscribed =>
-      status ==
-      AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscriptionStatus
-          .subscribed;
+  /// Whether the observer has an active subscription.
+  ///
+  /// Both [subscribed] and [alreadySubscribed] represent an active
+  /// registration when the returned subscription is not cancelled.
+  bool get isSubscribed {
+    final activeSubscription = subscription;
+
+    if (activeSubscription == null || activeSubscription.isCancelled) {
+      return false;
+    }
+
+    return status ==
+            AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscriptionStatus
+                .subscribed ||
+        status ==
+            AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscriptionStatus
+                .alreadySubscribed;
+  }
 }
 
 /// Represents one observer registration.
@@ -162,6 +181,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
 
   bool get isCancelled => _isCancelled;
 
+  /// Cancels this registration.
+  ///
+  /// Repeated cancellation calls have no effect.
   void cancel() {
     if (_isCancelled) {
       return;
@@ -181,7 +203,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverDispatcher({
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverErrorHandler
         errorHandler =
-        const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleSilentErrorHandler(),
+        const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSilentErrorHandler(),
   }) : _errorHandler = errorHandler;
 
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverErrorHandler
@@ -193,11 +215,15 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
 
   bool _isDisposed = false;
 
+  /// Whether this dispatcher has been disposed.
   bool get isDisposed => _isDisposed;
 
+  /// Number of currently registered subscriptions.
   int get observerCount => _subscriptions.length;
 
   /// Registers an observer unless it is already registered.
+  ///
+  /// Observer identity is checked using [identical].
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscriptionResult
       subscribe(
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserver
@@ -244,8 +270,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
 
   /// Delivers a notification to a stable snapshot of active subscriptions.
   ///
-  /// Changes to subscriptions during delivery affect subsequent notifications,
-  /// not the snapshot currently being processed.
+  /// Changes to subscriptions during delivery affect subsequent notifications.
+  /// A cancelled subscription is skipped even if it exists in the snapshot.
   void dispatch(
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotification
         notification,
@@ -284,6 +310,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
     }
   }
 
+  /// Reports an observer failure without allowing reporting errors to
+  /// interrupt delivery to other observers.
   void _reportFailure(
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverFailure
         failure,
@@ -291,10 +319,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
     try {
       _errorHandler.onObserverFailure(failure);
     } catch (_) {
-      // Error reporting must not interrupt delivery to other observers.
+      // Error reporting must not interrupt observer delivery.
     }
   }
 
+  /// Removes a subscription from the active registration set.
   void _removeSubscription(
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverSubscription
         subscription,
@@ -305,6 +334,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleO
   /// Stops notification delivery and removes all registrations.
   ///
   /// Observers are not disposed. The dispatcher does not own them.
+  /// Existing subscription objects are marked as cancelled.
   void dispose() {
     if (_isDisposed) {
       return;
