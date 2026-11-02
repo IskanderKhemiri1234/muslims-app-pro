@@ -22,12 +22,13 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolutionException
   });
 
   final AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode code;
+
   final String message;
 
   @override
   String toString() {
-    return 'AppEventSchemaMigrationAuditRepositoryScopeResolutionException'
-        '(code: ${code.name}, message: $message)';
+    return 'AppEventSchemaMigrationAuditRepositoryScopeResolutionException('
+        'code: ${code.name}, message: $message)';
   }
 }
 
@@ -35,6 +36,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolutionException
 ///
 /// The resolved repository is obtained from an active scope registered
 /// under the requested identifier.
+///
+/// This object does not own or dispose the scope or repository.
 final class AppEventSchemaMigrationAuditRepositoryScopeResolution {
   const AppEventSchemaMigrationAuditRepositoryScopeResolution._({
     required this.scopeId,
@@ -49,25 +52,27 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolution {
   final AppEventSchemaMigrationAuditRepository repository;
 
   /// Indicates whether the resolved scope remains active.
-  bool get isActive => scope.isActive;
+  bool get isActive {
+    return scope.isActive && scope.scopeId == scopeId;
+  }
 
   /// Verifies that the resolved scope remains usable.
   ///
-  /// Call this before beginning an operation that requires an active scope.
+  /// Call this before an operation that requires an active scope.
   void verifyActive() {
-    if (!scope.isActive) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeResolutionException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-            .scopeDisposed,
-        message: 'The resolved audit repository scope is no longer active.',
-      );
-    }
-
     if (scope.scopeId != scopeId) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeResolutionException(
         code: AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
             .scopeIdentityMismatch,
         message: 'The resolved scope identifier has changed.',
+      );
+    }
+
+    if (!scope.isActive) {
+      throw const AppEventSchemaMigrationAuditRepositoryScopeResolutionException(
+        code: AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeDisposed,
+        message: 'The resolved audit repository scope is no longer active.',
       );
     }
   }
@@ -76,6 +81,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolution {
 /// Resolves audit repository scopes through an injected registry.
 ///
 /// The resolver does not create, register, unregister, or dispose scopes.
+///
 /// It only provides validated access to scopes managed by the registry.
 final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
   const AppEventSchemaMigrationAuditRepositoryScopeResolver({
@@ -114,16 +120,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
 
       final repository = scope.repository;
 
-      final result =
+      final resolution =
           AppEventSchemaMigrationAuditRepositoryScopeResolution._(
         scopeId: normalizedId,
         scope: scope,
         repository: repository,
       );
 
-      result.verifyActive();
+      resolution.verifyActive();
 
-      return result;
+      return resolution;
+    } on AppEventSchemaMigrationAuditRepositoryScopeResolutionException {
+      rethrow;
     } on AppEventSchemaMigrationAuditRepositoryScopeRegistryException catch (
         error) {
       throw _mapRegistryError(error);
@@ -135,18 +143,22 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
   /// Resolves a scope and returns its repository directly.
   ///
   /// This is a convenience operation for consumers that do not need
-  /// to retain the scope resolution metadata.
+  /// to retain scope resolution metadata.
+  ///
+  /// The returned repository does not extend the scope lifetime.
   AppEventSchemaMigrationAuditRepository resolveRepository(
     String scopeId,
   ) {
     final resolution = resolve(scopeId);
+
     resolution.verifyActive();
+
     return resolution.repository;
   }
 
   /// Checks whether an active scope can be resolved.
   ///
-  /// Invalid identifiers and disposed registries are reported as errors.
+  /// Invalid identifiers and unavailable registries are reported as errors.
   /// A missing or disposed scope returns false.
   bool canResolve(String scopeId) {
     try {
@@ -154,16 +166,23 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
       return true;
     } on AppEventSchemaMigrationAuditRepositoryScopeResolutionException catch (
         error) {
-      if (error.code ==
-              AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                  .scopeNotFound ||
-          error.code ==
-              AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                  .scopeDisposed) {
-        return false;
-      }
+      switch (error.code) {
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .scopeNotFound:
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .scopeDisposed:
+          return false;
 
-      rethrow;
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .invalidScopeId:
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .repositoryUnavailable:
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .scopeIdentityMismatch:
+        case AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+              .registryUnavailable:
+          rethrow;
+      }
     }
   }
 
@@ -185,33 +204,37 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
       _mapRegistryError(
     AppEventSchemaMigrationAuditRepositoryScopeRegistryException error,
   ) {
-    final code =
-        switch (error.code) {
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .invalidScopeId =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .invalidScopeId,
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .scopeNotFound =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeNotFound,
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .scopeDisposed =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeDisposed,
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .registryDisposed =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .registryUnavailable,
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .duplicateScopeId =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeIdentityMismatch,
-          AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .scopeIdentityMismatch =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeIdentityMismatch,
-        };
+    final code = switch (error.code) {
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .invalidScopeId =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .invalidScopeId,
+
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .scopeNotFound =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeNotFound,
+
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .scopeDisposed =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeDisposed,
+
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .registryDisposed =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .registryUnavailable,
+
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .duplicateScopeId =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeIdentityMismatch,
+
+      AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .scopeIdentityMismatch =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeIdentityMismatch,
+    };
 
     return AppEventSchemaMigrationAuditRepositoryScopeResolutionException(
       code: code,
@@ -223,21 +246,23 @@ final class AppEventSchemaMigrationAuditRepositoryScopeResolver {
       _mapScopeError(
     AppEventSchemaMigrationAuditRepositoryScopeException error,
   ) {
-    final code =
-        switch (error.code) {
-          AppEventSchemaMigrationAuditRepositoryScopeErrorCode.invalidIdentifier =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .invalidScopeId,
-          AppEventSchemaMigrationAuditRepositoryScopeErrorCode.disposed =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeDisposed,
-          AppEventSchemaMigrationAuditRepositoryScopeErrorCode.scopeMismatch =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeIdentityMismatch,
-          AppEventSchemaMigrationAuditRepositoryScopeErrorCode.duplicateRegistration =>
-            AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
-                .scopeIdentityMismatch,
-        };
+    final code = switch (error.code) {
+      AppEventSchemaMigrationAuditRepositoryScopeErrorCode.invalidIdentifier =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .invalidScopeId,
+
+      AppEventSchemaMigrationAuditRepositoryScopeErrorCode.disposed =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeDisposed,
+
+      AppEventSchemaMigrationAuditRepositoryScopeErrorCode.scopeMismatch =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeIdentityMismatch,
+
+      AppEventSchemaMigrationAuditRepositoryScopeErrorCode.duplicateRegistration =>
+        AppEventSchemaMigrationAuditRepositoryScopeResolutionErrorCode
+            .scopeIdentityMismatch,
+    };
 
     return AppEventSchemaMigrationAuditRepositoryScopeResolutionException(
       code: code,
