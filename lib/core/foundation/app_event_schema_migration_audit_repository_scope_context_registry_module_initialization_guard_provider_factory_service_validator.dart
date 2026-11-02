@@ -1,5 +1,4 @@
-
-import 'package:your_app/core/foundation/app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_service_configuration.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_module_initialization_guard_provider_factory_service_configuration.dart';
 
 /// Stable validation issue codes for the service configuration validator.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceValidationCode {
@@ -33,7 +32,7 @@ class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializa
     required this.validationCode,
   });
 
-  final AppEventSchemaMigrationAuditRepositoryScopeContextContextRegistryModuleInitializationGuardProviderFactoryServiceValidationCode validationCode;
+  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleInitializationGuardProviderFactoryServiceValidationCode validationCode;
 
   String get code => validationCode.code;
 
