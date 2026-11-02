@@ -35,10 +35,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeException
 
 /// Provides an isolated repository access boundary.
 ///
-/// Each scope owns its repository reference and lifecycle state.
-/// It does not use a global provider, register itself globally, or
-/// dispose the repository because repository ownership belongs to
-/// the component that created it.
+/// The scope owns only its repository reference and lifecycle state.
+/// It never disposes the repository itself. Repository lifecycle ownership
+/// remains with the component that created the repository.
 final class AppEventSchemaMigrationAuditRepositoryScope {
   AppEventSchemaMigrationAuditRepositoryScope({
     required String scopeId,
@@ -53,7 +52,7 @@ final class AppEventSchemaMigrationAuditRepositoryScope {
   AppEventSchemaMigrationAuditRepositoryScopeState _state =
       AppEventSchemaMigrationAuditRepositoryScopeState.active;
 
-  /// Returns the repository while this scope is active.
+  /// Returns the repository only while this scope is active.
   AppEventSchemaMigrationAuditRepository get repository {
     _ensureActive();
     return _repository;
@@ -62,19 +61,17 @@ final class AppEventSchemaMigrationAuditRepositoryScope {
   /// Returns the current lifecycle state.
   AppEventSchemaMigrationAuditRepositoryScopeState get state => _state;
 
-  /// Indicates whether this scope can still provide its repository.
+  /// Indicates whether this scope can provide repository access.
   bool get isActive =>
       _state == AppEventSchemaMigrationAuditRepositoryScopeState.active;
 
   /// Indicates whether this scope has been disposed.
   bool get isDisposed =>
-      _state ==
-      AppEventSchemaMigrationAuditRepositoryScopeState.disposed;
+      _state == AppEventSchemaMigrationAuditRepositoryScopeState.disposed;
 
   /// Disposes this scope's access boundary.
   ///
-  /// The repository itself remains untouched. Calling this method
-  /// repeatedly is safe.
+  /// This operation is idempotent and never disposes the repository.
   void dispose() {
     if (isDisposed) {
       return;
@@ -83,16 +80,14 @@ final class AppEventSchemaMigrationAuditRepositoryScope {
     _state = AppEventSchemaMigrationAuditRepositoryScopeState.disposed;
   }
 
-  /// Verifies that an identifier belongs to this scope.
-  ///
-  /// This is useful when passing scope-bound operations between services.
+  /// Verifies that an identifier belongs to this active scope.
   void verifyScope(String candidateScopeId) {
     _ensureActive();
 
     final normalizedCandidate = _validateScopeId(candidateScopeId);
 
     if (normalizedCandidate != scopeId) {
-      throw AppEventSchemaMigrationAuditRepositoryScopeException(
+      throw const AppEventSchemaMigrationAuditRepositoryScopeException(
         code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode
             .scopeMismatch,
         message: 'The requested operation belongs to another scope.',
@@ -101,7 +96,7 @@ final class AppEventSchemaMigrationAuditRepositoryScope {
   }
 
   void _ensureActive() {
-    if (isDisposed) {
+    if (!isActive) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeException(
         code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode.disposed,
         message: 'The audit repository scope has been disposed.',
@@ -122,73 +117,93 @@ final class AppEventSchemaMigrationAuditRepositoryScope {
 
     return normalized;
   }
+
+  /// Normalizes an identifier using the same rules as scope construction.
+  ///
+  /// Kept private to this library so manager operations use the same
+  /// validation contract as the scope itself.
+  static String _normalizeManagerScopeId(String value) {
+    return _validateScopeId(value);
+  }
 }
 
 /// Creates and manages multiple independent audit repository scopes.
 ///
-/// The manager stores scope references only. It does not create repositories,
-/// select storage implementations, or access global providers.
+/// The manager stores existing scope references only. It does not create
+/// repositories, select storage implementations, or use global providers.
 final class AppEventSchemaMigrationAuditRepositoryScopeManager {
   final Map<String, AppEventSchemaMigrationAuditRepositoryScope> _scopes =
       <String, AppEventSchemaMigrationAuditRepositoryScope>{};
 
   bool _disposed = false;
 
-  /// Returns the number of active scopes.
+  /// Returns the number of currently active registered scopes.
   int get activeScopeCount {
     _ensureManagerActive();
-    return _scopes.values.where((scope) => scope.isActive).length;
+    _removeInactiveScopes();
+    return _scopes.length;
   }
 
-  /// Indicates whether the manager has been disposed.
+  /// Indicates whether this manager has been disposed.
   bool get isDisposed => _disposed;
 
-  /// Registers an existing isolated scope.
+  /// Registers an existing active scope.
   ///
-  /// A scope identifier may only be registered once at a time.
+  /// Each identifier can be registered only once at a time.
   void register(AppEventSchemaMigrationAuditRepositoryScope scope) {
     _ensureManagerActive();
 
-    if (!scope.isActive) {
+    if (!scope.isActive || scope.isDisposed) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeException(
         code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode.disposed,
         message: 'A disposed scope cannot be registered.',
       );
     }
 
-    if (_scopes.containsKey(scope.scopeId)) {
+    final scopeId =
+        AppEventSchemaMigrationAuditRepositoryScope._normalizeManagerScopeId(
+      scope.scopeId,
+    );
+
+    _removeInactiveScopes();
+
+    if (_scopes.containsKey(scopeId)) {
       throw AppEventSchemaMigrationAuditRepositoryScopeException(
         code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode
             .duplicateRegistration,
-        message: 'A scope with identifier "${scope.scopeId}" '
+        message: 'A scope with identifier "$scopeId" '
             'is already registered.',
       );
     }
 
-    _scopes[scope.scopeId] = scope;
+    _scopes[scopeId] = scope;
   }
 
-  /// Retrieves a registered scope by identifier.
+  /// Retrieves a registered active scope by identifier.
   AppEventSchemaMigrationAuditRepositoryScope getScope(String scopeId) {
     _ensureManagerActive();
 
-    final normalizedId = scopeId.trim();
-
-    if (normalizedId.isEmpty) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode
-            .invalidIdentifier,
-        message: 'The scope identifier cannot be empty.',
-      );
-    }
+    final normalizedId =
+        AppEventSchemaMigrationAuditRepositoryScope._normalizeManagerScopeId(
+      scopeId,
+    );
 
     final scope = _scopes[normalizedId];
 
-    if (scope == null || !scope.isActive) {
+    if (scope == null) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeException(
         code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode
             .scopeMismatch,
         message: 'No active audit repository scope matches this identifier.',
+      );
+    }
+
+    if (!scope.isActive || scope.isDisposed) {
+      _scopes.remove(normalizedId);
+
+      throw const AppEventSchemaMigrationAuditRepositoryScopeException(
+        code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode.disposed,
+        message: 'The requested audit repository scope has been disposed.',
       );
     }
 
@@ -197,23 +212,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeManager {
 
   /// Removes a scope from the manager.
   ///
-  /// When [disposeScope] is true, the scope access boundary is disposed.
-  /// The underlying repository is never disposed by the manager.
+  /// When [disposeScope] is true, only the scope access boundary is disposed.
+  /// The underlying repository remains untouched.
   bool unregister(
     String scopeId, {
     bool disposeScope = false,
   }) {
     _ensureManagerActive();
 
-    final normalizedId = scopeId.trim();
-
-    if (normalizedId.isEmpty) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeErrorCode
-            .invalidIdentifier,
-        message: 'The scope identifier cannot be empty.',
-      );
-    }
+    final normalizedId =
+        AppEventSchemaMigrationAuditRepositoryScope._normalizeManagerScopeId(
+      scopeId,
+    );
 
     final scope = _scopes.remove(normalizedId);
 
@@ -228,9 +238,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeManager {
     return true;
   }
 
-  /// Disposes all registered scopes and clears the registry.
+  /// Disposes all registered scopes and clears the manager.
   ///
   /// Repository instances remain owned by their original creators.
+  /// Calling this method repeatedly is safe.
   void dispose() {
     if (_disposed) {
       return;
@@ -242,6 +253,12 @@ final class AppEventSchemaMigrationAuditRepositoryScopeManager {
 
     _scopes.clear();
     _disposed = true;
+  }
+
+  void _removeInactiveScopes() {
+    _scopes.removeWhere(
+      (scopeId, scope) => !scope.isActive || scope.isDisposed,
+    );
   }
 
   void _ensureManagerActive() {
