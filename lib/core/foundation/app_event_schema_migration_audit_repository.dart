@@ -9,6 +9,9 @@ import 'app_event_schema_migration_audit_query.dart';
 ///
 /// Implementations may use in-memory collections, local databases, or
 /// persistent remote storage without changing their consumers.
+///
+/// Repository implementations do not implicitly own or dispose their
+/// underlying data sources.
 abstract interface class AppEventSchemaMigrationAuditRepository {
   /// Returns a page of audit records matching [query].
   ///
@@ -54,12 +57,15 @@ final class AppEventSchemaMigrationAuditRepositoryException
 
 /// Repository implementation backed by the existing audit reader.
 ///
-/// This adapter preserves the repository boundary while reusing the
-/// filtering, sorting, and offset-pagination behavior already implemented
-/// by [AppEventSchemaMigrationAuditReader].
+/// This adapter delegates filtering, sorting, offset pagination, and
+/// counting to the injected reader.
 ///
-/// Cursor pagination remains represented by the query model, but is not
-/// executed by this adapter until cursor support is added to the reader.
+/// The adapter owns neither the reader nor its underlying data source.
+/// Their lifecycle remains the responsibility of the component that
+/// creates and wires them.
+///
+/// Cursor pagination is represented by the query model but is explicitly
+/// rejected until the reader provides cursor-pagination support.
 final class ReaderBackedAppEventSchemaMigrationAuditRepository
     implements AppEventSchemaMigrationAuditRepository {
   ReaderBackedAppEventSchemaMigrationAuditRepository({
@@ -87,12 +93,14 @@ final class ReaderBackedAppEventSchemaMigrationAuditRepository
       );
     }
 
-    if (query.pageSize > _reader.maximumPageSize) {
+    final readerMaximumPageSize = _reader.maximumPageSize;
+
+    if (query.pageSize > readerMaximumPageSize) {
       throw AppEventSchemaMigrationAuditRepositoryException(
         code: AppEventSchemaMigrationAuditRepositoryErrorCode
             .pageSizeExceedsRepositoryLimit,
         message: 'The requested page size exceeds the reader limit of '
-            '${_reader.maximumPageSize}.',
+            '$readerMaximumPageSize.',
       );
     }
 
@@ -105,6 +113,8 @@ final class ReaderBackedAppEventSchemaMigrationAuditRepository
   }
 
   /// Counts all records matching [filter], without applying pagination.
+  ///
+  /// Errors raised by the underlying reader are allowed to propagate.
   @override
   Future<int> count({
     AppEventSchemaMigrationAuditFilter filter =
@@ -122,6 +132,7 @@ final class ReaderBackedAppEventSchemaMigrationAuditRepository
     return result;
   }
 
+  /// Validates query pagination invariants before accessing the reader.
   void _validateQuery(AppEventSchemaMigrationAuditQuery query) {
     if (query.page < 1 ||
         query.pageSize < 1 ||
