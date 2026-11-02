@@ -9,8 +9,13 @@ enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleStatus {
 
 /// Identifies why a lifecycle transition was rejected.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleError {
+  /// The transition was accepted and no error occurred.
   none,
+
+  /// The requested transition is not permitted from the current state.
   invalidTransition,
+
+  /// The module has already reached its terminal disposed state.
   moduleAlreadyDisposed,
 }
 
@@ -23,23 +28,29 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleR
     required this.error,
   });
 
+  /// State from which the transition was requested.
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
       currentState;
 
+  /// State requested by the caller.
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
       requestedState;
 
+  /// Whether the requested transition was accepted.
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleStatus
       status;
 
+  /// Reason for rejection, or [none] when accepted.
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleError
       error;
 
+  /// Whether the requested transition was accepted.
   bool get isAccepted =>
       status ==
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleStatus
           .accepted;
 
+  /// Whether the requested transition was rejected.
   bool get isRejected => !isAccepted;
 }
 
@@ -47,8 +58,28 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleR
 ///
 /// This class is deliberately stateless. It does not own the module,
 /// mutate its state, initialize it, or dispose any resource.
+///
+/// Permitted transitions:
+///
+/// - uninitialized -> initializing
+/// - uninitialized -> disposed
+/// - initializing -> initialized
+/// - initializing -> failed
+/// - initializing -> disposed
+/// - initialized -> disposed
+/// - failed -> initializing
+/// - failed -> disposed
+///
+/// The disposed state is terminal. No transition can leave it.
 abstract final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycle {
   /// Validates a proposed transition without changing either state.
+  ///
+  /// Repeating the current state is accepted for every non-disposed state.
+  /// Repeating or leaving the disposed state is rejected with
+  /// [moduleAlreadyDisposed].
+  ///
+  /// The result always describes the original current state and requested
+  /// state. This method never mutates a lifecycle controller or module.
   static AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleResult
       validateTransition({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -133,6 +164,7 @@ abstract final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryL
     );
   }
 
+  /// Creates an accepted validation result.
   static AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleResult
       _accepted({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -152,6 +184,7 @@ abstract final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryL
     );
   }
 
+  /// Creates a rejected validation result.
   static AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleResult
       _rejected({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
