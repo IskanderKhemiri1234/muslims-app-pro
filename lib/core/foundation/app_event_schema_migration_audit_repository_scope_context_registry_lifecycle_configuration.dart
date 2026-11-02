@@ -4,16 +4,28 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_lifec
 
 /// Determines which lifecycle transition outcomes produce notifications.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationPolicy {
+  /// Publishes notifications for both accepted and rejected transitions.
   all,
+
+  /// Publishes notifications only for accepted transitions.
   acceptedOnly,
+
+  /// Publishes notifications only for rejected transitions.
   rejectedOnly,
+
+  /// Disables all lifecycle notifications.
   disabled,
 }
 
 /// Immutable configuration for registry lifecycle notifications.
 ///
-/// This configuration describes policies and injected dependencies only.
-/// It does not create, own, initialize, or dispose any external resource.
+/// This configuration contains policies and externally supplied dependencies.
+///
+/// Ownership contract:
+/// - The composition root owns the injected [AppClock].
+/// - The composition root owns the injected observer error handler.
+/// - This configuration only retains references to those dependencies.
+/// - This configuration does not create, initialize, or dispose resources.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleConfiguration {
   const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleConfiguration({
     required this.clock,
@@ -25,17 +37,20 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleC
 
   /// Injected application clock used to timestamp lifecycle notifications.
   ///
-  /// The configuration retains the reference supplied by the composition root.
-  /// It does not own or dispose the clock.
+  /// The configuration retains the supplied reference without taking
+  /// ownership of the clock.
   final AppClock clock;
 
-  /// Handles failures raised by lifecycle observers.
+  /// Injected handler for failures raised by lifecycle observers.
   ///
-  /// The configuration does not own or dispose the error handler.
+  /// The configuration retains the supplied reference without taking
+  /// ownership of the handler.
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverErrorHandler
       observerErrorHandler;
 
-  /// Controls which transition outcomes are published to observers.
+  /// Policy controlling which lifecycle transition outcomes are published.
+  ///
+  /// Defaults to [AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationPolicy.all].
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationPolicy
       notificationPolicy;
 
@@ -58,12 +73,17 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleC
               .rejectedOnly;
 
   /// Whether lifecycle notifications are enabled.
+  ///
+  /// Returns false only when the policy is [disabled].
   bool get notificationsEnabled =>
       notificationPolicy !=
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationPolicy
           .disabled;
 
-  /// Determines whether a notification should be emitted for an outcome.
+  /// Determines whether a notification should be emitted for a transition.
+  ///
+  /// The caller must pass the actual outcome returned by the lifecycle
+  /// controller. This method does not validate or perform transitions.
   bool shouldNotify({
     required bool transitionAccepted,
   }) {
