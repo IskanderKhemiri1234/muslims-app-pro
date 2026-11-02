@@ -40,9 +40,9 @@ final class AppEventMetadata {
     required this.schemaVersion,
     Map<String, String> attributes = const {},
     Map<String, String> tags = const {},
-    this.producer,
-    this.producerVersion,
-    this.schemaName,
+    String? producer,
+    String? producerVersion,
+    String? schemaName,
   })  : attributes = _immutableStringMap(
           attributes,
           'attributes',
