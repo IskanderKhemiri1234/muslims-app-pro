@@ -1,12 +1,14 @@
 
-import 'dart:collection';
-
 import 'app_event_schema_migration_audit.dart';
 
+/// Defines the read operations exposed by an audit data source.
 abstract interface class AppEventSchemaMigrationAuditReadSource {
   Future<List<AppEventSchemaMigrationAuditRecord>> readRecords();
 }
 
+/// In-memory read source backed by an existing audit sink.
+///
+/// This adapter does not own or dispose the sink.
 final class InMemoryAppEventSchemaMigrationAuditReadSource
     implements AppEventSchemaMigrationAuditReadSource {
   InMemoryAppEventSchemaMigrationAuditReadSource({
@@ -23,11 +25,13 @@ final class InMemoryAppEventSchemaMigrationAuditReadSource
   }
 }
 
+/// Defines the ordering applied to audit records.
 enum AppEventSchemaMigrationAuditSortOrder {
   ascending,
   descending,
 }
 
+/// Identifies audit reader errors.
 enum AppEventSchemaMigrationAuditReaderErrorCode {
   invalidPage,
   invalidPageSize,
@@ -36,6 +40,7 @@ enum AppEventSchemaMigrationAuditReaderErrorCode {
   invalidRecord,
 }
 
+/// Describes an error raised by the audit reader.
 final class AppEventSchemaMigrationAuditReaderException
     implements Exception {
   const AppEventSchemaMigrationAuditReaderException({
@@ -50,6 +55,7 @@ final class AppEventSchemaMigrationAuditReaderException
   }
 }
 
+/// Defines optional filtering criteria for audit records.
 final class AppEventSchemaMigrationAuditFilter {
   AppEventSchemaMigrationAuditFilter({
     this.operationId,
@@ -71,18 +77,20 @@ final class AppEventSchemaMigrationAuditFilter {
     _validateOptionalIdentifier(guardCode, 'guardCode');
     _validateOptionalIdentifier(policyCode, 'policyCode');
 
-    if (sourceVersion != null && sourceVersion! < 1) {
+    if (sourceVersion != null && sourceVersion < 1) {
       throw ArgumentError.value(sourceVersion, 'sourceVersion');
     }
 
-    if (targetVersion != null && targetVersion! < 1) {
+    if (targetVersion != null && targetVersion < 1) {
       throw ArgumentError.value(targetVersion, 'targetVersion');
     }
 
     if (this.from != null &&
         this.until != null &&
         this.from!.isAfter(this.until!)) {
-      throw ArgumentError('The from date must not be after the until date.');
+      throw ArgumentError(
+        'The from date must not be after the until date.',
+      );
     }
   }
 
@@ -114,6 +122,7 @@ final class AppEventSchemaMigrationAuditFilter {
     }
   }
 
+  /// Returns whether [record] satisfies every configured filter.
   bool matches(AppEventSchemaMigrationAuditRecord record) {
     if (operationId != null && record.operationId != operationId) {
       return false;
@@ -170,6 +179,7 @@ final class AppEventSchemaMigrationAuditFilter {
   }
 }
 
+/// Represents one immutable page of audit records.
 final class AppEventSchemaMigrationAuditPage {
   AppEventSchemaMigrationAuditPage({
     required List<AppEventSchemaMigrationAuditRecord> records,
@@ -186,7 +196,9 @@ final class AppEventSchemaMigrationAuditPage {
     if (page < 1 ||
         pageSize < 1 ||
         totalRecords < 0 ||
-        totalPages < 0) {
+        totalPages < 0 ||
+        records.length > pageSize ||
+        records.length > totalRecords) {
       throw ArgumentError('Invalid pagination metadata.');
     }
   }
@@ -207,6 +219,10 @@ final class AppEventSchemaMigrationAuditPage {
   int get returnedRecords => records.length;
 }
 
+/// Reads, filters, sorts, and paginates audit records.
+///
+/// This reader does not own the read source and does not manage its
+/// lifecycle. Its maximum page size defaults to 200 records.
 final class AppEventSchemaMigrationAuditReader {
   AppEventSchemaMigrationAuditReader({
     required AppEventSchemaMigrationAuditReadSource source,
@@ -222,8 +238,11 @@ final class AppEventSchemaMigrationAuditReader {
   }
 
   final AppEventSchemaMigrationAuditReadSource _source;
+
+  /// Maximum number of records allowed in a single page.
   final int maximumPageSize;
 
+  /// Reads a filtered and sorted page of audit records.
   Future<AppEventSchemaMigrationAuditPage> readPage({
     AppEventSchemaMigrationAuditFilter? filter,
     int page = 1,
@@ -257,9 +276,10 @@ final class AppEventSchemaMigrationAuditReader {
     );
 
     final totalRecords = filteredRecords.length;
+
     final totalPages = totalRecords == 0
         ? 0
-        : (totalRecords + pageSize - 1) ~/ pageSize;
+        : 1 + ((totalRecords - 1) ~/ pageSize);
 
     final startIndex = (page - 1) * pageSize;
 
@@ -282,10 +302,12 @@ final class AppEventSchemaMigrationAuditReader {
     );
   }
 
+  /// Counts matching records independently of pagination.
   Future<int> count({
     AppEventSchemaMigrationAuditFilter? filter,
   }) async {
     final sourceRecords = await _source.readRecords();
+
     var total = 0;
 
     for (final record in sourceRecords) {
@@ -299,6 +321,7 @@ final class AppEventSchemaMigrationAuditReader {
     return total;
   }
 
+  /// Reads the first page.
   Future<AppEventSchemaMigrationAuditPage> firstPage({
     AppEventSchemaMigrationAuditFilter? filter,
     int pageSize = 50,
@@ -313,6 +336,9 @@ final class AppEventSchemaMigrationAuditReader {
     );
   }
 
+  /// Reads the next page when one exists.
+  ///
+  /// If no next page exists, the current page number is read again.
   Future<AppEventSchemaMigrationAuditPage> nextPage({
     required AppEventSchemaMigrationAuditPage currentPage,
     AppEventSchemaMigrationAuditFilter? filter,
@@ -334,6 +360,7 @@ final class AppEventSchemaMigrationAuditReader {
     );
   }
 
+  /// Reads the previous page, or the first page when already at page one.
   Future<AppEventSchemaMigrationAuditPage> previousPage({
     required AppEventSchemaMigrationAuditPage currentPage,
     AppEventSchemaMigrationAuditFilter? filter,
@@ -372,24 +399,37 @@ final class AppEventSchemaMigrationAuditReader {
     }
   }
 
+  /// Compares records using timestamp and audit ID as a stable tie-breaker.
+  ///
+  /// Reverses operand order for descending order instead of negating the
+  /// comparison result.
   int _compareRecords(
     AppEventSchemaMigrationAuditRecord first,
     AppEventSchemaMigrationAuditRecord second,
     AppEventSchemaMigrationAuditSortOrder sortOrder,
   ) {
+    if (sortOrder == AppEventSchemaMigrationAuditSortOrder.ascending) {
+      final timestampComparison =
+          first.timestamp.compareTo(second.timestamp);
+
+      if (timestampComparison != 0) {
+        return timestampComparison;
+      }
+
+      return first.auditId.compareTo(second.auditId);
+    }
+
     final timestampComparison =
-        first.timestamp.compareTo(second.timestamp);
+        second.timestamp.compareTo(first.timestamp);
 
-    final stableComparison = timestampComparison != 0
-        ? timestampComparison
-        : first.auditId.compareTo(second.auditId);
+    if (timestampComparison != 0) {
+      return timestampComparison;
+    }
 
-    return sortOrder ==
-            AppEventSchemaMigrationAuditSortOrder.ascending
-        ? stableComparison
-        : -stableComparison;
+    return second.auditId.compareTo(first.auditId);
   }
 
+  /// Validates the minimum integrity requirements of an audit record.
   void _validateRecord(AppEventSchemaMigrationAuditRecord record) {
     if (record.auditId.trim().isEmpty ||
         record.operationId.trim().isEmpty ||
