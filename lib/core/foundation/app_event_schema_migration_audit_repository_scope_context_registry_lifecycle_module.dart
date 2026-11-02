@@ -3,27 +3,20 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_modul
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_factory.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_observer.dart';
 
-/// Coordinates the lifecycle components associated with the audit
-/// repository scope context registry.
+/// Coordinates access to the lifecycle components associated with the
+/// audit repository scope context registry.
 ///
-/// This module is deliberately non-owning.
+/// This module is a non-owning dependency assembly boundary.
 ///
-/// Responsibilities:
-/// - Exposes the registry module supplied by the composition root.
-/// - Exposes the lifecycle assembly supplied by the composition root.
-/// - Exposes the lifecycle controller and configuration from that assembly.
-/// - Exposes the externally created observer dispatcher.
+/// It exposes the registry module, lifecycle assembly, lifecycle controller,
+/// lifecycle configuration, and observer dispatcher supplied by the
+/// composition root.
 ///
-/// Ownership rules:
-/// - Does not create any of its dependencies.
-/// - Does not initialize or dispose external resources.
-/// - Does not own the registry module.
-/// - Does not own the lifecycle assembly or its controller.
-/// - Does not own the observer dispatcher.
+/// It does not create, initialize, transition, or dispose these resources.
 ///
-/// Resource creation, initialization, orchestration, and disposal remain
-/// the responsibility of the external composition root or its coordinator.
-class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleModule {
+/// Resource ownership and lifecycle orchestration remain with the
+/// composition root or its explicitly designated coordinator.
+final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleModule {
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule
       _registryModule;
 
@@ -46,46 +39,39 @@ class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleModule 
 
   /// Returns the externally owned registry module.
   ///
-  /// This getter does not initialize the registry module and does not
-  /// transfer ownership to this lifecycle module.
+  /// This getter does not initialize the registry module or transfer
+  /// ownership to this lifecycle module.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule
       get registryModule => _registryModule;
 
-  /// Returns the lifecycle assembly supplied by the composition root.
-  ///
-  /// The assembly remains externally owned.
+  /// Returns the externally owned lifecycle assembly.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleAssembly
       get lifecycleAssembly => _lifecycleAssembly;
 
-  /// Returns the lifecycle controller contained in the supplied assembly.
+  /// Returns the controller contained in the supplied lifecycle assembly.
   ///
-  /// The controller is exposed without creating, replacing, or disposing it.
+  /// The controller is not created, replaced, or disposed here.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleController
       get lifecycleController => _lifecycleAssembly.controller;
 
-  /// Returns the immutable lifecycle configuration contained in the assembly.
+  /// Returns the immutable configuration contained in the assembly.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleConfiguration
       get lifecycleConfiguration => _lifecycleAssembly.configuration;
 
-  /// Returns the externally created observer dispatcher.
+  /// Returns the externally owned observer dispatcher.
   ///
-  /// This getter exposes the same dispatcher instance supplied to the
-  /// constructor. It does not create subscriptions, dispatch notifications,
-  /// or assume ownership of the dispatcher.
+  /// No subscriptions or notifications are created by this getter.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverDispatcher
       get observerDispatcher => _observerDispatcher;
 
   /// Indicates that all required dependencies were supplied.
   ///
-  /// Since the constructor requires non-null dependencies, this confirms
-  /// dependency assembly only. It does not indicate that initialization
-  /// has completed or that the underlying resources are active.
+  /// This confirms dependency assembly only. It does not indicate that
+  /// initialization has completed or that any resource is active.
   bool get isConfigured => true;
 
-  /// Indicates whether the lifecycle controller has reached its disposed
-  /// state.
+  /// Indicates whether the lifecycle assembly reports a disposed state.
   ///
-  /// This is a read-only state query. It does not dispose the controller,
-  /// assembly, registry module, or observer dispatcher.
+  /// This is a read-only query and does not dispose any resource.
   bool get isLifecycleDisposed => _lifecycleAssembly.isDisposed;
 }
