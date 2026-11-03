@@ -1,4 +1,5 @@
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
@@ -24,11 +25,6 @@ class AppTheme {
   static const double _radiusMedium = 16;
   static const double _radiusLarge = 22;
   static const double _radiusExtraLarge = 28;
-
-  static const Duration _animationDuration =
-      Duration(milliseconds: 250);
-
-  static const Curve _animationCurve = Curves.easeInOut;
 
   // ============================================================
   // DARK THEME
@@ -122,6 +118,61 @@ class AppTheme {
       ),
     );
 
+    final baseTextTheme = Typography.material2021(
+      platform: TargetPlatform.android,
+    );
+
+    final textTheme = (isDark
+            ? baseTextTheme.white
+            : baseTextTheme.black)
+        .apply(
+          bodyColor: foreground,
+          displayColor: foreground,
+        )
+        .copyWith(
+          headlineLarge: TextStyle(
+            color: foreground,
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            height: 1.25,
+          ),
+          headlineMedium: TextStyle(
+            color: foreground,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1.3,
+          ),
+          titleLarge: TextStyle(
+            color: foreground,
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+          ),
+          titleMedium: TextStyle(
+            color: foreground,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: TextStyle(
+            color: foreground,
+            fontSize: 16,
+            height: 1.6,
+          ),
+          bodyMedium: TextStyle(
+            color: foreground,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          bodySmall: TextStyle(
+            color: mutedText,
+            fontSize: 12,
+            height: 1.5,
+          ),
+          labelLarge: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -169,54 +220,7 @@ class AppTheme {
       // TYPOGRAPHY
       // ========================================================
 
-      textTheme: Typography.material2021(
-        platform: TargetPlatform.android,
-      ).apply(
-        bodyColor: foreground,
-        displayColor: foreground,
-      ).copyWith(
-        headlineLarge: TextStyle(
-          color: foreground,
-          fontSize: 30,
-          fontWeight: FontWeight.w800,
-          height: 1.25,
-        ),
-        headlineMedium: TextStyle(
-          color: foreground,
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
-          height: 1.3,
-        ),
-        titleLarge: TextStyle(
-          color: foreground,
-          fontSize: 21,
-          fontWeight: FontWeight.w700,
-        ),
-        titleMedium: TextStyle(
-          color: foreground,
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-        ),
-        bodyLarge: TextStyle(
-          color: foreground,
-          fontSize: 16,
-          height: 1.6,
-        ),
-        bodyMedium: TextStyle(
-          color: foreground,
-          fontSize: 14,
-          height: 1.5,
-        ),
-        bodySmall: TextStyle(
-          color: mutedText,
-          fontSize: 12,
-          height: 1.5,
-        ),
-        labelLarge: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      textTheme: textTheme,
 
       // ========================================================
       // CARDS
@@ -590,7 +594,7 @@ class AppTheme {
       ),
 
       // ========================================================
-      // ANIMATIONS
+      // PAGE TRANSITIONS
       // ========================================================
 
       pageTransitionsTheme: const PageTransitionsTheme(
