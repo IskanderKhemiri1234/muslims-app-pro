@@ -4,6 +4,17 @@ import 'app_event_schema_migration_audit_repository_scope_executor.dart';
 import 'app_event_schema_migration_audit_repository_scope_registry.dart';
 import 'app_event_schema_migration_audit_scope_execution_result.dart';
 
+/// Executes an audit scope operation while verifying the identity
+/// and lifecycle state of the selected repository scope.
+///
+/// The service does not construct operations or executors.
+/// Both dependencies are supplied externally.
+///
+/// The service validates the selected scope before execution
+/// and verifies it again after successful operation completion.
+///
+/// Operation failures are propagated without being converted
+/// into scope validation failures.
 final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     TRequest,
     TResult> {
@@ -21,6 +32,24 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
   final AppEventSchemaMigrationAuditRepositoryScopeExecutor<
       TRequest, TResult> _scopeExecutor;
 
+  /// Executes an operation against the explicitly selected scope.
+  ///
+  /// Before execution:
+  /// - Validates the supplied scope identifier.
+  /// - Verifies that the context is active.
+  /// - Verifies that the context identifier matches the requested scope.
+  /// - Verifies that the scope is registered.
+  /// - Verifies that the registered scope is identical to the context scope.
+  ///
+  /// After successful execution:
+  /// - Revalidates the context.
+  /// - Revalidates registration.
+  /// - Revalidates scope identity.
+  ///
+  /// A failed post-execution validation produces a result marked
+  /// as not verified. It does not discard the completed operation result.
+  ///
+  /// Exceptions raised during the operation itself propagate unchanged.
   Future<AppEventSchemaMigrationAuditScopeExecutionResult<TResult>>
       execute({
     required String scopeId,
