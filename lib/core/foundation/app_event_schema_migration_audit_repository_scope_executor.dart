@@ -1,22 +1,6 @@
 
-/// Defines the execution boundary for an explicitly requested
-/// application event schema migration audit scope operation.
-///
-/// Implementations are supplied by the Composition Root.
-///
-/// This abstraction does not define initialization, disposal,
-/// resource ownership, policy evaluation, or authorization.
-abstract interface class AppEventSchemaMigrationAuditScopeOperation<
-    TRequest,
-    TResult> {
-  /// Executes one explicitly supplied scope operation.
-  ///
-  /// Implementations must not assume that this method grants permission
-  /// to initialize unrelated modules or manage external resource lifecycles.
-  Future<TResult> execute({
-    required TRequest request,
-  });
-}
+import 'app_event_schema_migration_audit_repository_scope_context.dart';
+import 'app_event_schema_migration_audit_scope_operation.dart';
 
 /// Executes an explicitly requested application event schema migration
 /// audit scope operation through an injected operation implementation.
@@ -24,7 +8,7 @@ abstract interface class AppEventSchemaMigrationAuditScopeOperation<
 /// Architectural responsibilities:
 ///
 /// - Accept an operation implementation supplied by the Composition Root.
-/// - Forward an explicit request to that implementation.
+/// - Forward the explicit scope context and request.
 /// - Return the operation result without changing its meaning.
 /// - Propagate operation failures to the caller.
 ///
@@ -56,7 +40,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeExecutor<
   final AppEventSchemaMigrationAuditScopeOperation<TRequest, TResult>
       _operation;
 
-  /// Forwards an explicit request to the injected scope operation.
+  /// Forwards the supplied scope context and request to the operation.
   ///
   /// This method:
   ///
@@ -70,9 +54,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeExecutor<
   /// and invoking this method only through the Composition Root's
   /// controlled execution flow.
   Future<TResult> execute({
+    required AppEventSchemaMigrationAuditRepositoryScopeContext context,
     required TRequest request,
   }) {
     return _operation.execute(
+      context: context,
       request: request,
     );
   }
