@@ -33,15 +33,13 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistryException
 
 /// Maintains an isolated registry of audit repository scopes.
 ///
-/// The registry indexes registered scopes by normalized identifiers.
-///
 /// The registry owns the lifecycle of scopes while they remain registered.
 /// Unregistered scopes are no longer owned by this registry.
 ///
 /// Repository instances are never disposed by this registry.
 ///
-/// A scope identifier remains reserved while its scope is registered or
-/// while an unregistered scope still requires explicit identifier release.
+/// An identifier remains reserved while its scope is registered or while
+/// an unregistered scope still requires explicit identifier release.
 final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   AppEventSchemaMigrationAuditRepositoryScopeRegistry();
 
@@ -57,14 +55,12 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   int get activeScopeCount {
     _ensureRegistryActive();
     _removeExternallyDisposedScopes();
-
     return _activeScopes.length;
   }
 
   /// Number of identifiers currently reserved by this registry.
   int get reservedScopeCount {
     _ensureRegistryActive();
-
     return _reservedScopeIds.length;
   }
 
@@ -191,9 +187,6 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   }
 
   /// Checks whether an identifier is reserved.
-  ///
-  /// A reserved identifier cannot be reused until its reservation
-  /// has been explicitly released.
   bool isReserved(String scopeId) {
     _ensureRegistryActive();
 
@@ -206,8 +199,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   ///
   /// The identifier is released only after the scope is confirmed disposed.
   ///
-  /// If disposal fails, the scope remains registered and reserved so that
-  /// disposal can be retried.
+  /// If disposal fails before the scope reaches its disposed state,
+  /// the scope remains registered and reserved for a later retry.
+  ///
+  /// If disposal throws after the scope has actually been disposed,
+  /// the scope is still unregistered and its identifier is released.
   ///
   /// The repository instance itself remains untouched.
   bool disposeAndUnregister(String scopeId) {
@@ -225,11 +221,26 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       normalizedId: normalizedId,
     );
 
+    Object? disposalError;
+    StackTrace? disposalStackTrace;
+
     if (!scope.isDisposed) {
-      scope.dispose();
+      try {
+        scope.dispose();
+      } catch (error, stackTrace) {
+        disposalError = error;
+        disposalStackTrace = stackTrace;
+      }
     }
 
     if (!scope.isDisposed) {
+      if (disposalError != null && disposalStackTrace != null) {
+        Error.throwWithStackTrace(
+          disposalError,
+          disposalStackTrace,
+        );
+      }
+
       throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
         code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
             .scopeDisposed,
@@ -239,6 +250,13 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
     _activeScopes.remove(normalizedId);
     _reservedScopeIds.remove(normalizedId);
+
+    if (disposalError != null && disposalStackTrace != null) {
+      Error.throwWithStackTrace(
+        disposalError,
+        disposalStackTrace,
+      );
+    }
 
     return true;
   }
@@ -321,7 +339,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   /// are released.
   ///
   /// Scopes whose disposal fails remain registered and reserved.
-  /// The registry remains active so that a later call can retry cleanup.
+  /// The registry remains active so a later call can retry cleanup.
   ///
   /// Previously unregistered scopes are not owned or disposed here.
   ///
@@ -337,9 +355,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
     Object? firstError;
     StackTrace? firstStackTrace;
 
-    final scopes = List<MapEntry<
-        String,
-        AppEventSchemaMigrationAuditRepositoryScope>>.of(
+    final scopes = List<
+        MapEntry<
+            String,
+            AppEventSchemaMigrationAuditRepositoryScope>>.of(
       _activeScopes.entries,
     );
 
@@ -359,8 +378,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
         if (!scope.isDisposed) {
           throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-            code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-                .scopeDisposed,
+            code:
+                AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+                    .scopeDisposed,
             message: 'A registered scope did not enter the disposed state.',
           );
         }
@@ -371,8 +391,6 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
         firstError ??= error;
         firstStackTrace ??= stackTrace;
 
-        // A scope may throw after completing its disposal.
-        // Release it only when its final state confirms disposal.
         if (scope.isDisposed) {
           _activeScopes.remove(scopeId);
           _reservedScopeIds.remove(scopeId);
