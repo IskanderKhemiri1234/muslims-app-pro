@@ -1,4 +1,8 @@
 
+import 'app_event_schema_migration_audit_execution_clock.dart';
+import 'app_event_schema_migration_audit_execution_diagnostic.dart';
+import 'app_event_schema_migration_audit_execution_diagnostics_recorder.dart';
+import 'app_event_schema_migration_audit_execution_id_generator.dart';
 import 'app_event_schema_migration_audit_repository_scope_context.dart';
 import 'app_event_schema_migration_audit_repository_scope_executor.dart';
 import 'app_event_schema_migration_audit_repository_scope_registry.dart';
@@ -7,14 +11,9 @@ import 'app_event_schema_migration_audit_scope_execution_result.dart';
 /// Executes an audit scope operation while verifying the identity
 /// and lifecycle state of the selected repository scope.
 ///
-/// The service does not construct operations or executors.
-/// Both dependencies are supplied externally.
-///
-/// The service validates the selected scope before execution
-/// and verifies it again after successful operation completion.
-///
-/// Operation failures are propagated without being converted
-/// into scope validation failures.
+/// Execution diagnostics are recorded on a best-effort basis.
+/// Diagnostic infrastructure failures never replace the primary
+/// operation result or its original exception.
 final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     TRequest,
     TResult> {
@@ -23,8 +22,16 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
         scopeRegistry,
     required AppEventSchemaMigrationAuditRepositoryScopeExecutor<
         TRequest, TResult> scopeExecutor,
+    required AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder
+        diagnosticsRecorder,
+    required AppEventSchemaMigrationAuditExecutionIdGenerator
+        executionIdGenerator,
+    required AppEventSchemaMigrationAuditExecutionClock executionClock,
   })  : _scopeRegistry = scopeRegistry,
-        _scopeExecutor = scopeExecutor;
+        _scopeExecutor = scopeExecutor,
+        _diagnosticsRecorder = diagnosticsRecorder,
+        _executionIdGenerator = executionIdGenerator,
+        _executionClock = executionClock;
 
   final AppEventSchemaMigrationAuditRepositoryScopeRegistry
       _scopeRegistry;
@@ -32,24 +39,27 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
   final AppEventSchemaMigrationAuditRepositoryScopeExecutor<
       TRequest, TResult> _scopeExecutor;
 
+  final AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder
+      _diagnosticsRecorder;
+
+  final AppEventSchemaMigrationAuditExecutionIdGenerator
+      _executionIdGenerator;
+
+  final AppEventSchemaMigrationAuditExecutionClock _executionClock;
+
   /// Executes an operation against the explicitly selected scope.
   ///
-  /// Before execution:
-  /// - Validates the supplied scope identifier.
-  /// - Verifies that the context is active.
-  /// - Verifies that the context identifier matches the requested scope.
-  /// - Verifies that the scope is registered.
-  /// - Verifies that the registered scope is identical to the context scope.
+  /// Scope validation before execution remains authoritative.
   ///
-  /// After successful execution:
-  /// - Revalidates the context.
-  /// - Revalidates registration.
-  /// - Revalidates scope identity.
+  /// Diagnostic initialization and recording are best-effort:
+  /// failures in diagnostic infrastructure do not prevent the
+  /// repository operation from executing.
   ///
-  /// A failed post-execution validation produces a result marked
-  /// as not verified. It does not discard the completed operation result.
+  /// A failed operation is recorded when diagnostic metadata is
+  /// available, then its original exception is rethrown.
   ///
-  /// Exceptions raised during the operation itself propagate unchanged.
+  /// A successful operation retains its result even if diagnostic
+  /// recording fails.
   Future<AppEventSchemaMigrationAuditScopeExecutionResult<TResult>>
       execute({
     required String scopeId,
@@ -63,10 +73,43 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
       context: context,
     );
 
-    final operationResult = await _scopeExecutor.execute(
-      context: context,
-      request: request,
-    );
+    // Diagnostic initialization must not block the primary operation.
+    String? executionId;
+    DateTime? startedAt;
+    Duration? startedElapsed;
+
+    try {
+      executionId = _executionIdGenerator.generate();
+
+      startedAt = _executionClock.nowUtc();
+
+      startedElapsed = _executionClock.elapsedRealtime();
+    } catch (_) {
+      executionId = null;
+      startedAt = null;
+      startedElapsed = null;
+    }
+
+    late final TResult operationResult;
+
+    try {
+      operationResult = await _scopeExecutor.execute(
+        context: context,
+        request: request,
+      );
+    } catch (error, stackTrace) {
+      await _tryRecordDiagnostic(
+        executionId: executionId,
+        scopeId: normalizedScopeId,
+        operationResult: AppEventSchemaMigrationAuditExecutionOutcome
+            .failure,
+        startedAt: startedAt,
+        startedElapsed: startedElapsed,
+        failureCode: 'scope_operation_failed',
+      );
+
+      Error.throwWithStackTrace(error, stackTrace);
+    }
 
     var validationResult =
         AppEventSchemaMigrationAuditScopeExecutionValidationResult
@@ -83,11 +126,85 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
               .notVerified;
     }
 
+    await _tryRecordDiagnostic(
+      executionId: executionId,
+      scopeId: normalizedScopeId,
+      operationResult:
+          AppEventSchemaMigrationAuditExecutionOutcome.success,
+      startedAt: startedAt,
+      startedElapsed: startedElapsed,
+      validationResult: validationResult,
+    );
+
     return AppEventSchemaMigrationAuditScopeExecutionResult<TResult>(
       scopeId: normalizedScopeId,
       result: operationResult,
       validationResult: validationResult,
     );
+  }
+
+  /// Attempts to record exactly one completed diagnostic.
+  ///
+  /// Any diagnostic infrastructure failure is isolated from
+  /// the primary operation workflow.
+  Future<void> _tryRecordDiagnostic({
+    required String? executionId,
+    required String scopeId,
+    required AppEventSchemaMigrationAuditExecutionOutcome
+        operationResult,
+    required DateTime? startedAt,
+    required Duration? startedElapsed,
+    AppEventSchemaMigrationAuditScopeExecutionValidationResult?
+        validationResult,
+    String? failureCode,
+  }) async {
+    if (executionId == null ||
+        startedAt == null ||
+        startedElapsed == null) {
+      return;
+    }
+
+    try {
+      final completedAt = _executionClock.nowUtc();
+
+      final elapsed = _executionClock.elapsedRealtime();
+
+      final duration = elapsed - startedElapsed;
+
+      if (duration.isNegative) {
+        return;
+      }
+
+      // Protect the diagnostic model from wall-clock adjustments
+      // that could make completion appear earlier than execution start.
+      final normalizedCompletedAt =
+          completedAt.isBefore(startedAt) ? startedAt : completedAt;
+
+      final diagnostic =
+          AppEventSchemaMigrationAuditExecutionDiagnostic(
+        executionId: executionId,
+        scopeId: scopeId,
+        operation: _resolveOperation(),
+        startedAt: startedAt,
+        completedAt: normalizedCompletedAt,
+        duration: duration,
+        outcome: operationResult,
+        validationResult: validationResult,
+        failureCode: failureCode,
+      );
+
+      await _diagnosticsRecorder.record(diagnostic);
+    } catch (_) {
+      // Diagnostics must never replace the primary operation outcome.
+    }
+  }
+
+  AppEventSchemaMigrationAuditExecutionOperation _resolveOperation() {
+    if (TRequest == AppEventSchemaMigrationAuditFindPageScopeOperationRequest) {
+      return AppEventSchemaMigrationAuditExecutionOperation.findPage;
+    }
+
+    return AppEventSchemaMigrationAuditExecutionOperation.count;
   }
 
   void _verifyScopeBeforeExecution({
