@@ -26,9 +26,18 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_lifec
 import 'app_event_schema_migration_audit_repository_scope_context_registry_coordinator.dart';
 
 import 'app_event_schema_migration_audit_scope_execution_result.dart';
-import 'app_event_schema_migration_audit_scope_executor.dart';
+import 'app_event_schema_migration_audit_repository_scope_executor.dart';
 import 'app_event_schema_migration_audit_scope_aware_execution_service.dart';
 import 'app_event_schema_migration_audit_scope_operations.dart';
+
+import 'app_event_schema_migration_audit_execution_diagnostic.dart';
+import 'app_event_schema_migration_audit_execution_diagnostics_recorder.dart';
+import 'app_event_schema_migration_audit_execution_id_generator.dart';
+import 'app_event_schema_migration_audit_execution_clock.dart';
+
+import 'app_event_schema_migration_audit_in_memory_diagnostics_recorder.dart';
+import 'app_event_schema_migration_audit_uuid_execution_id_generator.dart';
+import 'app_event_schema_migration_audit_execution_clock_impl.dart';
 
 /// Central composition root for the event schema subsystem.
 ///
@@ -40,8 +49,11 @@ import 'app_event_schema_migration_audit_scope_operations.dart';
 /// - Creates one legacy scope registry and one resolver.
 /// - Creates one scope context registry.
 /// - Creates independent FindPage and Count scope operations.
-/// - Creates an independent executor for each scope operation.
+/// - Creates an independent repository scope executor for each operation.
 /// - Creates an independent scope-aware execution service for each executor.
+/// - Shares one diagnostics recorder across both execution services.
+/// - Shares one execution ID generator across both execution services.
+/// - Shares one execution clock across both execution services.
 /// - Creates and owns the registry lifecycle coordinator.
 /// - Owns the lifecycle of scopes registered through this root.
 /// - Provides serialized, retryable asynchronous disposal.
@@ -60,6 +72,8 @@ import 'app_event_schema_migration_audit_scope_operations.dart';
 /// - This root owns the coordinator.
 /// - The scope operations, executors, and execution services are
 ///   composition objects and do not own the repository or scopes.
+/// - The diagnostic recorder, ID generator, and execution clock are
+///   shared dependencies and are not disposed by this root.
 /// - This root does not dispose the shared clock, audit sink, logger,
 ///   reader, repository, schema registry, validator, migration executor,
 ///   scope operations, executors, execution services, or observer
@@ -81,6 +95,11 @@ final class AppEventSchemaCompositionRoot {
     required AppEventSchemaMigrationValidationCallback validationCallback,
     AppClock? clock,
     AppEventSchemaMigrationAuditIdGenerator? auditIdGenerator,
+    AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder?
+        diagnosticsRecorder,
+    AppEventSchemaMigrationAuditExecutionIdGenerator?
+        executionIdGenerator,
+    AppEventSchemaMigrationAuditExecutionClock? executionClock,
     int maximumNestingDepth = 32,
     int maximumAuditRecords = 1000,
     int maximumAuditPageSize = 200,
@@ -145,12 +164,22 @@ final class AppEventSchemaCompositionRoot {
       registry: scopeRegistry,
     );
 
+    // Shared execution diagnostics infrastructure.
+    this.diagnosticsRecorder = diagnosticsRecorder ??
+        AppEventSchemaMigrationAuditInMemoryDiagnosticsRecorder();
+
+    this.executionIdGenerator = executionIdGenerator ??
+        AppEventSchemaMigrationAuditUuidExecutionIdGenerator();
+
+    this.executionClock = executionClock ??
+        AppEventSchemaMigrationAuditSystemExecutionClock();
+
     // FindPage operation pipeline.
     findPageScopeOperation =
         const AppEventSchemaMigrationAuditFindPageScopeOperation();
 
     findPageScopeExecutor =
-        AppEventSchemaMigrationAuditScopeExecutor<
+        AppEventSchemaMigrationAuditRepositoryScopeExecutor<
             AppEventSchemaMigrationAuditQuery,
             AppEventSchemaMigrationAuditPage>(
       operation: findPageScopeOperation,
@@ -162,6 +191,11 @@ final class AppEventSchemaCompositionRoot {
             AppEventSchemaMigrationAuditPage>(
       scopeRegistry: scopeRegistry,
       scopeExecutor: findPageScopeExecutor,
+      operation:
+          AppEventSchemaMigrationAuditExecutionOperation.findPage,
+      diagnosticsRecorder: this.diagnosticsRecorder,
+      executionIdGenerator: this.executionIdGenerator,
+      executionClock: this.executionClock,
     );
 
     // Count operation pipeline.
@@ -169,7 +203,7 @@ final class AppEventSchemaCompositionRoot {
         const AppEventSchemaMigrationAuditCountScopeOperation();
 
     countScopeExecutor =
-        AppEventSchemaMigrationAuditScopeExecutor<
+        AppEventSchemaMigrationAuditRepositoryScopeExecutor<
             AppEventSchemaMigrationAuditFilter,
             int>(
       operation: countScopeOperation,
@@ -181,6 +215,11 @@ final class AppEventSchemaCompositionRoot {
             int>(
       scopeRegistry: scopeRegistry,
       scopeExecutor: countScopeExecutor,
+      operation:
+          AppEventSchemaMigrationAuditExecutionOperation.count,
+      diagnosticsRecorder: this.diagnosticsRecorder,
+      executionIdGenerator: this.executionIdGenerator,
+      executionClock: this.executionClock,
     );
 
     scopeContextRegistry =
@@ -270,12 +309,23 @@ final class AppEventSchemaCompositionRoot {
   late final AppEventSchemaMigrationAuditRepositoryScopeResolver
       scopeResolver;
 
+  /// Shared execution diagnostics recorder.
+  late final AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder
+      diagnosticsRecorder;
+
+  /// Shared execution identifier generator.
+  late final AppEventSchemaMigrationAuditExecutionIdGenerator
+      executionIdGenerator;
+
+  /// Shared monotonic execution clock.
+  late final AppEventSchemaMigrationAuditExecutionClock executionClock;
+
   /// Dedicated operation for reading an audit page.
   late final AppEventSchemaMigrationAuditFindPageScopeOperation
       findPageScopeOperation;
 
-  /// Dedicated executor for the FindPage operation.
-  late final AppEventSchemaMigrationAuditScopeExecutor<
+  /// Dedicated repository scope executor for FindPage.
+  late final AppEventSchemaMigrationAuditRepositoryScopeExecutor<
       AppEventSchemaMigrationAuditQuery,
       AppEventSchemaMigrationAuditPage> findPageScopeExecutor;
 
@@ -288,8 +338,8 @@ final class AppEventSchemaCompositionRoot {
   late final AppEventSchemaMigrationAuditCountScopeOperation
       countScopeOperation;
 
-  /// Dedicated executor for the Count operation.
-  late final AppEventSchemaMigrationAuditScopeExecutor<
+  /// Dedicated repository scope executor for Count.
+  late final AppEventSchemaMigrationAuditRepositoryScopeExecutor<
       AppEventSchemaMigrationAuditFilter,
       int> countScopeExecutor;
 
@@ -351,8 +401,6 @@ final class AppEventSchemaCompositionRoot {
   Completer<void>? _disposalCompleter;
 
   /// Indicates whether this composition root is still active.
-  ///
-  /// The root becomes inactive immediately when disposal is requested.
   bool get isDisposed => _disposed;
 
   /// Indicates whether asynchronous disposal has been requested.
@@ -517,9 +565,6 @@ final class AppEventSchemaCompositionRoot {
 
   /// Executes the FindPage operation through its dedicated
   /// scope-aware execution service.
-  ///
-  /// The service verifies the supplied context against the scope registry
-  /// before and after the operation.
   Future<
       AppEventSchemaMigrationAuditScopeExecutionResult<
           AppEventSchemaMigrationAuditPage>> executeFindPage({
@@ -541,9 +586,6 @@ final class AppEventSchemaCompositionRoot {
 
   /// Executes the Count operation through its dedicated
   /// scope-aware execution service.
-  ///
-  /// The service verifies the supplied context against the scope registry
-  /// before and after the operation.
   Future<
       AppEventSchemaMigrationAuditScopeExecutionResult<int>> executeCount({
     required String scopeId,
@@ -563,9 +605,6 @@ final class AppEventSchemaCompositionRoot {
   }
 
   /// Executes a synchronous operation through a resolved scope context.
-  ///
-  /// The context verifies that the underlying scope is active before
-  /// exposing its repository.
   T executeWithScopeContext<T>({
     required String scopeId,
     required T Function(
@@ -585,7 +624,6 @@ final class AppEventSchemaCompositionRoot {
 
   /// Executes an asynchronous operation through a resolved scope context.
   ///
-  /// The context is validated before the callback starts.
   /// This method does not lock the scope or prevent its disposal while
   /// the asynchronous operation is pending.
   Future<T> executeWithScopeContextAsync<T>({
@@ -673,8 +711,6 @@ final class AppEventSchemaCompositionRoot {
     }
 
     // 2. ScopeContextRegistry.
-    //
-    // This registry owns provider associations only.
     try {
       scopeContextRegistry.dispose();
     } catch (error, stackTrace) {
@@ -683,9 +719,6 @@ final class AppEventSchemaCompositionRoot {
     }
 
     // 3. ScopeRegistry.
-    //
-    // This registry owns the registered scopes and supports retryable
-    // disposal when one or more scope disposals fail.
     try {
       scopeRegistry.dispose();
     } catch (error, stackTrace) {
@@ -718,9 +751,6 @@ final class AppEventSchemaCompositionRoot {
 
   /// Releases a failed disposal attempt so a subsequent call to
   /// [dispose] can start a fresh cleanup attempt.
-  ///
-  /// The identity check prevents an older attempt from clearing
-  /// a newer attempt's completer.
   void _completeDisposalAttemptWithError(
     Completer<void> completer,
     Object error,
