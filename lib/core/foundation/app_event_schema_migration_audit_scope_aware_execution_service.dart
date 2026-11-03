@@ -1,22 +1,25 @@
 import 'app_event_schema_migration_audit_repository_scope_context.dart';
 import 'app_event_schema_migration_audit_repository_scope_executor.dart';
 import 'app_event_schema_migration_audit_repository_scope_registry.dart';
+import 'app_event_schema_migration_audit_scope_execution_result.dart';
 
 /// Coordinates an explicitly requested operation within a verified
 /// application event schema migration audit repository scope.
 ///
-/// The service uses the existing scope registry, scope context, and
-/// injected scope executor.
+/// The service uses the existing scope registry, scope context,
+/// injected scope executor, and immutable execution result contract.
 ///
 /// Architectural responsibilities:
 ///
-/// - Resolve the requested scope from the existing registry.
+/// - Validate the requested scope identifier.
 /// - Verify that the supplied context represents the requested scope.
 /// - Verify that the registered scope and context are active.
-/// - Verify that both components refer to the same scope identity.
+/// - Verify that both components refer to the same scope instance.
 /// - Delegate the explicit request to the injected scope executor.
-/// - Revalidate the context after successful asynchronous execution.
-/// - Propagate execution and validation failures without replacing them.
+/// - Preserve the original operation result.
+/// - Associate the operation result with its verified scope identifier.
+/// - Revalidate the scope after successful asynchronous execution.
+/// - Propagate operation and validation failures without replacing them.
 ///
 /// Architectural restrictions:
 ///
@@ -28,6 +31,10 @@ import 'app_event_schema_migration_audit_repository_scope_registry.dart';
 /// - Does not infer authorization from successful scope validation.
 /// - Does not claim lifecycle locking or atomic execution.
 /// - Does not implement audit logging through an unavailable logger.
+///
+/// A successful operation followed by a failed post-execution validation
+/// is reported as a validation failure. The operation may already have
+/// completed and its side effects are not automatically reversed.
 ///
 /// The Composition Root remains responsible for constructing this service,
 /// supplying its dependencies, and controlling whether an operation
@@ -62,17 +69,21 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
   /// active scope.
   ///
   /// The method validates the registry and context before execution.
-  /// After successful execution, it validates them again to detect
-  /// scope disposal or identity changes that occurred while the operation
-  /// was pending.
+  ///
+  /// If execution throws, the original operation exception propagates
+  /// unchanged and no execution result is created.
+  ///
+  /// If execution succeeds, the returned value is preserved and associated
+  /// with the normalized scope identifier.
+  ///
+  /// The method then validates the scope again. If post-execution validation
+  /// fails, that validation exception propagates. The operation may already
+  /// have completed; this service does not undo its effects.
   ///
   /// This method does not lock the scope lifecycle. Another component may
   /// dispose the scope while the operation is running.
-  ///
-  /// Execution failures are propagated unchanged. Post-execution
-  /// validation is performed only when the operation completes
-  /// successfully.
-  Future<TResult> execute({
+  Future<
+      AppEventSchemaMigrationAuditScopeExecutionResult<TResult>> execute({
     required String scopeId,
     required AppEventSchemaMigrationAuditRepositoryScopeContext context,
     required TRequest request,
@@ -84,7 +95,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
       context: context,
     );
 
-    final result = await _scopeExecutor.execute(
+    final operationResult = await _scopeExecutor.execute(
       request: request,
     );
 
@@ -93,7 +104,10 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
       context: context,
     );
 
-    return result;
+    return AppEventSchemaMigrationAuditScopeExecutionResult<TResult>(
+      scopeId: normalizedScopeId,
+      result: operationResult,
+    );
   }
 
   /// Validates that the registry and context identify the same active scope.
@@ -141,10 +155,10 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
 
   /// Revalidates scope identity and activity after successful execution.
   ///
-  /// A failure here indicates that the operation completed but the scope
-  /// could not be confirmed as active afterward.
+  /// A failure here means that the operation returned successfully but
+  /// the scope could not be confirmed as active afterward.
   ///
-  /// The method does not undo the completed operation.
+  /// The completed operation is not rolled back.
   void _verifyScopeAfterExecution({
     required String normalizedScopeId,
     required AppEventSchemaMigrationAuditRepositoryScopeContext context,
