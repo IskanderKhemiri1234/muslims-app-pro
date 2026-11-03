@@ -203,8 +203,7 @@ final class AppEventSchemaCompositionRoot {
   late final AppEventSchemaMigrationAuditLogger auditLogger;
 
   /// Audit read source using [auditSink].
-  late final InMemoryAppEventSchemaMigrationAuditReadSource
-      auditReadSource;
+  late final InMemoryAppEventSchemaMigrationAuditReadSource auditReadSource;
 
   /// Audit reader using [auditReadSource].
   late final AppEventSchemaMigrationAuditReader auditReader;
@@ -313,24 +312,37 @@ final class AppEventSchemaCompositionRoot {
 
   /// Creates and registers a repository scope and its context provider.
   ///
-  /// The scope references the shared [auditRepository].
+  /// Registration order:
+  /// 1. Register the scope in the legacy scope registry.
+  /// 2. Register its context provider in the context registry.
   ///
-  /// The legacy scope registry owns the scope after successful
-  /// registration. The context registry stores a provider association
-  /// for the same identifier.
-  ///
-  /// If registration fails, the context association is removed where
-  /// possible and the newly created scope is disposed.
+  /// If context registration fails, the first registration is rolled back
+  /// using disposeAndUnregister.
   AppEventSchemaMigrationAuditRepositoryScope createScope({
     required String scopeId,
   }) {
     _ensureActive();
 
-    final normalizedScopeId = scopeId.trim();
+    final normalizedScopeId = _normalizeScopeId(scopeId);
 
-    if (normalizedScopeId.isEmpty) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeContextException(
-        AppEventSchemaMigrationAuditRepositoryScopeContextError.invalidScopeId,
+    if (scopeRegistry.isReserved(normalizedScopeId)) {
+      throw AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
+        code:
+            AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+                .duplicateScopeId,
+        message:
+            'The scope identifier "$normalizedScopeId" is already reserved.',
+      );
+    }
+
+    if (scopeContextRegistry.isReserved(
+      scopeId: normalizedScopeId,
+    )) {
+      throw AppEventSchemaMigrationAuditRepositoryScopeContextRegistryException(
+        code:
+            AppEventSchemaMigrationAuditRepositoryScopeContextRegistryError
+                .duplicateScopeId,
+        scopeId: normalizedScopeId,
       );
     }
 
@@ -344,37 +356,44 @@ final class AppEventSchemaCompositionRoot {
       resolver: scopeResolver,
     );
 
-    var contextRegistered = false;
+    var scopeRegistered = false;
 
     try {
+      scopeRegistry.register(scope);
+      scopeRegistered = true;
+
       scopeContextRegistry.register(
         scopeId: normalizedScopeId,
         provider: contextProvider,
       );
 
-      contextRegistered = true;
-
-      scopeRegistry.register(scope);
-
       return scope;
     } catch (error, stackTrace) {
-      if (contextRegistered) {
+      if (scopeRegistered) {
         try {
-          scopeContextRegistry.unregister(
-            scopeId: normalizedScopeId,
+          scopeRegistry.disposeAndUnregister(
+            normalizedScopeId,
           );
         } catch (_) {
-          // Preserve the original registration failure.
+          // Preserve the original registration error.
+          //
+          // If scope disposal failed, ScopeRegistry retains ownership
+          // and the reservation so root disposal can retry cleanup.
+        }
+      } else {
+        try {
+          if (!scope.isDisposed) {
+            scope.dispose();
+          }
+        } catch (_) {
+          // Preserve the original registration error.
         }
       }
 
-      try {
-        scope.dispose();
-      } catch (_) {
-        // Preserve the original registration failure.
-      }
-
-      Error.throwWithStackTrace(error, stackTrace);
+      Error.throwWithStackTrace(
+        error,
+        stackTrace,
+      );
     }
   }
 
@@ -475,10 +494,12 @@ final class AppEventSchemaCompositionRoot {
       return existingCompleter.future;
     }
 
+    if (_disposalCompletedSuccessfully) {
+      return Future<void>.value();
+    }
+
     final completer = Completer<void>();
 
-    // The root becomes inactive immediately and remains inactive
-    // even if cleanup needs to be retried.
     _disposed = true;
     _disposalCompleter = completer;
 
@@ -489,6 +510,13 @@ final class AppEventSchemaCompositionRoot {
     return completer.future;
   }
 
+  bool get _disposalCompletedSuccessfully =>
+      _coordinatorDisposalSucceeded &&
+      scopeContextRegistry.isDisposed &&
+      scopeRegistry.isDisposed;
+
+  bool _coordinatorDisposalSucceeded = false;
+
   Future<void> _disposeOwnedResources(
     Completer<void> completer,
   ) async {
@@ -496,19 +524,17 @@ final class AppEventSchemaCompositionRoot {
     StackTrace? firstStackTrace;
 
     // 1. Dispose the coordinator first.
-    //
-    // Coordinator disposal is retryable. If it fails, the next root
-    // disposal attempt calls it again.
     try {
       await coordinator.dispose();
+      _coordinatorDisposalSucceeded = coordinator.isDisposed;
     } catch (error, stackTrace) {
       firstError ??= error;
       firstStackTrace ??= stackTrace;
     }
 
-    // 2. Dispose the context registry owned by this root.
+    // 2. Dispose the context registry.
     //
-    // Its disposal is independent of the registry module's provider.
+    // This registry owns provider associations only.
     try {
       scopeContextRegistry.dispose();
     } catch (error, stackTrace) {
@@ -516,7 +542,9 @@ final class AppEventSchemaCompositionRoot {
       firstStackTrace ??= stackTrace;
     }
 
-    // 3. Dispose the legacy scope registry owned by this root.
+    // 3. Dispose the legacy scope registry.
+    //
+    // This registry owns the registered scopes and is retryable.
     try {
       scopeRegistry.dispose();
     } catch (error, stackTrace) {
@@ -529,6 +557,17 @@ final class AppEventSchemaCompositionRoot {
         completer,
         firstError,
         firstStackTrace ?? StackTrace.current,
+      );
+      return;
+    }
+
+    if (!_disposalCompletedSuccessfully) {
+      _completeDisposalAttemptWithError(
+        completer,
+        StateError(
+          'Composition root cleanup did not reach its completed state.',
+        ),
+        StackTrace.current,
       );
       return;
     }
@@ -565,6 +604,19 @@ final class AppEventSchemaCompositionRoot {
     if (!completer.isCompleted) {
       completer.complete();
     }
+  }
+
+  String _normalizeScopeId(String value) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty || normalized.length > 128) {
+      throw const AppEventSchemaMigrationAuditRepositoryScopeContextException(
+        AppEventSchemaMigrationAuditRepositoryScopeContextError
+            .invalidScopeId,
+      );
+    }
+
+    return normalized;
   }
 
   void _ensureActive() {
