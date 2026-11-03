@@ -1,4 +1,3 @@
-
 import 'dart:collection';
 
 import 'app_event_schema_migration_audit_repository_scope_context.dart';
@@ -70,6 +69,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
       );
     }
 
+    // Both mutations are synchronous and occur only after validation.
     _providers[normalizedScopeId] = provider;
     _reservedScopeIds.add(normalizedScopeId);
   }
