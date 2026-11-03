@@ -194,23 +194,28 @@ class _QuranPageState extends State<QuranPage>
 
   Timer? _saveDebounce;
 
+  // All preference writes are serialized through this queue.
   Future<void> _writeQueue = Future<void>.value();
 
   String? _loadedDailyKey;
 
   String get _todayStorageKey => _dateKeyFor(DateTime.now());
 
-  double get _khatmaProgress =>
-      (_completedPages.length / _totalPages).clamp(0.0, 1.0);
+  double get _khatmaProgress {
+    return (_completedPages.length / _totalPages).clamp(0.0, 1.0);
+  }
 
-  double get _dailyProgress =>
-      (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
+  double get _dailyProgress {
+    return (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
+  }
 
-  bool get _currentPageCompleted =>
-      _completedPages.contains(_currentPage);
+  bool get _currentPageCompleted {
+    return _completedPages.contains(_currentPage);
+  }
 
-  bool get _currentPageBookmarked =>
-      _bookmarks.contains(_currentPage);
+  bool get _currentPageBookmarked {
+    return _bookmarks.contains(_currentPage);
+  }
 
   @override
   void initState() {
@@ -241,8 +246,9 @@ class _QuranPageState extends State<QuranPage>
     _saveDebounce?.cancel();
     _saveDebounce = null;
 
+    // Queue the final save without using BuildContext after disposal.
     if (!_isLoading) {
-      unawaited(_savePage(_currentPage));
+      _enqueuePageSave(_currentPage);
     }
 
     super.dispose();
@@ -256,11 +262,15 @@ class _QuranPageState extends State<QuranPage>
     return 'quran_daily_pages_$year-$month-$day';
   }
 
+  bool _isValidPage(int page) {
+    return page >= 1 && page <= _totalPages;
+  }
+
   Set<int> _parsePages(List<String> values) {
     return values
         .map(int.tryParse)
         .whereType<int>()
-        .where((page) => page >= 1 && page <= _totalPages)
+        .where(_isValidPage)
         .toSet();
   }
 
@@ -270,12 +280,17 @@ class _QuranPageState extends State<QuranPage>
     return sorted.map((page) => page.toString()).toList();
   }
 
+  /// Adds an operation to the sequential storage queue.
+  ///
+  /// A failed previous operation will not permanently block future writes.
   Future<void> _queueWrite(
     Future<void> Function() operation,
   ) {
     final nextWrite = _writeQueue
         .catchError((Object _) {})
-        .then((_) => operation());
+        .then<void>((_) async {
+          await operation();
+        });
 
     _writeQueue = nextWrite;
 
@@ -312,7 +327,8 @@ class _QuranPageState extends State<QuranPage>
         _completedPages = completed;
         _todayPages = today;
         _bookmarks = bookmarks;
-        _completedKhatmas = completedKhatmas < 0 ? 0 : completedKhatmas;
+        _completedKhatmas =
+            completedKhatmas < 0 ? 0 : completedKhatmas;
         _loadedDailyKey = dailyKey;
         _isLoading = false;
       });
@@ -327,30 +343,34 @@ class _QuranPageState extends State<QuranPage>
     }
   }
 
+  /// Refreshes the daily reading set when the calendar day changes.
+  ///
+  /// The operation is serialized with other preference writes so it cannot
+  /// overwrite a newer daily-reading update.
   Future<void> _refreshTodayPages() async {
     if (_isLoading || !mounted) return;
 
-    final currentDailyKey = _todayStorageKey;
+    final dailyKey = _todayStorageKey;
 
-    if (_loadedDailyKey == currentDailyKey) return;
+    if (_loadedDailyKey == dailyKey) return;
 
     try {
-      final preferences = await SharedPreferences.getInstance();
+      await _queueWrite(() async {
+        final preferences = await SharedPreferences.getInstance();
 
-      final today = _parsePages(
-        preferences.getStringList(currentDailyKey) ?? <String>[],
-      );
+        final today = _parsePages(
+          preferences.getStringList(dailyKey) ?? <String>[],
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setState(() {
-        _todayPages = today;
-        _loadedDailyKey = currentDailyKey;
+        setState(() {
+          _todayPages = today;
+          _loadedDailyKey = dailyKey;
+        });
       });
     } catch (_) {
-      if (mounted) {
-        _showMessage('تعذر تحديث الورد اليومي');
-      }
+      _showMessage('تعذر تحديث الورد اليومي');
     }
   }
 
@@ -371,15 +391,26 @@ class _QuranPageState extends State<QuranPage>
       );
   }
 
-  Future<void> _savePage(int page) async {
+  Future<void> _enqueuePageSave(int page) {
     final safePage = page.clamp(1, _totalPages).toInt();
 
-    try {
-      await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
+    return _queueWrite(() async {
+      final preferences = await SharedPreferences.getInstance();
 
-        await preferences.setInt(_savedPageKey, safePage);
-      });
+      final saved = await preferences.setInt(
+        _savedPageKey,
+        safePage,
+      );
+
+      if (!saved) {
+        throw StateError('Unable to save the current Quran page');
+      }
+    });
+  }
+
+  Future<void> _savePage(int page) async {
+    try {
+      await _enqueuePageSave(page);
     } catch (_) {
       _showMessage('تعذر حفظ موضع القراءة');
     }
@@ -398,7 +429,7 @@ class _QuranPageState extends State<QuranPage>
     int page, {
     bool saveImmediately = false,
   }) {
-    if (page < 1 || page > _totalPages) return;
+    if (!_isValidPage(page) || _isLoading) return;
 
     if (page != _currentPage) {
       setState(() {
@@ -418,7 +449,10 @@ class _QuranPageState extends State<QuranPage>
       const Duration(milliseconds: 450),
       () {
         _saveDebounce = null;
-        unawaited(_savePage(_currentPage));
+
+        if (mounted && !_isLoading) {
+          unawaited(_savePage(_currentPage));
+        }
       },
     );
   }
@@ -442,30 +476,37 @@ class _QuranPageState extends State<QuranPage>
       _isSaving = true;
     });
 
-    try {
-      await _refreshTodayPages();
+    var khatmaFinished = false;
+    var completedKhatmasAfterSave = _completedKhatmas;
 
+    try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
 
-        final completed = Set<int>.from(_completedPages)
-          ..add(pageToMark);
+        // Read the latest persisted state inside the queue.
+        final completed = _parsePages(
+          preferences.getStringList(_completedPagesKey) ?? <String>[],
+        );
 
         final dailyKey = _todayStorageKey;
 
-        final today = _loadedDailyKey == dailyKey
-            ? Set<int>.from(_todayPages)
-            : _parsePages(
-                preferences.getStringList(dailyKey) ?? <String>[],
-              );
+        final today = _parsePages(
+          preferences.getStringList(dailyKey) ?? <String>[],
+        );
 
+        completed.add(pageToMark);
         today.add(pageToMark);
 
-        final khatmaFinished = completed.length >= _totalPages;
+        khatmaFinished = completed.length >= _totalPages;
 
-        final newKhatmaCount =
-            _completedKhatmas + (khatmaFinished ? 1 : 0);
+        final storedKhatmas =
+            preferences.getInt(_completedKhatmasKey) ?? 0;
 
+        completedKhatmasAfterSave =
+            (storedKhatmas < 0 ? 0 : storedKhatmas) +
+                (khatmaFinished ? 1 : 0);
+
+        // A completed khatma starts a new reading cycle.
         if (khatmaFinished) {
           completed.clear();
         }
@@ -491,7 +532,7 @@ class _QuranPageState extends State<QuranPage>
         if (khatmaFinished) {
           final khatmaSaved = await preferences.setInt(
             _completedKhatmasKey,
-            newKhatmaCount,
+            completedKhatmasAfterSave,
           );
 
           if (!khatmaSaved) {
@@ -505,15 +546,18 @@ class _QuranPageState extends State<QuranPage>
           _completedPages = completed;
           _todayPages = today;
           _loadedDailyKey = dailyKey;
-          _completedKhatmas = newKhatmaCount;
+          _completedKhatmas = completedKhatmasAfterSave;
         });
-
-        if (khatmaFinished) {
-          await _showKhatmaDialog(newKhatmaCount);
-        } else {
-          _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
-        }
       });
+
+      if (!mounted) return;
+
+      if (khatmaFinished) {
+        // Show the dialog after the storage queue has completed.
+        await _showKhatmaDialog(completedKhatmasAfterSave);
+      } else {
+        _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
+      }
     } catch (_) {
       _showMessage('تعذر حفظ تقدم القراءة. حاول مرة أخرى.');
     } finally {
@@ -531,11 +575,13 @@ class _QuranPageState extends State<QuranPage>
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
+        final isDark =
+            Theme.of(dialogContext).brightness == Brightness.dark;
+
         return AlertDialog(
-          backgroundColor:
-              Theme.of(dialogContext).brightness == Brightness.dark
-                  ? const Color(0xFF1B2821)
-                  : const Color(0xFFFFFCF3),
+          backgroundColor: isDark
+              ? const Color(0xFF1B2821)
+              : const Color(0xFFFFFCF3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -579,22 +625,20 @@ class _QuranPageState extends State<QuranPage>
     });
 
     try {
-      await _refreshTodayPages();
-
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
 
-        final completed = Set<int>.from(_completedPages)
-          ..remove(pageToUndo);
+        final completed = _parsePages(
+          preferences.getStringList(_completedPagesKey) ?? <String>[],
+        );
 
         final dailyKey = _todayStorageKey;
 
-        final today = _loadedDailyKey == dailyKey
-            ? Set<int>.from(_todayPages)
-            : _parsePages(
-                preferences.getStringList(dailyKey) ?? <String>[],
-              );
+        final today = _parsePages(
+          preferences.getStringList(dailyKey) ?? <String>[],
+        );
 
+        completed.remove(pageToUndo);
         today.remove(pageToUndo);
 
         final completedSaved = await preferences.setStringList(
@@ -622,9 +666,9 @@ class _QuranPageState extends State<QuranPage>
           _todayPages = today;
           _loadedDailyKey = dailyKey;
         });
-
-        _showMessage('تم إلغاء تسجيل قراءة الصفحة');
       });
+
+      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
     } catch (_) {
       _showMessage('تعذر تحديث سجل القراءة');
     } finally {
@@ -645,7 +689,10 @@ class _QuranPageState extends State<QuranPage>
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
 
-        final updated = Set<int>.from(_bookmarks);
+        // Read bookmarks from storage to avoid stale in-memory snapshots.
+        final updated = _parsePages(
+          preferences.getStringList(_bookmarksKey) ?? <String>[],
+        );
 
         final wasBookmarked = updated.contains(page);
 
@@ -682,13 +729,15 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _removeBookmark(int page) async {
-    if (_isLoading) return;
+    if (_isLoading || !_isValidPage(page)) return;
 
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
 
-        final updated = Set<int>.from(_bookmarks)..remove(page);
+        final updated = _parsePages(
+          preferences.getStringList(_bookmarksKey) ?? <String>[],
+        )..remove(page);
 
         final saved = await preferences.setStringList(
           _bookmarksKey,
@@ -711,6 +760,8 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _openBookmarks() async {
+    if (_isLoading || !mounted) return;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final pages = _bookmarks.toList()..sort();
@@ -732,7 +783,7 @@ class _QuranPageState extends State<QuranPage>
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: pages.length,
-                  separatorBuilder: (_, __) {
+                  separatorBuilder: (_, index) {
                     return const Divider(height: 1);
                   },
                   itemBuilder: (context, index) {
@@ -789,6 +840,8 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _goToPage() async {
+    if (_isLoading || !mounted) return;
+
     final controller = TextEditingController(
       text: _currentPage.toString(),
     );
@@ -826,9 +879,7 @@ class _QuranPageState extends State<QuranPage>
                     controller.text.trim(),
                   );
 
-                  if (page == null ||
-                      page < 1 ||
-                      page > _totalPages) {
+                  if (page == null || !_isValidPage(page)) {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
                       const SnackBar(
                         content: Text('رقم الصفحة غير صحيح'),
@@ -858,6 +909,8 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _openIndex() async {
+    if (_isLoading || !mounted) return;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final selectedPage = await showModalBottomSheet<int>(
@@ -887,7 +940,7 @@ class _QuranPageState extends State<QuranPage>
                     children: [
                       ListView.separated(
                         itemCount: _surahs.length,
-                        separatorBuilder: (_, __) {
+                        separatorBuilder: (_, index) {
                           return const Divider(height: 1);
                         },
                         itemBuilder: (context, index) {
@@ -923,7 +976,7 @@ class _QuranPageState extends State<QuranPage>
                       ),
                       ListView.separated(
                         itemCount: _juzPages.length,
-                        separatorBuilder: (_, __) {
+                        separatorBuilder: (_, index) {
                           return const Divider(height: 1);
                         },
                         itemBuilder: (context, index) {
@@ -969,7 +1022,7 @@ class _QuranPageState extends State<QuranPage>
     }
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader() {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       padding: const EdgeInsets.all(20),
@@ -982,7 +1035,7 @@ class _QuranPageState extends State<QuranPage>
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: _green.withOpacity(0.20),
+            color: _green.withValues(alpha: 0.20),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -997,10 +1050,10 @@ class _QuranPageState extends State<QuranPage>
                 width: 45,
                 height: 45,
                 decoration: BoxDecoration(
-                  color: _gold.withOpacity(0.17),
+                  color: _gold.withValues(alpha: 0.17),
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(
-                    color: _gold.withOpacity(0.5),
+                    color: _gold.withValues(alpha: 0.5),
                   ),
                 ),
                 child: const Icon(
@@ -1039,7 +1092,7 @@ class _QuranPageState extends State<QuranPage>
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: _gold.withOpacity(0.16),
+                  color: _gold.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -1080,7 +1133,7 @@ class _QuranPageState extends State<QuranPage>
             child: LinearProgressIndicator(
               value: _khatmaProgress,
               minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.16),
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
               valueColor:
                   const AlwaysStoppedAnimation<Color>(_gold),
             ),
@@ -1117,9 +1170,8 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Widget _buildDailyCard(bool isDark) {
-    final cardColor = isDark
-        ? const Color(0xFF1B2A23)
-        : Colors.white;
+    final cardColor =
+        isDark ? const Color(0xFF1B2A23) : Colors.white;
 
     final textColor = isDark
         ? const Color(0xFFE8DFC9)
@@ -1132,7 +1184,7 @@ class _QuranPageState extends State<QuranPage>
         color: cardColor,
         borderRadius: BorderRadius.circular(21),
         border: Border.all(
-          color: _gold.withOpacity(0.22),
+          color: _gold.withValues(alpha: 0.22),
         ),
       ),
       child: Row(
@@ -1141,7 +1193,7 @@ class _QuranPageState extends State<QuranPage>
             width: 43,
             height: 43,
             decoration: BoxDecoration(
-              color: _gold.withOpacity(0.15),
+              color: _gold.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(
@@ -1166,7 +1218,7 @@ class _QuranPageState extends State<QuranPage>
                 Text(
                   '${_todayPages.length} من $_dailyTarget صفحات',
                   style: TextStyle(
-                    color: textColor.withOpacity(0.65),
+                    color: textColor.withValues(alpha: 0.65),
                     fontSize: 11,
                   ),
                 ),
@@ -1182,7 +1234,7 @@ class _QuranPageState extends State<QuranPage>
                 CircularProgressIndicator(
                   value: _dailyProgress,
                   strokeWidth: 4,
-                  backgroundColor: _gold.withOpacity(0.16),
+                  backgroundColor: _gold.withValues(alpha: 0.16),
                   valueColor:
                       const AlwaysStoppedAnimation<Color>(_gold),
                 ),
@@ -1219,12 +1271,12 @@ class _QuranPageState extends State<QuranPage>
         color: pageColor,
         borderRadius: BorderRadius.circular(19),
         border: Border.all(
-          color: _gold.withOpacity(0.35),
+          color: _gold.withValues(alpha: 0.35),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -1239,10 +1291,10 @@ class _QuranPageState extends State<QuranPage>
               vertical: 11,
             ),
             decoration: BoxDecoration(
-              color: _green.withOpacity(isDark ? 0.35 : 0.07),
+              color: _green.withValues(alpha: isDark ? 0.35 : 0.07),
               border: Border(
                 bottom: BorderSide(
-                  color: _gold.withOpacity(0.3),
+                  color: _gold.withValues(alpha: 0.3),
                 ),
               ),
             ),
@@ -1266,7 +1318,7 @@ class _QuranPageState extends State<QuranPage>
                 Text(
                   'مصحف المدينة',
                   style: TextStyle(
-                    color: textColor.withOpacity(0.6),
+                    color: textColor.withValues(alpha: 0.6),
                     fontSize: 11,
                   ),
                 ),
@@ -1275,12 +1327,13 @@ class _QuranPageState extends State<QuranPage>
           ),
           Expanded(
             child: SingleChildScrollView(
-              key: PageStorageKey<int>(_currentPage),
+              key: const PageStorageKey<String>('quran_reader_scroll'),
               padding: const EdgeInsets.all(10),
               child: Directionality(
                 textDirection: TextDirection.rtl,
                 child: QuranMadinaFlutter(
-                  key: ValueKey<int>(_currentPage),
+                  // Keep this widget mounted while changing pages.
+                  // A page-dependent ValueKey would recreate its WebView.
                   page: _currentPage,
                   bundled: true,
                   headless: true,
@@ -1306,7 +1359,7 @@ class _QuranPageState extends State<QuranPage>
         color: isDark ? const Color(0xFF1B2A23) : Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: _gold.withOpacity(0.2),
+          color: _gold.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -1351,9 +1404,9 @@ class _QuranPageState extends State<QuranPage>
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: _green,
-              inactiveTrackColor: _green.withOpacity(0.15),
+              inactiveTrackColor: _green.withValues(alpha: 0.15),
               thumbColor: _gold,
-              overlayColor: _gold.withOpacity(0.15),
+              overlayColor: _gold.withValues(alpha: 0.15),
               trackHeight: 4,
             ),
             child: Slider(
@@ -1377,7 +1430,7 @@ class _QuranPageState extends State<QuranPage>
               Text(
                 '1',
                 style: TextStyle(
-                  color: textColor.withOpacity(0.6),
+                  color: textColor.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),
@@ -1394,7 +1447,7 @@ class _QuranPageState extends State<QuranPage>
               Text(
                 '604',
                 style: TextStyle(
-                  color: textColor.withOpacity(0.6),
+                  color: textColor.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),
@@ -1413,7 +1466,7 @@ class _QuranPageState extends State<QuranPage>
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _green,
                     side: BorderSide(
-                      color: _green.withOpacity(0.3),
+                      color: _green.withValues(alpha: 0.3),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -1520,7 +1573,7 @@ class _QuranPageState extends State<QuranPage>
           : SafeArea(
               child: Column(
                 children: [
-                  _buildHeader(isDark),
+                  _buildHeader(),
                   _buildDailyCard(isDark),
                   Expanded(
                     child: _buildReader(isDark),
@@ -1601,7 +1654,7 @@ class _BottomSheetShell extends StatelessWidget {
             width: 42,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.5),
+              color: Colors.grey.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(10),
             ),
           ),
