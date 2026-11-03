@@ -7,21 +7,22 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_lifec
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_assembly.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_module.dart';
 
-/// Coordinates the lifecycle of the registry module.
+/// Coordinates the lifecycle of the Scope Context Registry module.
 ///
 /// Responsibilities:
 /// - Coalesces concurrent initialization requests.
+/// - Allows a new initialization attempt after a failed attempt.
 /// - Coalesces concurrent disposal requests.
 /// - Handles disposal requested during initialization.
 /// - Applies lifecycle transitions through the lifecycle controller.
 /// - Dispatches accepted and rejected lifecycle notifications.
-/// - Disposes the owned registry module and its owned provider.
-/// - Disposes the observer dispatcher after the disposed notification.
+/// - Disposes the registry module and its owned provider.
+/// - Disposes the owned observer dispatcher after the terminal notification.
 ///
 /// Ownership contract:
-/// - This coordinator manages the registry module lifecycle.
+/// - The coordinator manages the registry module lifecycle.
 /// - The registry module owns its provider.
-/// - The coordinator owns the observer dispatcher supplied to it.
+/// - The coordinator owns the supplied observer dispatcher.
 /// - The coordinator does not own or dispose the external registry.
 /// - The coordinator does not own or dispose the AppClock.
 /// - The coordinator does not own observers or observer error handlers.
@@ -50,74 +51,72 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
   Completer<void>? _initializationCompleter;
   Completer<void>? _disposalCompleter;
 
+  bool _initializationWasRequested = false;
+  bool _initializationSucceeded = false;
   bool _disposeRequested = false;
   bool _dispatcherDisposed = false;
+  bool _disposalSucceeded = false;
 
-  /// Returns the registry module managed by this coordinator.
+  /// The registry module managed by this coordinator.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule
       get registryModule => _registryModule;
 
-  /// Returns the lifecycle assembly managed by this coordinator.
+  /// The lifecycle assembly managed by this coordinator.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleAssembly
       get lifecycleAssembly => _lifecycleAssembly;
 
-  /// Returns the lifecycle controller.
+  /// The lifecycle controller responsible for state transitions.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleController
       get lifecycleController => _lifecycleAssembly.controller;
 
-  /// Returns the lifecycle configuration.
+  /// The lifecycle configuration used for notifications.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleConfiguration
       get lifecycleConfiguration => _lifecycleAssembly.configuration;
 
-  /// Returns the observer dispatcher.
+  /// The observer dispatcher managed by this coordinator.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleObserverDispatcher
       get observerDispatcher => _observerDispatcher;
 
-  /// Indicates whether initialization has been requested.
-  bool get isInitializationRequested =>
-      _initializationCompleter != null;
+  /// Whether initialization has ever been requested.
+  bool get isInitializationRequested => _initializationWasRequested;
 
-  /// Indicates whether initialization is currently pending.
+  /// Whether initialization is currently pending.
   bool get isInitializing =>
       lifecycleController.currentState ==
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
           .initializing;
 
-  /// Indicates whether disposal has been requested.
+  /// Whether disposal has been requested.
   bool get isDisposalRequested => _disposeRequested;
 
-  /// Indicates whether disposal has completed successfully.
+  /// Whether disposal completed successfully.
+  ///
+  /// A terminal controller state alone is not sufficient:
+  /// module and dispatcher cleanup must also have completed successfully.
   bool get isDisposed =>
-      lifecycleController.isDisposed &&
-      _disposalCompleter?.isCompleted == true;
+      lifecycleController.isDisposed && _disposalSucceeded;
 
-  /// Indicates whether the observer dispatcher has been disposed.
+  /// Whether the observer dispatcher has been disposed.
   bool get isDispatcherDisposed =>
       _dispatcherDisposed || _observerDispatcher.isDisposed;
 
   /// Initializes the registry module.
   ///
-  /// Concurrent calls share the same Future.
+  /// Concurrent calls during the same attempt share one Future.
   ///
-  /// If disposal is requested before module initialization starts,
-  /// initialization completes with a cancellation error.
+  /// A failed initialization can be retried while disposal has not
+  /// been requested and the lifecycle controller permits the transition.
   ///
-  /// If disposal is requested while module initialization is running:
-  /// - The module initialization operation is allowed to finish.
+  /// If disposal is requested during initialization:
+  /// - The active module initialization is allowed to finish.
   /// - No initialized transition is emitted after the disposal request.
-  /// - The initialization Future is always completed.
-  /// - The disposal operation waits for initialization to finish.
-  /// - The lifecycle then transitions to disposed.
-  ///
-  /// If initialization fails without a pending disposal request:
-  /// - The lifecycle attempts to transition to failed.
-  /// - The original initialization error is rethrown.
+  /// - The initialization Future is completed.
+  /// - Disposal waits for initialization to finish.
   Future<void> initialize() {
     if (_disposeRequested) {
       return Future<void>.error(
         StateError(
-          'Cannot initialize the registry coordinator after disposal '
-          'has been requested.',
+          'Cannot initialize after disposal has been requested.',
         ),
       );
     }
@@ -136,12 +135,17 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       );
     }
 
+    if (_initializationSucceeded) {
+      return Future<void>.value();
+    }
+
     final completer = Completer<void>();
 
-    // Store the completer before starting asynchronous work.
+    _initializationWasRequested = true;
     _initializationCompleter = completer;
 
-    _runInitialization(completer);
+    // The method catches and completes all operational errors internally.
+    unawaited(_runInitialization(completer));
 
     return completer.future;
   }
@@ -150,12 +154,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
   ///
   /// Concurrent calls share the same Future.
   ///
-  /// The disposal request is recorded synchronously before asynchronous
-  /// cleanup starts. This prevents new initialization requests from entering.
-  ///
-  /// The disposed notification is dispatched before the observer dispatcher
-  /// is disposed.
-  ///
+  /// The disposal request is recorded synchronously before cleanup starts.
   /// The external registry is never disposed by this coordinator.
   Future<void> dispose() {
     final existingCompleter = _disposalCompleter;
@@ -164,15 +163,12 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       return existingCompleter.future;
     }
 
-    // Record the request synchronously.
     _disposeRequested = true;
 
     final completer = Completer<void>();
-
-    // Store the completer before starting asynchronous cleanup.
     _disposalCompleter = completer;
 
-    _runDisposal(completer);
+    unawaited(_runDisposal(completer));
 
     return completer.future;
   }
@@ -201,7 +197,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
         );
       }
 
-      // An observer may synchronously request disposal while receiving
+      // An observer can synchronously request disposal while handling
       // the initializing notification.
       if (_disposeRequested) {
         throw StateError(
@@ -211,11 +207,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
 
       await _registryModule.initialize();
 
-      // The module initialization completed successfully.
-      //
-      // If disposal was requested during that operation, do not emit
-      // initialized. The disposal operation will perform the terminal
-      // lifecycle transition.
+      // The module has finished initializing, but disposal may have
+      // been requested while its asynchronous initialization was running.
       if (_disposeRequested) {
         _completeSuccessfully(completer);
         return;
@@ -235,10 +228,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
         );
       }
 
+      _initializationSucceeded = true;
       _completeSuccessfully(completer);
     } catch (error, stackTrace) {
-      // Do not transition to failed when disposal has already been requested.
-      // The disposal operation owns the final transition to disposed.
+      // Do not emit a failed transition after disposal was requested.
       if (!_disposeRequested &&
           lifecycleController.currentState ==
               AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -256,6 +249,15 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
         }
       }
 
+      // Permit a later retry only if disposal has not been requested.
+      //
+      // Existing callers retain the Future they already received.
+      // A later caller can create a new initialization attempt.
+      if (!_disposeRequested &&
+          identical(_initializationCompleter, completer)) {
+        _initializationCompleter = null;
+      }
+
       _completeWithError(
         completer,
         error,
@@ -263,27 +265,14 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       );
     } finally {
       // Defensive completion guarantee.
-      //
-      // No execution path may leave the initialization Future pending.
       if (!completer.isCompleted) {
-        if (_disposeRequested) {
-          _completeWithError(
-            completer,
-            StateError(
-              'Initialization ended without completing because disposal '
-              'was requested.',
-            ),
-            StackTrace.current,
-          );
-        } else {
-          _completeWithError(
-            completer,
-            StateError(
-              'Initialization ended without a completion result.',
-            ),
-            StackTrace.current,
-          );
-        }
+        _completeWithError(
+          completer,
+          StateError(
+            'Initialization ended without a completion result.',
+          ),
+          StackTrace.current,
+        );
       }
     }
   }
@@ -294,21 +283,19 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     Object? firstError;
     StackTrace? firstStackTrace;
 
-    // Wait for initialization if it has already been requested.
-    //
-    // Initialization always completes its Future, including cancellation
-    // and failure paths.
+    // Wait for an active initialization attempt before disposing
+    // the module that owns the provider.
     final initializationCompleter = _initializationCompleter;
 
     if (initializationCompleter != null) {
       try {
         await initializationCompleter.future;
       } catch (_) {
-        // Initialization failure or cancellation must not prevent cleanup.
+        // Initialization failure must not prevent resource cleanup.
       }
     }
 
-    // Emit the terminal lifecycle transition before closing the dispatcher.
+    // Emit the terminal transition before disposing the dispatcher.
     try {
       if (!lifecycleController.isDisposed) {
         final disposedSnapshot = lifecycleController.transitionTo(
@@ -331,9 +318,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     }
 
     // The registry module owns its provider.
-    //
-    // Disposing the module disposes its owned provider without disposing
-    // the external registry.
+    // Its disposal must not dispose the external registry.
     try {
       await _registryModule.dispose();
     } catch (error, stackTrace) {
@@ -341,10 +326,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       firstStackTrace ??= stackTrace;
     }
 
-    // The dispatcher must be closed even if module disposal fails.
-    //
-    // Its disposal failure is captured without leaving the disposal
-    // Future incomplete.
+    // Always attempt dispatcher disposal, even if module cleanup failed.
     try {
       _disposeObserverDispatcher();
     } catch (error, stackTrace) {
@@ -361,16 +343,14 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       return;
     }
 
+    _disposalSucceeded = true;
     _completeSuccessfully(completer);
   }
 
   /// Dispatches a lifecycle snapshot according to the configured policy.
   ///
-  /// Both accepted and rejected transitions are eligible for notification.
-  /// The configuration determines which notifications are enabled.
-  ///
-  /// Notification failures must not interrupt lifecycle transitions
-  /// or prevent resource cleanup.
+  /// Notification delivery is best-effort and must never interrupt
+  /// lifecycle transitions or resource cleanup.
   void _dispatchLifecycleSnapshot(
     AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleSnapshot
         snapshot,
@@ -401,21 +381,19 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
 
       _observerDispatcher.dispatch(notification);
     } catch (_) {
-      // The lifecycle controller remains authoritative.
-      // Notification delivery is best-effort and cannot block cleanup.
+      // Observer and notification failures must not control lifecycle state.
     }
   }
 
   /// Disposes the owned dispatcher at most once.
   ///
-  /// This method intentionally does not dispose observers or their
-  /// external resources.
+  /// This does not dispose observers or their external resources.
   void _disposeObserverDispatcher() {
     if (_dispatcherDisposed) {
       return;
     }
 
-    // Mark before invoking dispose to prevent reentrant disposal.
+    // Set the flag before invoking dispose to prevent reentrant calls.
     _dispatcherDisposed = true;
 
     if (_observerDispatcher.isDisposed) {
