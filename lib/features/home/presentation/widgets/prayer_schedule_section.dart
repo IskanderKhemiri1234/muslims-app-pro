@@ -18,7 +18,7 @@ class PrayerScheduleSection extends StatelessWidget {
   });
 
   final PrayerTimes prayerTimes;
-  final Prayer nextPrayer;
+  final Prayer? nextPrayer;
   final bool isArabic;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
@@ -31,9 +31,6 @@ class PrayerScheduleSection extends StatelessWidget {
     Prayer.maghrib,
     Prayer.isha,
   ];
-
-  static const Duration _animationDuration =
-      Duration(milliseconds: 250);
 
   IconData _iconFor(Prayer prayer) {
     switch (prayer) {
@@ -59,6 +56,8 @@ class PrayerScheduleSection extends StatelessWidget {
     final theme = Theme.of(context);
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    final currentNextPrayer = nextPrayer;
 
     final entries = prayers
         .map((prayer) {
@@ -101,8 +100,8 @@ class PrayerScheduleSection extends StatelessWidget {
           _EmptyScheduleState(isArabic: isArabic)
         else
           ...entries.map((entry) {
-            final isNext =
-                entry.prayer == nextPrayer &&
+            final isNext = currentNextPrayer != null &&
+                entry.prayer == currentNextPrayer &&
                 entry.prayer != Prayer.none &&
                 entry.prayer != Prayer.sunrise;
 
@@ -182,6 +181,9 @@ class _PrayerScheduleTile extends StatelessWidget {
     required this.reduceMotion,
   });
 
+  static const Duration _animationDuration =
+      Duration(milliseconds: 250);
+
   final String name;
   final String formattedTime;
   final bool isNext;
@@ -208,7 +210,7 @@ class _PrayerScheduleTile extends StatelessWidget {
 
     final duration = reduceMotion
         ? Duration.zero
-        : _PrayerScheduleTile._animationDuration;
+        : _animationDuration;
 
     return Semantics(
       container: true,
