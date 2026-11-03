@@ -11,9 +11,8 @@ import 'app_event_schema_migration_audit_scope_execution_result.dart';
 /// Executes an audit scope operation while verifying the identity
 /// and lifecycle state of the selected repository scope.
 ///
-/// Execution diagnostics are recorded on a best-effort basis.
-/// Diagnostic infrastructure failures never replace the primary
-/// operation result or its original exception.
+/// Diagnostic infrastructure is best-effort and never replaces
+/// the primary operation result or its original exception.
 final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     TRequest,
     TResult> {
@@ -22,6 +21,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
         scopeRegistry,
     required AppEventSchemaMigrationAuditRepositoryScopeExecutor<
         TRequest, TResult> scopeExecutor,
+    required AppEventSchemaMigrationAuditExecutionOperation operation,
     required AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder
         diagnosticsRecorder,
     required AppEventSchemaMigrationAuditExecutionIdGenerator
@@ -29,6 +29,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     required AppEventSchemaMigrationAuditExecutionClock executionClock,
   })  : _scopeRegistry = scopeRegistry,
         _scopeExecutor = scopeExecutor,
+        _operation = operation,
         _diagnosticsRecorder = diagnosticsRecorder,
         _executionIdGenerator = executionIdGenerator,
         _executionClock = executionClock;
@@ -38,6 +39,8 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
 
   final AppEventSchemaMigrationAuditRepositoryScopeExecutor<
       TRequest, TResult> _scopeExecutor;
+
+  final AppEventSchemaMigrationAuditExecutionOperation _operation;
 
   final AppEventSchemaMigrationAuditExecutionDiagnosticsRecorder
       _diagnosticsRecorder;
@@ -51,15 +54,11 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
   ///
   /// Scope validation before execution remains authoritative.
   ///
-  /// Diagnostic initialization and recording are best-effort:
-  /// failures in diagnostic infrastructure do not prevent the
-  /// repository operation from executing.
+  /// Diagnostic initialization and recording failures do not prevent
+  /// the primary operation from executing or replace its outcome.
   ///
-  /// A failed operation is recorded when diagnostic metadata is
-  /// available, then its original exception is rethrown.
-  ///
-  /// A successful operation retains its result even if diagnostic
-  /// recording fails.
+  /// A failed operation is recorded when possible, then its original
+  /// exception and stack trace are rethrown.
   Future<AppEventSchemaMigrationAuditScopeExecutionResult<TResult>>
       execute({
     required String scopeId,
@@ -73,16 +72,14 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
       context: context,
     );
 
-    // Diagnostic initialization must not block the primary operation.
     String? executionId;
     DateTime? startedAt;
     Duration? startedElapsed;
 
+    // Diagnostic initialization must never block the operation.
     try {
       executionId = _executionIdGenerator.generate();
-
       startedAt = _executionClock.nowUtc();
-
       startedElapsed = _executionClock.elapsedRealtime();
     } catch (_) {
       executionId = null;
@@ -101,8 +98,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
       await _tryRecordDiagnostic(
         executionId: executionId,
         scopeId: normalizedScopeId,
-        operationResult: AppEventSchemaMigrationAuditExecutionOutcome
-            .failure,
+        outcome: AppEventSchemaMigrationAuditExecutionOutcome.failure,
         startedAt: startedAt,
         startedElapsed: startedElapsed,
         failureCode: 'scope_operation_failed',
@@ -129,8 +125,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     await _tryRecordDiagnostic(
       executionId: executionId,
       scopeId: normalizedScopeId,
-      operationResult:
-          AppEventSchemaMigrationAuditExecutionOutcome.success,
+      outcome: AppEventSchemaMigrationAuditExecutionOutcome.success,
       startedAt: startedAt,
       startedElapsed: startedElapsed,
       validationResult: validationResult,
@@ -143,15 +138,12 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     );
   }
 
-  /// Attempts to record exactly one completed diagnostic.
-  ///
-  /// Any diagnostic infrastructure failure is isolated from
-  /// the primary operation workflow.
+  /// Records one completed diagnostic if all required metadata
+  /// is available. Diagnostic failures are intentionally isolated.
   Future<void> _tryRecordDiagnostic({
     required String? executionId,
     required String scopeId,
-    required AppEventSchemaMigrationAuditExecutionOutcome
-        operationResult,
+    required AppEventSchemaMigrationAuditExecutionOutcome outcome,
     required DateTime? startedAt,
     required Duration? startedElapsed,
     AppEventSchemaMigrationAuditScopeExecutionValidationResult?
@@ -166,17 +158,16 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
 
     try {
       final completedAt = _executionClock.nowUtc();
+      final completedElapsed = _executionClock.elapsedRealtime();
 
-      final elapsed = _executionClock.elapsedRealtime();
-
-      final duration = elapsed - startedElapsed;
+      final duration = completedElapsed - startedElapsed;
 
       if (duration.isNegative) {
         return;
       }
 
-      // Protect the diagnostic model from wall-clock adjustments
-      // that could make completion appear earlier than execution start.
+      // Preserve valid timestamp ordering if the device wall clock
+      // was adjusted while the operation was running.
       final normalizedCompletedAt =
           completedAt.isBefore(startedAt) ? startedAt : completedAt;
 
@@ -184,27 +175,19 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
           AppEventSchemaMigrationAuditExecutionDiagnostic(
         executionId: executionId,
         scopeId: scopeId,
-        operation: _resolveOperation(),
+        operation: _operation,
         startedAt: startedAt,
         completedAt: normalizedCompletedAt,
         duration: duration,
-        outcome: operationResult,
+        outcome: outcome,
         validationResult: validationResult,
         failureCode: failureCode,
       );
 
       await _diagnosticsRecorder.record(diagnostic);
     } catch (_) {
-      // Diagnostics must never replace the primary operation outcome.
+      // Recording failure must not replace the primary outcome.
     }
-  }
-
-  AppEventSchemaMigrationAuditExecutionOperation _resolveOperation() {
-    if (TRequest == AppEventSchemaMigrationAuditFindPageScopeOperationRequest) {
-      return AppEventSchemaMigrationAuditExecutionOperation.findPage;
-    }
-
-    return AppEventSchemaMigrationAuditExecutionOperation.count;
   }
 
   void _verifyScopeBeforeExecution({
