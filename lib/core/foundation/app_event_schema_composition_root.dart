@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'app_clock.dart';
@@ -5,6 +6,7 @@ import 'app_event_schema_registry.dart';
 import 'app_event_schema_validator.dart';
 import 'app_event_schema_migration.dart';
 import 'app_event_schema_migration_audit.dart';
+import 'app_event_schema_migration_audit_query.dart';
 import 'app_event_schema_migration_audit_reader.dart';
 import 'app_event_schema_migration_audit_repository.dart';
 import 'app_event_schema_migration_audit_repository_scope.dart';
@@ -23,6 +25,11 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_lifec
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_assembly.dart';
 import 'app_event_schema_migration_audit_repository_scope_context_registry_coordinator.dart';
 
+import 'app_event_schema_migration_audit_scope_execution_result.dart';
+import 'app_event_schema_migration_audit_scope_executor.dart';
+import 'app_event_schema_migration_audit_scope_aware_execution_service.dart';
+import 'app_event_schema_migration_audit_scope_operations.dart';
+
 /// Central composition root for the event schema subsystem.
 ///
 /// Responsibilities:
@@ -32,6 +39,9 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_coord
 /// - Creates one audit reader and one repository adapter.
 /// - Creates one legacy scope registry and one resolver.
 /// - Creates one scope context registry.
+/// - Creates independent FindPage and Count scope operations.
+/// - Creates an independent executor for each scope operation.
+/// - Creates an independent scope-aware execution service for each executor.
 /// - Creates and owns the registry lifecycle coordinator.
 /// - Owns the lifecycle of scopes registered through this root.
 /// - Provides serialized, retryable asynchronous disposal.
@@ -48,9 +58,12 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_coord
 /// - The coordinator owns the lifecycle of the registry module
 ///   and the observer dispatcher.
 /// - This root owns the coordinator.
-/// - The root does not dispose the shared clock, audit sink, logger,
+/// - The scope operations, executors, and execution services are
+///   composition objects and do not own the repository or scopes.
+/// - This root does not dispose the shared clock, audit sink, logger,
 ///   reader, repository, schema registry, validator, migration executor,
-///   or observer implementations.
+///   scope operations, executors, execution services, or observer
+///   implementations.
 ///
 /// Disposal order:
 /// 1. Coordinator.
@@ -130,6 +143,44 @@ final class AppEventSchemaCompositionRoot {
     scopeResolver =
         AppEventSchemaMigrationAuditRepositoryScopeResolver(
       registry: scopeRegistry,
+    );
+
+    // FindPage operation pipeline.
+    findPageScopeOperation =
+        const AppEventSchemaMigrationAuditFindPageScopeOperation();
+
+    findPageScopeExecutor =
+        AppEventSchemaMigrationAuditScopeExecutor<
+            AppEventSchemaMigrationAuditQuery,
+            AppEventSchemaMigrationAuditPage>(
+      operation: findPageScopeOperation,
+    );
+
+    findPageExecutionService =
+        AppEventSchemaMigrationAuditScopeAwareExecutionService<
+            AppEventSchemaMigrationAuditQuery,
+            AppEventSchemaMigrationAuditPage>(
+      scopeRegistry: scopeRegistry,
+      scopeExecutor: findPageScopeExecutor,
+    );
+
+    // Count operation pipeline.
+    countScopeOperation =
+        const AppEventSchemaMigrationAuditCountScopeOperation();
+
+    countScopeExecutor =
+        AppEventSchemaMigrationAuditScopeExecutor<
+            AppEventSchemaMigrationAuditFilter,
+            int>(
+      operation: countScopeOperation,
+    );
+
+    countExecutionService =
+        AppEventSchemaMigrationAuditScopeAwareExecutionService<
+            AppEventSchemaMigrationAuditFilter,
+            int>(
+      scopeRegistry: scopeRegistry,
+      scopeExecutor: countScopeExecutor,
     );
 
     scopeContextRegistry =
@@ -218,6 +269,34 @@ final class AppEventSchemaCompositionRoot {
   /// Resolves registered legacy repository scopes.
   late final AppEventSchemaMigrationAuditRepositoryScopeResolver
       scopeResolver;
+
+  /// Dedicated operation for reading an audit page.
+  late final AppEventSchemaMigrationAuditFindPageScopeOperation
+      findPageScopeOperation;
+
+  /// Dedicated executor for the FindPage operation.
+  late final AppEventSchemaMigrationAuditScopeExecutor<
+      AppEventSchemaMigrationAuditQuery,
+      AppEventSchemaMigrationAuditPage> findPageScopeExecutor;
+
+  /// Dedicated scope-aware execution service for FindPage.
+  late final AppEventSchemaMigrationAuditScopeAwareExecutionService<
+      AppEventSchemaMigrationAuditQuery,
+      AppEventSchemaMigrationAuditPage> findPageExecutionService;
+
+  /// Dedicated operation for counting audit records.
+  late final AppEventSchemaMigrationAuditCountScopeOperation
+      countScopeOperation;
+
+  /// Dedicated executor for the Count operation.
+  late final AppEventSchemaMigrationAuditScopeExecutor<
+      AppEventSchemaMigrationAuditFilter,
+      int> countScopeExecutor;
+
+  /// Dedicated scope-aware execution service for Count.
+  late final AppEventSchemaMigrationAuditScopeAwareExecutionService<
+      AppEventSchemaMigrationAuditFilter,
+      int> countExecutionService;
 
   /// Registry associating scope identifiers with context providers.
   ///
@@ -433,6 +512,53 @@ final class AppEventSchemaCompositionRoot {
 
     return scopeContextRegistry.provideContext(
       scopeId: scopeId,
+    );
+  }
+
+  /// Executes the FindPage operation through its dedicated
+  /// scope-aware execution service.
+  ///
+  /// The service verifies the supplied context against the scope registry
+  /// before and after the operation.
+  Future<
+      AppEventSchemaMigrationAuditScopeExecutionResult<
+          AppEventSchemaMigrationAuditPage>> executeFindPage({
+    required String scopeId,
+    required AppEventSchemaMigrationAuditQuery request,
+  }) {
+    _ensureActive();
+
+    final context = resolveScopeContext(
+      scopeId: scopeId,
+    );
+
+    return findPageExecutionService.execute(
+      scopeId: scopeId,
+      context: context,
+      request: request,
+    );
+  }
+
+  /// Executes the Count operation through its dedicated
+  /// scope-aware execution service.
+  ///
+  /// The service verifies the supplied context against the scope registry
+  /// before and after the operation.
+  Future<
+      AppEventSchemaMigrationAuditScopeExecutionResult<int>> executeCount({
+    required String scopeId,
+    required AppEventSchemaMigrationAuditFilter request,
+  }) {
+    _ensureActive();
+
+    final context = resolveScopeContext(
+      scopeId: scopeId,
+    );
+
+    return countExecutionService.execute(
+      scopeId: scopeId,
+      context: context,
+      request: request,
     );
   }
 
