@@ -1,4 +1,3 @@
-
 import 'dart:ui' show FontFeature;
 
 import 'package:adhan/adhan.dart';
@@ -63,7 +62,9 @@ class PrayerScheduleSection extends StatelessWidget {
         .map((prayer) {
           final time = prayerTimes.timeForPrayer(prayer);
 
-          if (time == null) return null;
+          if (time == null) {
+            return null;
+          }
 
           return _PrayerEntry(
             prayer: prayer,
