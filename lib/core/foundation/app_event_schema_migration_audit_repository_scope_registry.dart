@@ -1,4 +1,3 @@
-
 import 'dart:collection';
 
 import 'app_event_schema_migration_audit_repository_scope.dart';
@@ -391,6 +390,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
         firstError ??= error;
         firstStackTrace ??= stackTrace;
 
+        // Preserve ownership when disposal has not completed.
+        // If the scope is already disposed, release its reservation.
         if (scope.isDisposed) {
           _activeScopes.remove(scopeId);
           _reservedScopeIds.remove(scopeId);
