@@ -1,4 +1,3 @@
-
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/services/timezone_discovery_service.dart'
@@ -44,10 +43,19 @@ class TimezoneDiscoveryService {
       longitude: longitude,
     );
 
-    final timezoneId = resolved.timezoneId.trim();
+    final timezoneId = resolved.timezoneId?.trim();
+    final location = resolved.location;
+    final countryCode = resolved.countryCode?.trim();
 
-    if (timezoneId.isEmpty ||
-        timezoneId != resolved.location.name) {
+    if (timezoneId == null ||
+        timezoneId.isEmpty ||
+        location == null) {
+      throw StateError(
+        'The timezone resolver returned incomplete timezone data.',
+      );
+    }
+
+    if (timezoneId != location.name) {
       throw StateError(
         'The timezone resolver returned an invalid timezone.',
       );
@@ -55,8 +63,11 @@ class TimezoneDiscoveryService {
 
     return DiscoveredTimezone(
       timezoneId: timezoneId,
-      countryCode: resolved.countryCode,
-      location: resolved.location,
+      countryCode:
+          countryCode == null || countryCode.isEmpty
+              ? null
+              : countryCode,
+      location: location,
     );
   }
 
