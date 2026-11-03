@@ -259,7 +259,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
           );
         },
         builder: (context, snapshot, _) {
-          if (snapshot.prayerTimes == null) {
+          final prayerTimes = snapshot.prayerTimes;
+
+          if (prayerTimes == null) {
             return _LoadingView(
               isArabic: _isArabic,
               message: snapshot.message,
@@ -352,7 +354,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               const SizedBox(height: 30),
 
                               PrayerScheduleSection(
-                                prayerTimes: snapshot.prayerTimes!,
+                                prayerTimes: prayerTimes,
                                 nextPrayer: snapshot.nextPrayer,
                                 isArabic: _isArabic,
                                 prayerName: _prayerName,
