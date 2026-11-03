@@ -35,15 +35,15 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_coord
 /// - Creates one scope context registry.
 /// - Creates and owns the registry lifecycle coordinator.
 /// - Owns the lifecycle of scopes registered through this root.
-/// - Provides one serialized asynchronous disposal operation.
+/// - Provides serialized, retryable asynchronous disposal.
 ///
 /// Ownership contract:
 /// - This root owns the legacy scope registry.
 /// - This root owns the scope context registry.
 /// - The legacy scope registry owns successfully registered scopes.
 /// - Every registered scope references the shared audit repository.
-/// - The scope context registry owns only provider-to-identifier
-///   associations, not the providers themselves.
+/// - The scope context registry owns provider-to-identifier associations,
+///   not the providers themselves.
 /// - The registry module owns its access provider.
 /// - The registry module does not own the scope context registry.
 /// - The coordinator owns the lifecycle of the registry module
@@ -268,6 +268,9 @@ final class AppEventSchemaCompositionRoot {
 
   bool _disposed = false;
 
+  /// The completer for the currently active disposal attempt.
+  ///
+  /// A failed attempt releases this reference so a later call can retry.
   Completer<void>? _disposalCompleter;
 
   /// Indicates whether this composition root is still active.
@@ -276,12 +279,12 @@ final class AppEventSchemaCompositionRoot {
   bool get isDisposed => _disposed;
 
   /// Indicates whether asynchronous disposal has been requested.
-  bool get isDisposalRequested => _disposalCompleter != null;
+  bool get isDisposalRequested => _disposed;
 
-  /// Indicates whether the disposal future has completed.
+  /// Indicates whether the current disposal attempt has completed.
   ///
-  /// Completion does not necessarily mean every cleanup operation
-  /// succeeded. Inspect the returned future for disposal errors.
+  /// After a failed attempt, the attempt reference is cleared to allow
+  /// another call to [dispose].
   bool get isDisposalCompleted =>
       _disposalCompleter?.isCompleted ?? false;
 
@@ -401,6 +404,7 @@ final class AppEventSchemaCompositionRoot {
     required String scopeId,
   }) {
     _ensureActive();
+
     return scopeContextRegistry.provideContext(
       scopeId: scopeId,
     );
@@ -451,9 +455,11 @@ final class AppEventSchemaCompositionRoot {
 
   /// Disposes all resources owned by this composition root.
   ///
-  /// Concurrent calls share the same future.
+  /// Concurrent calls during the same attempt share one Future.
   ///
   /// The root becomes inactive synchronously when this method is called.
+  ///
+  /// If an attempt fails, a later call can start a new attempt.
   ///
   /// Cleanup is serialized:
   /// 1. Await coordinator disposal.
@@ -471,9 +477,10 @@ final class AppEventSchemaCompositionRoot {
 
     final completer = Completer<void>();
 
-    // Publish the disposal request before starting asynchronous cleanup.
-    _disposalCompleter = completer;
+    // The root becomes inactive immediately and remains inactive
+    // even if cleanup needs to be retried.
     _disposed = true;
+    _disposalCompleter = completer;
 
     unawaited(
       _disposeOwnedResources(completer),
@@ -488,6 +495,10 @@ final class AppEventSchemaCompositionRoot {
     Object? firstError;
     StackTrace? firstStackTrace;
 
+    // 1. Dispose the coordinator first.
+    //
+    // Coordinator disposal is retryable. If it fails, the next root
+    // disposal attempt calls it again.
     try {
       await coordinator.dispose();
     } catch (error, stackTrace) {
@@ -495,6 +506,9 @@ final class AppEventSchemaCompositionRoot {
       firstStackTrace ??= stackTrace;
     }
 
+    // 2. Dispose the context registry owned by this root.
+    //
+    // Its disposal is independent of the registry module's provider.
     try {
       scopeContextRegistry.dispose();
     } catch (error, stackTrace) {
@@ -502,6 +516,7 @@ final class AppEventSchemaCompositionRoot {
       firstStackTrace ??= stackTrace;
     }
 
+    // 3. Dispose the legacy scope registry owned by this root.
     try {
       scopeRegistry.dispose();
     } catch (error, stackTrace) {
@@ -509,18 +524,47 @@ final class AppEventSchemaCompositionRoot {
       firstStackTrace ??= stackTrace;
     }
 
-    final disposalError = firstError;
-    final disposalStackTrace = firstStackTrace;
-
-    if (disposalError != null) {
-      completer.completeError(
-        disposalError,
-        disposalStackTrace ?? StackTrace.current,
+    if (firstError != null) {
+      _completeDisposalAttemptWithError(
+        completer,
+        firstError,
+        firstStackTrace ?? StackTrace.current,
       );
       return;
     }
 
-    completer.complete();
+    _completeDisposalAttemptSuccessfully(completer);
+  }
+
+  /// Releases a failed disposal attempt so a subsequent call to
+  /// [dispose] can start a fresh cleanup attempt.
+  ///
+  /// The identity check prevents an older attempt from clearing
+  /// a newer attempt's completer.
+  void _completeDisposalAttemptWithError(
+    Completer<void> completer,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    if (identical(_disposalCompleter, completer)) {
+      _disposalCompleter = null;
+    }
+
+    if (!completer.isCompleted) {
+      completer.completeError(
+        error,
+        stackTrace,
+      );
+    }
+  }
+
+  /// Completes the current disposal attempt successfully.
+  void _completeDisposalAttemptSuccessfully(
+    Completer<void> completer,
+  ) {
+    if (!completer.isCompleted) {
+      completer.complete();
+    }
   }
 
   void _ensureActive() {
