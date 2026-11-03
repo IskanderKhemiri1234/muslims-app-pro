@@ -1,4 +1,3 @@
-
 import 'app_clock.dart';
 import 'app_event_schema_registry.dart';
 import 'app_event_schema_validator.dart';
@@ -9,6 +8,13 @@ import 'app_event_schema_migration_audit_repository.dart';
 import 'app_event_schema_migration_audit_repository_scope.dart';
 import 'app_event_schema_migration_audit_repository_scope_registry.dart';
 import 'app_event_schema_migration_audit_repository_scope_resolver.dart';
+import 'app_event_schema_migration_audit_repository_scope_context.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_configuration.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_controller.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_factory.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_observer.dart';
+import 'app_event_schema_migration_audit_repository_scope_context_registry_coordinator.dart';
 
 /// Central composition root for the event schema subsystem.
 ///
@@ -18,14 +24,11 @@ import 'app_event_schema_migration_audit_repository_scope_resolver.dart';
 /// - Creates one shared audit sink for both writing and reading.
 /// - Creates one audit reader and one repository adapter.
 /// - Creates one scope registry and one resolver.
-/// - Owns the lifecycle of scopes registered through this root.
+/// - Manages Coordinator lifecycles per scope context.
+/// - Owns the lifecycle of scopes and coordinators registered through this root.
 ///
 /// This class does not use global state, service locators, or implicit
 /// initialization.
-///
-/// The migration path resolver and validation callback are explicitly
-/// supplied by the application because their behavior belongs to the
-/// application's migration and validation policies.
 final class AppEventSchemaCompositionRoot {
   AppEventSchemaCompositionRoot({
     Iterable<AppEventSchemaDefinition> definitions =
@@ -104,50 +107,45 @@ final class AppEventSchemaCompositionRoot {
     );
   }
 
-  /// Shared clock used by the audit logger.
+  /// Shared clock used across subsystem.
   late final AppClock clock;
 
   /// The single schema registry instance.
   late final AppEventSchemaRegistry registry;
 
   /// The single validator instance.
-  ///
-  /// Its registry is identical to [registry].
   late final AppEventSchemaValidator validator;
 
   /// The migration executor wired to [registry] and [validator].
   late final AppEventSchemaMigrationExecutor migrationExecutor;
 
   /// The one shared in-memory audit sink.
-  ///
-  /// Both [auditLogger] and [auditReadSource] use this exact instance.
   late final InMemoryAppEventSchemaMigrationAuditSink auditSink;
 
   /// Shared audit ID generator.
-  late final AppEventSchemaMigrationAuditIdGenerator
-      auditIdGenerator;
+  late final AppEventSchemaMigrationAuditIdGenerator auditIdGenerator;
 
   /// Audit writer using [auditSink].
   late final AppEventSchemaMigrationAuditLogger auditLogger;
 
   /// Audit read source using [auditSink].
-  late final InMemoryAppEventSchemaMigrationAuditReadSource
-      auditReadSource;
+  late final InMemoryAppEventSchemaMigrationAuditReadSource auditReadSource;
 
   /// Audit reader using [auditReadSource].
   late final AppEventSchemaMigrationAuditReader auditReader;
 
   /// Single repository adapter using [auditReader].
-  late final ReaderBackedAppEventSchemaMigrationAuditRepository
-      auditRepository;
+  late final ReaderBackedAppEventSchemaMigrationAuditRepository auditRepository;
 
   /// Owns the lifecycle of scopes registered through this root.
-  late final AppEventSchemaMigrationAuditRepositoryScopeRegistry
-      scopeRegistry;
+  late final AppEventSchemaMigrationAuditRepositoryScopeRegistry scopeRegistry;
 
   /// Resolves registered scopes through [scopeRegistry].
-  late final AppEventSchemaMigrationAuditRepositoryScopeResolver
-      scopeResolver;
+  late final AppEventSchemaMigrationAuditRepositoryScopeResolver scopeResolver;
+
+  /// Active scope context coordinators managed by this root.
+  final List<AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinator>
+      _activeCoordinators = [];
 
   bool _disposed = false;
 
@@ -155,14 +153,6 @@ final class AppEventSchemaCompositionRoot {
   bool get isDisposed => _disposed;
 
   /// Creates and registers a repository scope.
-  ///
-  /// Every scope references the shared [auditRepository].
-  ///
-  /// The scope registry becomes responsible for disposing the scope
-  /// after successful registration.
-  ///
-  /// If registration fails, the newly created scope is disposed before
-  /// the original error is rethrown.
   AppEventSchemaMigrationAuditRepositoryScope createScope({
     required String scopeId,
   }) {
@@ -182,9 +172,44 @@ final class AppEventSchemaCompositionRoot {
     }
   }
 
+  /// Creates, wires, and manages a fully bound scope context coordinator.
+  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinator createScopeCoordinator({
+    required String scopeId,
+  }) {
+    _ensureActive();
+
+    final scopeContext = AppEventSchemaMigrationAuditRepositoryScopeContext(
+      scopeId: scopeId,
+      repository: auditRepository,
+    );
+
+    final contextRegistry = AppEventSchemaMigrationAuditRepositoryScopeContextRegistry(
+      scopeContext: scopeContext,
+    );
+
+    final configuration = AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleConfiguration(
+      clock: clock,
+    );
+
+    final factory = AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleFactory(
+      configuration: configuration,
+    );
+
+    final controller = AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleController(
+      factory: factory,
+    );
+
+    final coordinator = AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinator(
+      registry: contextRegistry,
+      controller: controller,
+      clock: clock,
+    );
+
+    _activeCoordinators.add(coordinator);
+    return coordinator;
+  }
+
   /// Resolves a registered scope.
-  ///
-  /// The returned resolution does not extend the scope lifetime.
   AppEventSchemaMigrationAuditRepositoryScopeResolution resolveScope(
     String scopeId,
   ) {
@@ -200,21 +225,15 @@ final class AppEventSchemaCompositionRoot {
     return scopeResolver.resolveRepository(scopeId);
   }
 
-  /// Disposes this composition root.
+  /// Disposes this composition root and all managed coordinators and scopes.
   ///
   /// Disposal order:
-  /// 1. Dispose all scopes owned by the scope registry.
-  /// 2. Leave non-disposable components untouched.
-  ///
-  /// The registry itself has a dispose contract and disposes its
-  /// registered scopes. Those scopes do not dispose their repositories.
-  ///
-  /// The remaining components expose no dispose contract in the
-  /// supplied implementations, so this method does not call dispose
-  /// on them.
+  /// 1. Mark root inactive.
+  /// 2. Asynchronously/Synchronously dispose all active scope coordinators.
+  /// 3. Dispose the scope registry.
   ///
   /// This operation is idempotent.
-  void dispose() {
+  Future<void> dispose() async {
     if (_disposed) {
       return;
     }
@@ -222,7 +241,15 @@ final class AppEventSchemaCompositionRoot {
     // Mark the root inactive before starting lifecycle teardown.
     _disposed = true;
 
-    // First and only owned disposal operation.
+    // Dispose all active scope coordinators first.
+    for (final coordinator in List.of(_activeCoordinators)) {
+      if (!coordinator.isDisposed) {
+        await coordinator.dispose();
+      }
+    }
+    _activeCoordinators.clear();
+
+    // Dispose scope registry.
     scopeRegistry.dispose();
   }
 
