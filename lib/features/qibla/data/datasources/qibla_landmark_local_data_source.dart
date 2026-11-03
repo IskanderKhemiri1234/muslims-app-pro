@@ -184,13 +184,15 @@ class QiblaLandmarkLocalDataSource {
       _fail(index, 'category is required.');
     }
 
+    final categoryName = value.trim();
+
     for (final category in QiblaLandmarkCategory.values) {
-      if (category.name == value) {
+      if (category.name == categoryName) {
         return category;
       }
     }
 
-    _fail(index, 'Unknown category "$value".');
+    _fail(index, 'Unknown category "$categoryName".');
   }
 
   List<QiblaLandmarkSource> _parseSources(
@@ -236,7 +238,7 @@ class QiblaLandmarkLocalDataSource {
           name: _requiredString(json, 'name', index),
           url: url,
           sourceType: _requiredString(json, 'sourceType', index),
-          accessedAt: accessedAt,
+          accessedAt: accessedAt ?? '',
           publisher: _optionalString(json, 'publisher', index),
           license: _optionalString(json, 'license', index),
         ),
@@ -258,6 +260,7 @@ class QiblaLandmarkLocalDataSource {
 
     final result = <QiblaLandmarkImage>[];
     final paths = <String>{};
+    final ids = <String>{};
     var primaryCount = 0;
 
     for (final item in value) {
@@ -274,6 +277,13 @@ class QiblaLandmarkLocalDataSource {
 
       if (!paths.add(assetPath)) {
         _fail(index, 'Duplicate image asset path "$assetPath".');
+      }
+
+      final imageId =
+          _optionalString(json, 'id', index) ?? assetPath;
+
+      if (!ids.add(imageId)) {
+        _fail(index, 'Duplicate image ID "$imageId".');
       }
 
       final creator = _requiredString(json, 'creator', index);
@@ -296,9 +306,12 @@ class QiblaLandmarkLocalDataSource {
 
       result.add(
         QiblaLandmarkImage(
+          id: imageId,
           assetPath: assetPath,
-          captionAr: _optionalString(json, 'captionAr', index),
-          captionEn: _optionalString(json, 'captionEn', index),
+          captionAr:
+              _optionalString(json, 'captionAr', index) ?? '',
+          captionEn:
+              _optionalString(json, 'captionEn', index) ?? '',
           creator: creator,
           sourceName: sourceName,
           sourceUrl: sourceUrl,
@@ -405,11 +418,13 @@ class QiblaLandmarkLocalDataSource {
         _fail(index, '$field must contain non-empty strings.');
       }
 
-      if (result.contains(item.trim())) {
+      final normalizedItem = item.trim();
+
+      if (result.contains(normalizedItem)) {
         _fail(index, '$field contains duplicate values.');
       }
 
-      result.add(item.trim());
+      result.add(normalizedItem);
     }
 
     return List.unmodifiable(result);
@@ -423,7 +438,10 @@ class QiblaLandmarkLocalDataSource {
     final value = json[key];
 
     if (value is! String || value.trim().isEmpty) {
-      _fail(index, '$key is required and must be a non-empty string.');
+      _fail(
+        index,
+        '$key is required and must be a non-empty string.',
+      );
     }
 
     return value.trim();
