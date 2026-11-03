@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
@@ -61,8 +60,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     if (oldWidget.isArabic != widget.isArabic ||
         oldWidget.isDark != widget.isDark) {
       // The framework rebuilds this widget automatically.
-      // This method is intentionally reserved for future
-      // synchronization when external settings are introduced.
+      // No additional synchronization is required here.
     }
   }
 
@@ -270,6 +268,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             );
           }
 
+          final message = snapshot.message;
+
           return Scaffold(
             body: Stack(
               children: [
@@ -374,10 +374,10 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                                 },
                               ),
 
-                              if (snapshot.message != null) ...[
+                              if (message != null) ...[
                                 const SizedBox(height: 12),
                                 _MessageCard(
-                                  message: snapshot.message!,
+                                  message: message,
                                 ),
                               ],
 
@@ -800,7 +800,9 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasError = message != null && message!.trim().isNotEmpty;
+    final displayMessage = message?.trim();
+    final hasError =
+        displayMessage != null && displayMessage.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -847,11 +849,11 @@ class _LoadingView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
 
-                  if (hasError) ...[
+                  if (hasError && displayMessage != null) ...[
                     const SizedBox(height: 12),
 
                     Text(
-                      message!,
+                      displayMessage,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
