@@ -1,6 +1,6 @@
 
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_controller.dart';
-import 'app_event_schema_migration_audit_repository_scope_context_registry_module.dart';
+import 'app_event_schema_migration_audit_repository_scope_context.dart';
 
 /// Describes the kind of lifecycle notification being delivered.
 enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryLifecycleNotificationType {
