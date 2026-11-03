@@ -35,6 +35,7 @@ final class AppEventSchemaMigrationAuditScopeAwareExecutionService<
     );
 
     final operationResult = await _scopeExecutor.execute(
+      context: context,
       request: request,
     );
 
