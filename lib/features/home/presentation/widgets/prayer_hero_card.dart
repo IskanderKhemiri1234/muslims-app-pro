@@ -1,4 +1,3 @@
-
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
@@ -77,16 +76,13 @@ class _HeroSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Capture nullable values locally so they can be safely promoted.
     final currentPrayer = nextPrayer;
     final currentTime = nextTime;
 
-    final hasNextPrayer =
-        currentPrayer != null && currentTime != null;
-
-    final prayerLabel = hasNextPrayer
-        ? prayerName(currentPrayer)
-        : (isArabic ? 'غير متاح' : 'Unavailable');
+    final prayerLabel =
+        currentPrayer != null && currentTime != null
+            ? prayerName(currentPrayer)
+            : (isArabic ? 'غير متاح' : 'Unavailable');
 
     final animationKey =
         '${currentPrayer?.name ?? 'unavailable'}_'
@@ -160,7 +156,7 @@ class _HeroSurface extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 7),
-              if (hasNextPrayer)
+              if (currentPrayer != null && currentTime != null)
                 Row(
                   children: [
                     const Icon(
