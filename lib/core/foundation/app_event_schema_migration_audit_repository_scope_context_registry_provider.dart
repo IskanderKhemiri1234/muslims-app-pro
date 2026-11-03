@@ -6,35 +6,30 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry.dart'
 ///
 /// This provider is an access boundary only.
 ///
-/// It does not:
-/// - Create or dispose the registry.
-/// - Register or unregister scope providers.
-/// - Own scope contexts.
-/// - Own repositories.
-/// - Prevent the external registry owner from disposing the registry.
+/// Ownership contract:
+/// - The registry is externally owned.
+/// - This provider owns no registry resources.
+/// - This provider does not register or unregister scope providers.
+/// - This provider does not own scope contexts or repositories.
+/// - Disposing this provider never disposes the injected registry.
+/// - The external registry owner may dispose the registry independently.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
-  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistry _registry;
-
-  bool _isDisposed = false;
-
-  /// Creates an access provider around an externally managed registry.
-  ///
-  /// The registry must be created and managed by the composition root
-  /// or another explicitly designated lifecycle owner.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider({
     required AppEventSchemaMigrationAuditRepositoryScopeContextRegistry
         registry,
   }) : _registry = registry;
 
+  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistry _registry;
+
+  bool _isDisposed = false;
+
   /// Indicates whether this access provider has been disposed.
-  ///
-  /// Disposing this provider does not dispose the injected registry.
   bool get isDisposed => _isDisposed;
 
   /// Returns the injected registry after validating both lifecycle states.
   ///
-  /// Throws a provider exception if either the provider or registry
-  /// is no longer available.
+  /// Throws [AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderException]
+  /// when the provider or external registry is no longer available.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistry get registry {
     _ensureProviderActive();
     _ensureRegistryActive();
@@ -44,25 +39,23 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Provides a registered context through the injected registry.
   ///
-  /// The registry remains responsible for:
-  /// - Scope provider lookup.
-  /// - Scope identity verification.
-  /// - Active-context validation.
+  /// Scope lookup, identity verification, and active-context validation
+  /// remain the responsibility of the registry.
   AppEventSchemaMigrationAuditRepositoryScopeContext provideContext({
     required String scopeId,
   }) {
-    _ensureProviderActive();
-    _ensureRegistryActive();
+    final activeRegistry = registry;
 
-    return _registry.provideContext(scopeId: scopeId);
+    return activeRegistry.provideContext(scopeId: scopeId);
   }
 
   /// Executes a synchronous operation using the injected registry.
   ///
-  /// Both lifecycle states are validated immediately before the callback
-  /// is invoked.
+  /// The provider and registry are checked immediately before invoking
+  /// the callback.
   ///
-  /// This method does not transfer ownership of the registry.
+  /// The callback must not retain the registry beyond its intended
+  /// lifecycle boundary.
   T execute<T>(
     T Function(
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistry registry,
@@ -75,11 +68,13 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Executes an asynchronous operation using the injected registry.
   ///
-  /// The provider and registry are validated before the callback starts.
+  /// The provider and registry are checked before the callback begins.
   ///
-  /// This method does not lock the registry and does not prevent its
-  /// external owner from disposing it while the asynchronous operation
-  /// is pending.
+  /// This method does not lock the registry or prevent its external owner
+  /// from disposing it while the asynchronous operation is pending.
+  ///
+  /// The operation is responsible for handling failures caused by external
+  /// registry disposal during its execution.
   Future<T> executeAsync<T>(
     Future<T> Function(
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistry registry,
@@ -92,10 +87,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider {
 
   /// Disables further access through this provider.
   ///
-  /// This operation is idempotent.
+  /// Idempotent.
   ///
-  /// The injected registry and all resources reachable through it remain
-  /// owned by their original lifecycle owner.
+  /// Does not dispose the injected registry or any resources reachable
+  /// through it.
   void dispose() {
     if (_isDisposed) {
       return;
@@ -132,12 +127,12 @@ enum AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderError {
 /// Exception raised when registry access is unavailable.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderException
     implements Exception {
-  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderError
-      code;
-
   const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderException(
     this.code,
   );
+
+  final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProviderError
+      code;
 
   @override
   String toString() {
