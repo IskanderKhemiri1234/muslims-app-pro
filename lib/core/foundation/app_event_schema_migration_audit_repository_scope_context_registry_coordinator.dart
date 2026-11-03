@@ -13,6 +13,7 @@ import 'app_event_schema_migration_audit_repository_scope_context_registry_modul
 /// - Coalesces concurrent initialization requests.
 /// - Allows a new initialization attempt after a failed attempt.
 /// - Coalesces concurrent disposal requests.
+/// - Allows a new disposal attempt after a failed attempt.
 /// - Handles disposal requested during initialization.
 /// - Applies lifecycle transitions through the lifecycle controller.
 /// - Dispatches accepted and rejected lifecycle notifications.
@@ -152,11 +153,17 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
 
   /// Disposes the registry module and the owned observer dispatcher.
   ///
-  /// Concurrent calls share the same Future.
+  /// Concurrent calls during one attempt share the same Future.
+  ///
+  /// If an attempt fails, a later call can start a new attempt.
   ///
   /// The disposal request is recorded synchronously before cleanup starts.
   /// The external registry is never disposed by this coordinator.
   Future<void> dispose() {
+    if (_disposalSucceeded) {
+      return Future<void>.value();
+    }
+
     final existingCompleter = _disposalCompleter;
 
     if (existingCompleter != null) {
@@ -296,6 +303,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     }
 
     // Emit the terminal transition before disposing the dispatcher.
+    //
+    // If the transition was already accepted during an earlier
+    // disposal attempt, do not emit it again.
     try {
       if (!lifecycleController.isDisposed) {
         final disposedSnapshot = lifecycleController.transitionTo(
@@ -319,6 +329,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
 
     // The registry module owns its provider.
     // Its disposal must not dispose the external registry.
+    //
+    // The module is responsible for retaining its cleanup state
+    // when disposal fails, allowing this call to be retried safely.
     try {
       await _registryModule.dispose();
     } catch (error, stackTrace) {
@@ -327,6 +340,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     }
 
     // Always attempt dispatcher disposal, even if module cleanup failed.
+    //
+    // A successful dispatcher disposal is remembered. A failed disposal
+    // remains eligible for another attempt.
     try {
       _disposeObserverDispatcher();
     } catch (error, stackTrace) {
@@ -335,7 +351,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     }
 
     if (firstError != null) {
-      _completeWithError(
+      _completeDisposalAttemptWithError(
         completer,
         firstError,
         firstStackTrace ?? StackTrace.current,
@@ -385,7 +401,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     }
   }
 
-  /// Disposes the owned dispatcher at most once.
+  /// Disposes the owned dispatcher.
+  ///
+  /// The flag is updated only after disposal has succeeded or the
+  /// dispatcher reports that it is already disposed.
   ///
   /// This does not dispose observers or their external resources.
   void _disposeObserverDispatcher() {
@@ -393,14 +412,35 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       return;
     }
 
-    // Set the flag before invoking dispose to prevent reentrant calls.
-    _dispatcherDisposed = true;
-
     if (_observerDispatcher.isDisposed) {
+      _dispatcherDisposed = true;
       return;
     }
 
     _observerDispatcher.dispose();
+
+    _dispatcherDisposed = _observerDispatcher.isDisposed;
+  }
+
+  /// Releases the current failed disposal attempt so a later call
+  /// to dispose() can create a fresh attempt.
+  ///
+  /// The identity check prevents an older attempt from clearing
+  /// a newer attempt's completer.
+  void _completeDisposalAttemptWithError(
+    Completer<void> completer,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    if (identical(_disposalCompleter, completer)) {
+      _disposalCompleter = null;
+    }
+
+    _completeWithError(
+      completer,
+      error,
+      stackTrace,
+    );
   }
 
   void _completeSuccessfully(
