@@ -33,15 +33,15 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistryException
 
 /// Maintains an isolated registry of audit repository scopes.
 ///
-/// The registry indexes active scopes by normalized identifiers.
+/// The registry indexes registered scopes by normalized identifiers.
 ///
-/// Registered scope identifiers remain reserved until their associated
-/// scopes have been safely disposed and explicitly released.
+/// The registry owns the lifecycle of scopes while they remain registered.
+/// Unregistered scopes are no longer owned by this registry.
 ///
-/// The registry owns the lifecycle of registered scopes, but never
-/// disposes repository instances.
+/// Repository instances are never disposed by this registry.
 ///
-/// Unregistered scopes are not owned by this registry.
+/// A scope identifier remains reserved while its scope is registered or
+/// while an unregistered scope still requires explicit identifier release.
 final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   AppEventSchemaMigrationAuditRepositoryScopeRegistry();
 
@@ -53,7 +53,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
   bool _disposed = false;
 
-  /// Number of currently registered active scopes.
+  /// Number of currently registered, non-disposed scopes.
   int get activeScopeCount {
     _ensureRegistryActive();
     _removeExternallyDisposedScopes();
@@ -71,7 +71,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   /// Indicates whether the registry has been disposed.
   bool get isDisposed => _disposed;
 
-  /// Returns an immutable snapshot of active scope identifiers.
+  /// Returns an immutable snapshot of registered scope identifiers.
   Set<String> get activeScopeIds {
     _ensureRegistryActive();
     _removeExternallyDisposedScopes();
@@ -83,9 +83,9 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
   /// Registers a scope and reserves its identifier.
   ///
-  /// The scope must be active and its identifier must be normalized.
+  /// The scope must be active, not disposed, and have a normalized ID.
   ///
-  /// A reserved identifier cannot be registered again.
+  /// A previously reserved identifier cannot be registered again.
   void register(
     AppEventSchemaMigrationAuditRepositoryScope scope,
   ) {
@@ -119,12 +119,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       );
     }
 
-    // Both mutations happen only after all validation succeeds.
     _reservedScopeIds.add(scopeId);
     _activeScopes[scopeId] = scope;
   }
 
-  /// Retrieves an active scope by its identifier.
+  /// Retrieves a registered active scope by its identifier.
   AppEventSchemaMigrationAuditRepositoryScope get(
     String scopeId,
   ) {
@@ -137,22 +136,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       throw AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
         code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
             .scopeNotFound,
-        message: 'No active scope matches "$normalizedId".',
+        message: 'No registered scope matches "$normalizedId".',
       );
     }
 
-    if (scope.scopeId != normalizedId) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-            .scopeIdentityMismatch,
-        message: 'The registered scope identifier does not match its key.',
-      );
-    }
+    _verifyScopeIdentity(
+      scope: scope,
+      normalizedId: normalizedId,
+    );
 
-    if (scope.isDisposed || !scope.isActive) {
+    if (scope.isDisposed) {
       _activeScopes.remove(normalizedId);
 
-      // Keep the identifier reserved until explicit release.
       throw AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
         code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
             .scopeDisposed,
@@ -160,10 +155,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       );
     }
 
+    if (!scope.isActive) {
+      throw AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
+        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .scopeDisposed,
+        message: 'The scope "$normalizedId" is not currently active.',
+      );
+    }
+
     return scope;
   }
 
-  /// Checks whether an active scope is registered.
+  /// Checks whether a registered scope is active.
   bool contains(String scopeId) {
     _ensureRegistryActive();
 
@@ -174,28 +177,23 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       return false;
     }
 
-    if (scope.scopeId != normalizedId) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-            .scopeIdentityMismatch,
-        message: 'The registered scope identifier does not match its key.',
-      );
-    }
+    _verifyScopeIdentity(
+      scope: scope,
+      normalizedId: normalizedId,
+    );
 
-    if (scope.isDisposed || !scope.isActive) {
+    if (scope.isDisposed) {
       _activeScopes.remove(normalizedId);
-
-      // Reservation is intentionally retained.
       return false;
     }
 
-    return true;
+    return scope.isActive;
   }
 
   /// Checks whether an identifier is reserved.
   ///
-  /// A reserved identifier cannot be reused until its scope is safely
-  /// disposed and its reservation is explicitly released.
+  /// A reserved identifier cannot be reused until its reservation
+  /// has been explicitly released.
   bool isReserved(String scopeId) {
     _ensureRegistryActive();
 
@@ -206,7 +204,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
   /// Disposes and unregisters a scope.
   ///
-  /// The identifier is released only after disposal succeeds.
+  /// The identifier is released only after the scope is confirmed disposed.
+  ///
+  /// If disposal fails, the scope remains registered and reserved so that
+  /// disposal can be retried.
   ///
   /// The repository instance itself remains untouched.
   bool disposeAndUnregister(String scopeId) {
@@ -219,16 +220,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       return false;
     }
 
-    if (scope.scopeId != normalizedId) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-            .scopeIdentityMismatch,
-        message: 'The registered scope identifier does not match its key.',
-      );
-    }
+    _verifyScopeIdentity(
+      scope: scope,
+      normalizedId: normalizedId,
+    );
 
-    // If disposal throws, the registration and reservation are retained.
-    // This allows the owner to inspect the failure and retry safely.
     if (!scope.isDisposed) {
       scope.dispose();
     }
@@ -249,9 +245,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
   /// Unregisters a scope without disposing it.
   ///
+  /// The registry relinquishes ownership of the scope.
+  ///
   /// An active scope remains reserved after unregistration.
   ///
-  /// This registry no longer owns the unregistered scope's lifecycle.
+  /// A disposed scope has its identifier reservation released.
   bool unregister(String scopeId) {
     _ensureRegistryActive();
 
@@ -262,13 +260,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
       return false;
     }
 
-    if (scope.scopeId != normalizedId) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-            .scopeIdentityMismatch,
-        message: 'The registered scope identifier does not match its key.',
-      );
-    }
+    _verifyScopeIdentity(
+      scope: scope,
+      normalizedId: normalizedId,
+    );
 
     _activeScopes.remove(normalizedId);
 
@@ -281,12 +276,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
     return true;
   }
 
-  /// Releases a reserved identifier after safe disposal.
+  /// Releases a reserved identifier after its scope has been disposed.
   ///
-  /// The identifier can only be released when:
-  /// - The supplied scope has the requested identifier.
-  /// - The supplied scope has been disposed.
-  /// - No active scope is registered under that identifier.
+  /// The supplied scope must match the identifier and must be disposed.
+  ///
+  /// No registered scope may still be associated with the identifier.
   bool releaseDisposedScopeId({
     required String scopeId,
     required AppEventSchemaMigrationAuditRepositoryScope scope,
@@ -295,13 +289,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
     final normalizedId = _normalizeScopeId(scopeId);
 
-    if (scope.scopeId != normalizedId) {
-      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
-        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
-            .scopeIdentityMismatch,
-        message: 'The supplied scope does not match the requested identifier.',
-      );
-    }
+    _verifyScopeIdentity(
+      scope: scope,
+      normalizedId: normalizedId,
+    );
 
     if (!scope.isDisposed) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
@@ -326,11 +317,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
   ///
   /// Every registered scope receives a disposal attempt.
   ///
-  /// Previously unregistered scopes are not owned by this registry
-  /// and are therefore not disposed here.
+  /// Successfully disposed scopes are removed and their identifiers
+  /// are released.
   ///
-  /// The registry becomes disposed even if one or more scope disposals fail.
-  /// The first disposal error is rethrown after all scopes are processed.
+  /// Scopes whose disposal fails remain registered and reserved.
+  /// The registry remains active so that a later call can retry cleanup.
+  ///
+  /// Previously unregistered scopes are not owned or disposed here.
+  ///
+  /// Repository instances are never disposed by this operation.
+  ///
+  /// The first disposal error is rethrown after all registered scopes
+  /// have been processed.
   void dispose() {
     if (_disposed) {
       return;
@@ -339,24 +337,53 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
     Object? firstError;
     StackTrace? firstStackTrace;
 
-    final scopes = List<AppEventSchemaMigrationAuditRepositoryScope>.of(
-      _activeScopes.values,
+    final scopes = List<MapEntry<
+        String,
+        AppEventSchemaMigrationAuditRepositoryScope>>.of(
+      _activeScopes.entries,
     );
 
-    for (final scope in scopes) {
+    for (final entry in scopes) {
+      final scopeId = entry.key;
+      final scope = entry.value;
+
       try {
+        _verifyScopeIdentity(
+          scope: scope,
+          normalizedId: scopeId,
+        );
+
         if (!scope.isDisposed) {
           scope.dispose();
         }
+
+        if (!scope.isDisposed) {
+          throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
+            code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+                .scopeDisposed,
+            message: 'A registered scope did not enter the disposed state.',
+          );
+        }
+
+        _activeScopes.remove(scopeId);
+        _reservedScopeIds.remove(scopeId);
       } catch (error, stackTrace) {
         firstError ??= error;
         firstStackTrace ??= stackTrace;
+
+        // A scope may throw after completing its disposal.
+        // Release it only when its final state confirms disposal.
+        if (scope.isDisposed) {
+          _activeScopes.remove(scopeId);
+          _reservedScopeIds.remove(scopeId);
+        }
       }
     }
 
-    _activeScopes.clear();
-    _reservedScopeIds.clear();
-    _disposed = true;
+    if (_activeScopes.isEmpty) {
+      _reservedScopeIds.clear();
+      _disposed = true;
+    }
 
     if (firstError != null && firstStackTrace != null) {
       Error.throwWithStackTrace(
@@ -368,7 +395,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
   /// Removes scopes that have already been disposed externally.
   ///
-  /// Their identifiers remain reserved until explicit release.
+  /// Their identifiers remain reserved until explicitly released.
+  ///
+  /// Non-disposed scopes are retained even when inactive because the
+  /// registry must not silently abandon ownership of those scopes.
   void _removeExternallyDisposedScopes() {
     final disposedIds = _activeScopes.entries
         .where((entry) => entry.value.isDisposed)
@@ -377,6 +407,19 @@ final class AppEventSchemaMigrationAuditRepositoryScopeRegistry {
 
     for (final scopeId in disposedIds) {
       _activeScopes.remove(scopeId);
+    }
+  }
+
+  void _verifyScopeIdentity({
+    required AppEventSchemaMigrationAuditRepositoryScope scope,
+    required String normalizedId,
+  }) {
+    if (scope.scopeId != normalizedId) {
+      throw const AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
+        code: AppEventSchemaMigrationAuditRepositoryScopeRegistryErrorCode
+            .scopeIdentityMismatch,
+        message: 'The registered scope identifier does not match its key.',
+      );
     }
   }
 
