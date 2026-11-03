@@ -58,6 +58,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleExce
 /// - Registered providers, scopes, and repositories remain externally owned.
 /// - Disposing this module never disposes the external registry.
 final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
+  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule({
+    required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryConfiguration
+        configuration,
+  }) : _configuration = configuration;
+
   final AppEventSchemaMigrationAuditRepositoryScopeContextRegistryConfiguration
       _configuration;
 
@@ -75,10 +80,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
   bool _disposeRequested = false;
 
-  AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule({
-    required AppEventSchemaMigrationAuditRepositoryScopeContextRegistryConfiguration
-        configuration,
-  }) : _configuration = configuration;
+  bool _disposalSucceeded = false;
 
   /// Current lifecycle state.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -90,26 +92,32 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
       AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
           .initialized;
 
-  /// Whether the module has been permanently disposed.
+  /// Whether disposal completed successfully.
+  ///
+  /// A disposal request or an unsuccessful cleanup attempt does not
+  /// count as successful disposal.
   bool get isDisposed =>
       _state ==
-      AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
-          .disposed;
+          AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
+              .disposed &&
+      _disposalSucceeded;
 
   /// Whether disposal has been requested.
   ///
-  /// Once disposal is requested, new initialization and provider access
-  /// operations are rejected, even while pending initialization is finishing.
+  /// Once requested, new initialization and provider access operations
+  /// are rejected immediately.
   bool get isDisposalRequested => _disposeRequested;
 
   /// Initializes the module.
   ///
-  /// Concurrent initialization requests share the same future.
-  /// A failed initialization may be retried while the module is active.
+  /// Concurrent initialization requests share the same Future.
   ///
-  /// Initialization cannot be restarted after disposal has been requested.
+  /// A failed initialization can be retried while disposal has not
+  /// been requested.
+  ///
+  /// Initialization cannot restart after disposal has been requested.
   Future<void> initialize() {
-    _ensureNotDisposed();
+    _ensureActive();
 
     if (isInitialized) {
       _validateInitializedResources();
@@ -123,8 +131,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
     }
 
     final completer = Completer<void>();
+    final initializationFuture = completer.future;
 
-    _initializationFuture = completer.future;
+    // Publish the Future before starting asynchronous initialization.
+    _initializationFuture = initializationFuture;
 
     _state =
         AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
@@ -132,7 +142,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
     unawaited(_initializeInternal(completer));
 
-    return completer.future;
+    return initializationFuture;
   }
 
   /// Returns the initialized access provider.
@@ -140,7 +150,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   /// The provider and its registry are validated on every access.
   AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider
       get provider {
-    _ensureNotDisposed();
+    _ensureActive();
 
     if (!isInitialized) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
@@ -176,29 +186,26 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
   /// Provides a context through the initialized access provider.
   ///
-  /// Errors from the provider and registry are intentionally preserved,
-  /// so callers can distinguish missing providers, invalid scope identities,
-  /// and other registry-level failures.
+  /// Registry-level errors are preserved by the provider.
   AppEventSchemaMigrationAuditRepositoryScopeContext provideContext({
     required String scopeId,
   }) {
     return provider.provideContext(scopeId: scopeId);
   }
 
-  /// Disables this module and its owned access provider.
+  /// Disables this module and disposes its owned access provider.
   ///
-  /// Concurrent disposal requests share the same future.
+  /// Concurrent disposal requests share the same Future.
   ///
-  /// Pending initialization is allowed to finish or fail before the owned
-  /// provider is disposed.
+  /// Pending initialization is awaited before provider cleanup.
   ///
-  /// The externally managed registry and all resources reachable through it
-  /// remain untouched.
+  /// The external registry and resources reachable through it
+  /// are never disposed by this module.
   ///
-  /// Once this method is called, new initialization and provider access
-  /// operations are rejected immediately.
+  /// If provider cleanup fails, the failure is propagated and a later
+  /// dispose() call may retry the cleanup.
   Future<void> dispose() {
-    if (isDisposed) {
+    if (_disposalSucceeded) {
       return Future<void>.value();
     }
 
@@ -208,42 +215,37 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
       return pendingDisposal;
     }
 
+    // Reject new initialization and provider access immediately.
     _disposeRequested = true;
 
     final completer = Completer<void>();
+    final disposalFuture = completer.future;
 
-    _disposalFuture = completer.future;
+    _disposalFuture = disposalFuture;
 
     unawaited(_disposeInternal(completer));
 
-    return completer.future;
+    return disposalFuture;
   }
 
-  Future<void> _initializeInternal(Completer<void> completer) async {
+  Future<void> _initializeInternal(
+    Completer<void> completer,
+  ) async {
+    AppEventSchemaMigrationAuditRepositoryScopeContextRegistryProvider?
+        createdProvider;
+
     try {
-      if (_disposeRequested) {
-        throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
-          code:
-              AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
-                  .moduleDisposed,
-        );
-      }
+      _ensureActive();
 
       _configuration.validate();
 
-      if (_disposeRequested) {
-        throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
-          code:
-              AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
-                  .moduleDisposed,
-        );
-      }
+      _ensureActive();
 
-      final createdProvider = _configuration.createProvider();
+      createdProvider = _configuration.createProvider();
 
+      // A disposal request may have been made while the provider
+      // was being created.
       if (_disposeRequested || isDisposed) {
-        createdProvider.dispose();
-
         throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
           code:
               AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
@@ -257,19 +259,18 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
           AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
               .initialized;
 
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
+      _completeSuccessfully(completer);
     } catch (error, stackTrace) {
-      final currentProvider = _provider;
+      // Remove any provider that was partially or fully created.
+      final providerToClean = _provider ?? createdProvider;
 
       _provider = null;
 
       try {
-        currentProvider?.dispose();
+        providerToClean?.dispose();
       } catch (_) {
-        // Provider cleanup is best-effort.
-        // The external registry is never disposed here.
+        // Preserve the original initialization failure.
+        // The external registry remains externally owned.
       }
 
       if (!_disposeRequested && !isDisposed) {
@@ -280,9 +281,11 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
 
       final failure = _createInitializationFailure(error);
 
-      if (!completer.isCompleted) {
-        completer.completeError(failure, stackTrace);
-      }
+      _completeWithError(
+        completer,
+        failure,
+        stackTrace,
+      );
     } finally {
       if (identical(_initializationFuture, completer.future)) {
         _initializationFuture = null;
@@ -290,49 +293,57 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
     }
   }
 
-  Future<void> _disposeInternal(Completer<void> completer) async {
+  Future<void> _disposeInternal(
+    Completer<void> completer,
+  ) async {
     try {
+      // Wait for the initialization operation that was active when
+      // disposal began.
       final pendingInitialization = _initializationFuture;
 
       if (pendingInitialization != null) {
         try {
           await pendingInitialization;
         } catch (_) {
-          // Initialization failure does not prevent disposal.
+          // Initialization failure must not prevent provider cleanup.
         }
       }
 
+      // Initialization is now finished. No new initialization can begin
+      // because _disposeRequested remains true.
       final currentProvider = _provider;
 
-      _provider = null;
+      if (currentProvider != null) {
+        // Do not clear the reference before disposal succeeds.
+        // If disposal throws, a subsequent dispose() can retry it.
+        currentProvider.dispose();
+
+        _provider = null;
+      }
 
       _state =
           AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
               .disposed;
 
-      try {
-        currentProvider?.dispose();
-      } catch (error, stackTrace) {
-        if (!completer.isCompleted) {
-          completer.completeError(error, stackTrace);
-        }
+      _disposalSucceeded = true;
 
-        return;
-      }
-
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
+      _completeSuccessfully(completer);
     } catch (error, stackTrace) {
-      _provider = null;
-
+      // Disposal was requested, but cleanup did not complete.
+      // Keep the provider reference so another dispose() call can retry.
       _state =
           AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleState
-              .disposed;
+              .failed;
 
-      if (!completer.isCompleted) {
-        completer.completeError(error, stackTrace);
+      if (identical(_disposalFuture, completer.future)) {
+        _disposalFuture = null;
       }
+
+      _completeWithError(
+        completer,
+        error,
+        stackTrace,
+      );
     }
   }
 
@@ -365,7 +376,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
   }
 
   void _validateInitializedResources() {
-    _ensureNotDisposed();
+    _ensureActive();
 
     final currentProvider = _provider;
 
@@ -389,12 +400,33 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModule {
     }
   }
 
-  void _ensureNotDisposed() {
+  void _ensureActive() {
     if (_disposeRequested || isDisposed) {
       throw const AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleException(
         code:
             AppEventSchemaMigrationAuditRepositoryScopeContextRegistryModuleError
                 .moduleDisposed,
+      );
+    }
+  }
+
+  void _completeSuccessfully(
+    Completer<void> completer,
+  ) {
+    if (!completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  void _completeWithError(
+    Completer<void> completer,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    if (!completer.isCompleted) {
+      completer.completeError(
+        error,
+        stackTrace,
       );
     }
   }
