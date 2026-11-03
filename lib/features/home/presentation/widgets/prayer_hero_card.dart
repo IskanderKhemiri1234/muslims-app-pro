@@ -67,7 +67,7 @@ class _HeroSurface extends StatelessWidget {
     required this.reduceMotion,
   });
 
-  final Prayer nextPrayer;
+  final Prayer? nextPrayer;
   final DateTime? nextTime;
   final bool isArabic;
   final String Function(Prayer) prayerName;
@@ -77,9 +77,20 @@ class _HeroSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prayerLabel = nextTime == null
-        ? (isArabic ? 'غير متاح' : 'Unavailable')
-        : prayerName(nextPrayer);
+    // Capture nullable values locally so they can be safely promoted.
+    final currentPrayer = nextPrayer;
+    final currentTime = nextTime;
+
+    final hasNextPrayer =
+        currentPrayer != null && currentTime != null;
+
+    final prayerLabel = hasNextPrayer
+        ? prayerName(currentPrayer)
+        : (isArabic ? 'غير متاح' : 'Unavailable');
+
+    final animationKey =
+        '${currentPrayer?.name ?? 'unavailable'}_'
+        '${currentTime?.millisecondsSinceEpoch ?? 'none'}';
 
     return Container(
       padding: const EdgeInsets.all(23),
@@ -133,9 +144,7 @@ class _HeroSurface extends StatelessWidget {
                   );
                 },
                 child: SizedBox(
-                  key: ValueKey<String>(
-                    '${nextPrayer.name}_${nextTime?.millisecondsSinceEpoch}',
-                  ),
+                  key: ValueKey<String>(animationKey),
                   width: double.infinity,
                   child: Text(
                     prayerLabel,
@@ -151,7 +160,7 @@ class _HeroSurface extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 7),
-              if (nextTime != null)
+              if (hasNextPrayer)
                 Row(
                   children: [
                     const Icon(
@@ -161,7 +170,7 @@ class _HeroSurface extends StatelessWidget {
                     ),
                     const SizedBox(width: 7),
                     Text(
-                      formatTime(nextTime),
+                      formatTime(currentTime),
                       textDirection: TextDirection.ltr,
                       style: const TextStyle(
                         color: AppColors.goldLight,
