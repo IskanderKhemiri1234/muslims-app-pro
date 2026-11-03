@@ -28,7 +28,10 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
   /// Returns an immutable snapshot of registered scope identifiers.
   Set<String> get registeredScopeIds {
     _ensureNotDisposed();
-    return UnmodifiableSetView<String>(_providers.keys.toSet());
+
+    return UnmodifiableSetView<String>(
+      _providers.keys.toSet(),
+    );
   }
 
   /// Returns an immutable snapshot of all identifiers reserved during
@@ -37,6 +40,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
   /// Reserved identifiers cannot be reused after unregistration.
   Set<String> get reservedScopeIds {
     _ensureNotDisposed();
+
     return UnmodifiableSetView<String>(
       Set<String>.from(_reservedScopeIds),
     );
@@ -104,9 +108,13 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
     _ensureNotDisposed();
 
     final normalizedScopeId = _normalizeScopeId(scopeId);
-    final provider = getProvider(scopeId: normalizedScopeId);
+    final provider = getProvider(
+      scopeId: normalizedScopeId,
+    );
 
-    final context = provider.provide(scopeId: normalizedScopeId);
+    final context = provider.provide(
+      scopeId: normalizedScopeId,
+    );
 
     if (context.scopeId != normalizedScopeId) {
       throw AppEventSchemaMigrationAuditRepositoryScopeContextRegistryException(
@@ -129,6 +137,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
     _ensureNotDisposed();
 
     final normalizedScopeId = _normalizeScopeId(scopeId);
+
     return _providers.containsKey(normalizedScopeId);
   }
 
@@ -139,6 +148,7 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistry {
     _ensureNotDisposed();
 
     final normalizedScopeId = _normalizeScopeId(scopeId);
+
     return _reservedScopeIds.contains(normalizedScopeId);
   }
 
