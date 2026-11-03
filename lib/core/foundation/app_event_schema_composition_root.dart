@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'app_clock.dart';
@@ -325,6 +324,7 @@ final class AppEventSchemaCompositionRoot {
 
     final normalizedScopeId = _normalizeScopeId(scopeId);
 
+    // Preflight both registries before creating or registering resources.
     if (scopeRegistry.isReserved(normalizedScopeId)) {
       throw AppEventSchemaMigrationAuditRepositoryScopeRegistryException(
         code:
@@ -359,9 +359,12 @@ final class AppEventSchemaCompositionRoot {
     var scopeRegistered = false;
 
     try {
+      // The scope registry becomes the lifecycle owner first.
       scopeRegistry.register(scope);
       scopeRegistered = true;
 
+      // Provider registration is performed only after scope ownership
+      // has been established successfully.
       scopeContextRegistry.register(
         scopeId: normalizedScopeId,
         provider: contextProvider,
@@ -370,23 +373,27 @@ final class AppEventSchemaCompositionRoot {
       return scope;
     } catch (error, stackTrace) {
       if (scopeRegistered) {
+        // Roll back through the owning registry. Do not unregister first:
+        // an active unregistered scope intentionally keeps its ID reserved.
+        //
+        // If disposal fails, ScopeRegistry retains ownership and reservation
+        // so the root's disposal sequence can retry it later.
         try {
           scopeRegistry.disposeAndUnregister(
             normalizedScopeId,
           );
         } catch (_) {
-          // Preserve the original registration error.
-          //
-          // If scope disposal failed, ScopeRegistry retains ownership
-          // and the reservation so root disposal can retry cleanup.
+          // Preserve the original registration error and stack trace.
         }
       } else {
+        // The scope was never accepted by ScopeRegistry, so the root
+        // still has responsibility for cleaning up this unregistered object.
         try {
           if (!scope.isDisposed) {
             scope.dispose();
           }
         } catch (_) {
-          // Preserve the original registration error.
+          // Preserve the original registration error and stack trace.
         }
       }
 
@@ -500,6 +507,7 @@ final class AppEventSchemaCompositionRoot {
 
     final completer = Completer<void>();
 
+    // Stop accepting new work before starting asynchronous cleanup.
     _disposed = true;
     _disposalCompleter = completer;
 
@@ -523,16 +531,22 @@ final class AppEventSchemaCompositionRoot {
     Object? firstError;
     StackTrace? firstStackTrace;
 
-    // 1. Dispose the coordinator first.
+    // 1. Coordinator.
     try {
       await coordinator.dispose();
       _coordinatorDisposalSucceeded = coordinator.isDisposed;
+
+      if (!_coordinatorDisposalSucceeded) {
+        throw StateError(
+          'Coordinator disposal completed without reaching its disposed state.',
+        );
+      }
     } catch (error, stackTrace) {
       firstError ??= error;
       firstStackTrace ??= stackTrace;
     }
 
-    // 2. Dispose the context registry.
+    // 2. ScopeContextRegistry.
     //
     // This registry owns provider associations only.
     try {
@@ -542,9 +556,10 @@ final class AppEventSchemaCompositionRoot {
       firstStackTrace ??= stackTrace;
     }
 
-    // 3. Dispose the legacy scope registry.
+    // 3. ScopeRegistry.
     //
-    // This registry owns the registered scopes and is retryable.
+    // This registry owns the registered scopes and supports retryable
+    // disposal when one or more scope disposals fail.
     try {
       scopeRegistry.dispose();
     } catch (error, stackTrace) {
