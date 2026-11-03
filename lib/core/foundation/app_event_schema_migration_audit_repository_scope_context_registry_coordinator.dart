@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'app_event_schema_migration_audit_repository_scope_context_registry_lifecycle_configuration.dart';
@@ -281,6 +280,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
     Object? firstError;
     StackTrace? firstStackTrace;
 
+    // Initialization and disposal must not run concurrently against
+    // the same registry module.
     final initializationCompleter = _initializationCompleter;
 
     if (initializationCompleter != null) {
@@ -291,6 +292,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       }
     }
 
+    // Preserve the terminal lifecycle notification before disposing
+    // the observer dispatcher.
     try {
       if (!lifecycleController.isDisposed) {
         final disposedSnapshot = lifecycleController.transitionTo(
@@ -312,6 +315,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       firstStackTrace ??= stackTrace;
     }
 
+    // The module owns its provider. Its dispose operation must be
+    // safe to retry after partial cleanup.
     try {
       await _registryModule.dispose();
     } catch (error, stackTrace) {
@@ -319,6 +324,8 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       firstStackTrace ??= stackTrace;
     }
 
+    // The dispatcher is independently owned by this coordinator.
+    // Always attempt its cleanup, even if module disposal failed.
     try {
       _disposeObserverDispatcher();
     } catch (error, stackTrace) {
@@ -335,6 +342,20 @@ final class AppEventSchemaMigrationAuditRepositoryScopeContextRegistryCoordinato
       return;
     }
 
+    // Do not report successful disposal unless both owned resources
+    // are confirmed disposed.
+    if (!_observerDispatcher.isDisposed) {
+      _completeDisposalAttemptWithError(
+        completer,
+        StateError(
+          'The observer dispatcher did not enter the disposed state.',
+        ),
+        StackTrace.current,
+      );
+      return;
+    }
+
+    _dispatcherDisposed = true;
     _disposalSucceeded = true;
 
     _completeSuccessfully(completer);
