@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,7 +18,8 @@ class QuranPage extends StatefulWidget {
   State<QuranPage> createState() => _QuranPageState();
 }
 
-class _QuranPageState extends State<QuranPage> {
+class _QuranPageState extends State<QuranPage>
+    with WidgetsBindingObserver {
   static const int _totalPages = 604;
   static const int _dailyTarget = 5;
 
@@ -150,36 +150,58 @@ class _QuranPageState extends State<QuranPage> {
   ];
 
   static const List<int> _juzPages = [
-    1, 22, 42, 62, 82,
-    102, 121, 142, 162, 182,
-    201, 222, 242, 262, 282,
-    302, 322, 342, 362, 382,
-    402, 422, 442, 462, 482,
-    502, 522, 542, 562, 582,
+    1,
+    22,
+    42,
+    62,
+    82,
+    102,
+    121,
+    142,
+    162,
+    182,
+    201,
+    222,
+    242,
+    262,
+    282,
+    302,
+    322,
+    342,
+    362,
+    382,
+    402,
+    422,
+    442,
+    462,
+    482,
+    502,
+    522,
+    542,
+    562,
+    582,
   ];
 
   int _currentPage = 1;
   int _completedKhatmas = 0;
 
-  Set<int> _completedPages = {};
-  Set<int> _todayPages = {};
-  Set<int> _bookmarks = {};
+  Set<int> _completedPages = <int>{};
+  Set<int> _todayPages = <int>{};
+  Set<int> _bookmarks = <int>{};
 
   bool _isLoading = true;
   bool _isSaving = false;
 
   Timer? _saveDebounce;
+
   Future<void> _writeQueue = Future<void>.value();
 
-  String get _todayStorageKey {
-    final now = DateTime.now();
-    final date =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    return 'quran_daily_pages_$date';
-  }
+  String? _loadedDailyKey;
+
+  String get _todayStorageKey => _dateKeyFor(DateTime.now());
 
   double get _khatmaProgress =>
-      _completedPages.length / _totalPages;
+      (_completedPages.length / _totalPages).clamp(0.0, 1.0);
 
   double get _dailyProgress =>
       (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
@@ -193,19 +215,45 @@ class _QuranPageState extends State<QuranPage> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
     _restoreData();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _flushCurrentPage();
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      _refreshTodayPages();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
     _saveDebounce?.cancel();
+    _saveDebounce = null;
+
+    if (!_isLoading) {
+      unawaited(_savePage(_currentPage));
+    }
+
     super.dispose();
   }
 
   String _dateKeyFor(DateTime date) {
-    return 'quran_daily_pages_${date.year}-'
-        '${date.month.toString().padLeft(2, '0')}-'
-        '${date.day.toString().padLeft(2, '0')}';
+    final year = date.year.toString();
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+
+    return 'quran_daily_pages_$year-$month-$day';
   }
 
   Set<int> _parsePages(List<String> values) {
@@ -218,14 +266,20 @@ class _QuranPageState extends State<QuranPage> {
 
   List<String> _serializePages(Set<int> pages) {
     final sorted = pages.toList()..sort();
+
     return sorted.map((page) => page.toString()).toList();
   }
 
-  Future<void> _queueWrite(Future<void> Function() operation) {
-    _writeQueue = _writeQueue
-        .catchError((_) {})
+  Future<void> _queueWrite(
+    Future<void> Function() operation,
+  ) {
+    final nextWrite = _writeQueue
+        .catchError((Object _) {})
         .then((_) => operation());
-    return _writeQueue;
+
+    _writeQueue = nextWrite;
+
+    return nextWrite;
   }
 
   Future<void> _restoreData() async {
@@ -235,16 +289,21 @@ class _QuranPageState extends State<QuranPage> {
       final savedPage = preferences.getInt(_savedPageKey) ?? 1;
 
       final completed = _parsePages(
-        preferences.getStringList(_completedPagesKey) ?? [],
+        preferences.getStringList(_completedPagesKey) ?? <String>[],
       );
 
+      final dailyKey = _todayStorageKey;
+
       final today = _parsePages(
-        preferences.getStringList(_todayStorageKey) ?? [],
+        preferences.getStringList(dailyKey) ?? <String>[],
       );
 
       final bookmarks = _parsePages(
-        preferences.getStringList(_bookmarksKey) ?? [],
+        preferences.getStringList(_bookmarksKey) ?? <String>[],
       );
+
+      final completedKhatmas =
+          preferences.getInt(_completedKhatmasKey) ?? 0;
 
       if (!mounted) return;
 
@@ -253,15 +312,45 @@ class _QuranPageState extends State<QuranPage> {
         _completedPages = completed;
         _todayPages = today;
         _bookmarks = bookmarks;
-        _completedKhatmas =
-            preferences.getInt(_completedKhatmasKey) ?? 0;
+        _completedKhatmas = completedKhatmas < 0 ? 0 : completedKhatmas;
+        _loadedDailyKey = dailyKey;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
 
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+      });
+
       _showMessage('تعذر تحميل بيانات القراءة المحفوظة');
+    }
+  }
+
+  Future<void> _refreshTodayPages() async {
+    if (_isLoading || !mounted) return;
+
+    final currentDailyKey = _todayStorageKey;
+
+    if (_loadedDailyKey == currentDailyKey) return;
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      final today = _parsePages(
+        preferences.getStringList(currentDailyKey) ?? <String>[],
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _todayPages = today;
+        _loadedDailyKey = currentDailyKey;
+      });
+    } catch (_) {
+      if (mounted) {
+        _showMessage('تعذر تحديث الورد اليومي');
+      }
     }
   }
 
@@ -283,115 +372,170 @@ class _QuranPageState extends State<QuranPage> {
   }
 
   Future<void> _savePage(int page) async {
+    final safePage = page.clamp(1, _totalPages).toInt();
+
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
-        await preferences.setInt(_savedPageKey, page);
+
+        await preferences.setInt(_savedPageKey, safePage);
       });
     } catch (_) {
       _showMessage('تعذر حفظ موضع القراءة');
     }
   }
 
-  void _selectPage(int page, {bool saveImmediately = false}) {
-    if (page < 1 || page > _totalPages) return;
-    if (page == _currentPage) return;
+  void _flushCurrentPage() {
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
 
-    setState(() => _currentPage = page);
+    if (!_isLoading) {
+      unawaited(_savePage(_currentPage));
+    }
+  }
+
+  void _selectPage(
+    int page, {
+    bool saveImmediately = false,
+  }) {
+    if (page < 1 || page > _totalPages) return;
+
+    if (page != _currentPage) {
+      setState(() {
+        _currentPage = page;
+      });
+    }
 
     _saveDebounce?.cancel();
+    _saveDebounce = null;
 
     if (saveImmediately) {
       unawaited(_savePage(page));
-    } else {
-      _saveDebounce = Timer(
-        const Duration(milliseconds: 450),
-        () => unawaited(_savePage(page)),
-      );
+      return;
     }
+
+    _saveDebounce = Timer(
+      const Duration(milliseconds: 450),
+      () {
+        _saveDebounce = null;
+        unawaited(_savePage(_currentPage));
+      },
+    );
   }
 
   void _changePage(int amount) {
     final newPage =
         (_currentPage + amount).clamp(1, _totalPages).toInt();
 
-    _selectPage(newPage, saveImmediately: true);
+    _selectPage(
+      newPage,
+      saveImmediately: true,
+    );
   }
 
   Future<void> _markCurrentPageRead() async {
-    if (_currentPageCompleted || _isSaving) return;
-
-    setState(() => _isSaving = true);
+    if (_currentPageCompleted || _isSaving || _isLoading) return;
 
     final pageToMark = _currentPage;
 
+    setState(() {
+      _isSaving = true;
+    });
+
     try {
-      final preferences = await SharedPreferences.getInstance();
-
-      final completed = Set<int>.from(_completedPages)
-        ..add(pageToMark);
-
-      final today = Set<int>.from(_todayPages)
-        ..add(pageToMark);
-
-      final khatmaFinished = completed.length >= _totalPages;
-      final newKhatmaCount =
-          _completedKhatmas + (khatmaFinished ? 1 : 0);
-
-      if (khatmaFinished) {
-        completed.clear();
-      }
+      await _refreshTodayPages();
 
       await _queueWrite(() async {
-        await preferences.setStringList(
+        final preferences = await SharedPreferences.getInstance();
+
+        final completed = Set<int>.from(_completedPages)
+          ..add(pageToMark);
+
+        final dailyKey = _todayStorageKey;
+
+        final today = _loadedDailyKey == dailyKey
+            ? Set<int>.from(_todayPages)
+            : _parsePages(
+                preferences.getStringList(dailyKey) ?? <String>[],
+              );
+
+        today.add(pageToMark);
+
+        final khatmaFinished = completed.length >= _totalPages;
+
+        final newKhatmaCount =
+            _completedKhatmas + (khatmaFinished ? 1 : 0);
+
+        if (khatmaFinished) {
+          completed.clear();
+        }
+
+        final completedSaved = await preferences.setStringList(
           _completedPagesKey,
           _serializePages(completed),
         );
 
-        await preferences.setStringList(
-          _dateKeyFor(DateTime.now()),
+        if (!completedSaved) {
+          throw StateError('Failed to save completed pages');
+        }
+
+        final todaySaved = await preferences.setStringList(
+          dailyKey,
           _serializePages(today),
         );
 
+        if (!todaySaved) {
+          throw StateError('Failed to save daily pages');
+        }
+
         if (khatmaFinished) {
-          await preferences.setInt(
+          final khatmaSaved = await preferences.setInt(
             _completedKhatmasKey,
             newKhatmaCount,
           );
+
+          if (!khatmaSaved) {
+            throw StateError('Failed to save khatma count');
+          }
+        }
+
+        if (!mounted) return;
+
+        setState(() {
+          _completedPages = completed;
+          _todayPages = today;
+          _loadedDailyKey = dailyKey;
+          _completedKhatmas = newKhatmaCount;
+        });
+
+        if (khatmaFinished) {
+          await _showKhatmaDialog(newKhatmaCount);
+        } else {
+          _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
         }
       });
-
-      if (!mounted) return;
-
-      setState(() {
-        _completedPages = completed;
-        _todayPages = today;
-        _completedKhatmas = newKhatmaCount;
-      });
-
-      if (khatmaFinished) {
-        await _showKhatmaDialog(newKhatmaCount);
-      } else {
-        _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
-      }
     } catch (_) {
       _showMessage('تعذر حفظ تقدم القراءة. حاول مرة أخرى.');
     } finally {
       if (mounted) {
-        setState(() => _isSaving = false);
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
 
   Future<void> _showKhatmaDialog(int count) async {
+    if (!mounted) return;
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: Theme.of(dialogContext).brightness ==
-                  Brightness.dark
-              ? const Color(0xFF1B2821)
-              : const Color(0xFFFFFCF3),
+          backgroundColor:
+              Theme.of(dialogContext).brightness == Brightness.dark
+                  ? const Color(0xFF1B2821)
+                  : const Color(0xFFFFFCF3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -414,7 +558,9 @@ class _QuranPageState extends State<QuranPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: _green,
               ),
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
               child: const Text('الحمد لله'),
             ),
           ],
@@ -424,101 +570,141 @@ class _QuranPageState extends State<QuranPage> {
   }
 
   Future<void> _undoCurrentPageRead() async {
-    if (!_currentPageCompleted || _isSaving) return;
+    if (!_currentPageCompleted || _isSaving || _isLoading) return;
 
     final pageToUndo = _currentPage;
-    setState(() => _isSaving = true);
+
+    setState(() {
+      _isSaving = true;
+    });
 
     try {
-      final preferences = await SharedPreferences.getInstance();
-
-      final completed = Set<int>.from(_completedPages)
-        ..remove(pageToUndo);
-
-      final today = Set<int>.from(_todayPages)
-        ..remove(pageToUndo);
+      await _refreshTodayPages();
 
       await _queueWrite(() async {
-        await preferences.setStringList(
+        final preferences = await SharedPreferences.getInstance();
+
+        final completed = Set<int>.from(_completedPages)
+          ..remove(pageToUndo);
+
+        final dailyKey = _todayStorageKey;
+
+        final today = _loadedDailyKey == dailyKey
+            ? Set<int>.from(_todayPages)
+            : _parsePages(
+                preferences.getStringList(dailyKey) ?? <String>[],
+              );
+
+        today.remove(pageToUndo);
+
+        final completedSaved = await preferences.setStringList(
           _completedPagesKey,
           _serializePages(completed),
         );
 
-        await preferences.setStringList(
-          _dateKeyFor(DateTime.now()),
+        if (!completedSaved) {
+          throw StateError('Failed to save completed pages');
+        }
+
+        final todaySaved = await preferences.setStringList(
+          dailyKey,
           _serializePages(today),
         );
+
+        if (!todaySaved) {
+          throw StateError('Failed to save daily pages');
+        }
+
+        if (!mounted) return;
+
+        setState(() {
+          _completedPages = completed;
+          _todayPages = today;
+          _loadedDailyKey = dailyKey;
+        });
+
+        _showMessage('تم إلغاء تسجيل قراءة الصفحة');
       });
-
-      if (!mounted) return;
-
-      setState(() {
-        _completedPages = completed;
-        _todayPages = today;
-      });
-
-      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
     } catch (_) {
       _showMessage('تعذر تحديث سجل القراءة');
     } finally {
       if (mounted) {
-        setState(() => _isSaving = false);
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
 
   Future<void> _toggleBookmark() async {
-    if (_isSaving) return;
+    if (_isLoading) return;
 
     final page = _currentPage;
-    final updated = Set<int>.from(_bookmarks);
-
-    if (updated.contains(page)) {
-      updated.remove(page);
-    } else {
-      updated.add(page);
-    }
 
     try {
-      final preferences = await SharedPreferences.getInstance();
-
       await _queueWrite(() async {
-        await preferences.setStringList(
+        final preferences = await SharedPreferences.getInstance();
+
+        final updated = Set<int>.from(_bookmarks);
+
+        final wasBookmarked = updated.contains(page);
+
+        if (wasBookmarked) {
+          updated.remove(page);
+        } else {
+          updated.add(page);
+        }
+
+        final saved = await preferences.setStringList(
           _bookmarksKey,
           _serializePages(updated),
         );
+
+        if (!saved) {
+          throw StateError('Failed to save bookmarks');
+        }
+
+        if (!mounted) return;
+
+        setState(() {
+          _bookmarks = updated;
+        });
+
+        _showMessage(
+          wasBookmarked
+              ? 'تم حذف العلامة المرجعية'
+              : 'تم حفظ الصفحة في العلامات المرجعية',
+        );
       });
-
-      if (!mounted) return;
-
-      setState(() => _bookmarks = updated);
-
-      _showMessage(
-        updated.contains(page)
-            ? 'تم حفظ الصفحة في العلامات المرجعية'
-            : 'تم حذف العلامة المرجعية',
-      );
     } catch (_) {
       _showMessage('تعذر حفظ العلامة المرجعية');
     }
   }
 
   Future<void> _removeBookmark(int page) async {
-    final updated = Set<int>.from(_bookmarks)..remove(page);
+    if (_isLoading) return;
 
     try {
-      final preferences = await SharedPreferences.getInstance();
-
       await _queueWrite(() async {
-        await preferences.setStringList(
+        final preferences = await SharedPreferences.getInstance();
+
+        final updated = Set<int>.from(_bookmarks)..remove(page);
+
+        final saved = await preferences.setStringList(
           _bookmarksKey,
           _serializePages(updated),
         );
+
+        if (!saved) {
+          throw StateError('Failed to remove bookmark');
+        }
+
+        if (!mounted) return;
+
+        setState(() {
+          _bookmarks = updated;
+        });
       });
-
-      if (!mounted) return;
-
-      setState(() => _bookmarks = updated);
     } catch (_) {
       _showMessage('تعذر حذف العلامة المرجعية');
     }
@@ -526,6 +712,7 @@ class _QuranPageState extends State<QuranPage> {
 
   Future<void> _openBookmarks() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final pages = _bookmarks.toList()..sort();
 
     final selectedPage = await showModalBottomSheet<int>(
@@ -545,8 +732,9 @@ class _QuranPageState extends State<QuranPage> {
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: pages.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1),
+                  separatorBuilder: (_, __) {
+                    return const Divider(height: 1);
+                  },
                   itemBuilder: (context, index) {
                     final page = pages[index];
 
@@ -564,8 +752,9 @@ class _QuranPageState extends State<QuranPage> {
                             ? 'الصفحة الحالية'
                             : 'الانتقال إلى الصفحة',
                       ),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, page),
+                      onTap: () {
+                        Navigator.pop(sheetContext, page);
+                      },
                       trailing: IconButton(
                         tooltip: 'حذف العلامة',
                         icon: const Icon(
@@ -574,11 +763,13 @@ class _QuranPageState extends State<QuranPage> {
                         ),
                         onPressed: () async {
                           await _removeBookmark(page);
-                          if (sheetContext.mounted) {
-                            Navigator.pop(sheetContext);
-                          }
+
+                          if (!sheetContext.mounted) return;
+
+                          Navigator.pop(sheetContext);
+
                           if (mounted) {
-                            _openBookmarks();
+                            await _openBookmarks();
                           }
                         },
                       ),
@@ -590,7 +781,10 @@ class _QuranPageState extends State<QuranPage> {
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage, saveImmediately: true);
+      _selectPage(
+        selectedPage,
+        saveImmediately: true,
+      );
     }
   }
 
@@ -599,56 +793,67 @@ class _QuranPageState extends State<QuranPage> {
       text: _currentPage.toString(),
     );
 
-    final selectedPage = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('الانتقال إلى صفحة'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            decoration: const InputDecoration(
-              hintText: 'من 1 إلى 604',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: _green,
+    int? selectedPage;
+
+    try {
+      selectedPage = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('الانتقال إلى صفحة'),
+            content: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                hintText: 'من 1 إلى 604',
+                border: OutlineInputBorder(),
               ),
-              onPressed: () {
-                final page = int.tryParse(controller.text.trim());
-
-                if (page == null ||
-                    page < 1 ||
-                    page > _totalPages) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('رقم الصفحة غير صحيح'),
-                    ),
-                  );
-                  return;
-                }
-
-                Navigator.pop(dialogContext, page);
-              },
-              child: const Text('انتقال'),
             ),
-          ],
-        );
-      },
-    );
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _green,
+                ),
+                onPressed: () {
+                  final page = int.tryParse(
+                    controller.text.trim(),
+                  );
 
-    controller.dispose();
+                  if (page == null ||
+                      page < 1 ||
+                      page > _totalPages) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('رقم الصفحة غير صحيح'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(dialogContext, page);
+                },
+                child: const Text('انتقال'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage, saveImmediately: true);
+      _selectPage(
+        selectedPage,
+        saveImmediately: true,
+      );
     }
   }
 
@@ -682,15 +887,15 @@ class _QuranPageState extends State<QuranPage> {
                     children: [
                       ListView.separated(
                         itemCount: _surahs.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1),
+                        separatorBuilder: (_, __) {
+                          return const Divider(height: 1);
+                        },
                         itemBuilder: (context, index) {
                           final surah = _surahs[index];
 
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  const Color(0x1FD8B66A),
+                              backgroundColor: const Color(0x1FD8B66A),
                               child: Text(
                                 '${index + 1}',
                                 style: const TextStyle(
@@ -707,22 +912,24 @@ class _QuranPageState extends State<QuranPage> {
                               ),
                             ),
                             trailing: Text('صفحة ${surah.page}'),
-                            onTap: () => Navigator.pop(
-                              sheetContext,
-                              surah.page,
-                            ),
+                            onTap: () {
+                              Navigator.pop(
+                                sheetContext,
+                                surah.page,
+                              );
+                            },
                           );
                         },
                       ),
                       ListView.separated(
                         itemCount: _juzPages.length,
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1),
+                        separatorBuilder: (_, __) {
+                          return const Divider(height: 1);
+                        },
                         itemBuilder: (context, index) {
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  const Color(0x1FD8B66A),
+                              backgroundColor: const Color(0x1FD8B66A),
                               child: Text(
                                 '${index + 1}',
                                 style: const TextStyle(
@@ -735,10 +942,12 @@ class _QuranPageState extends State<QuranPage> {
                             trailing: Text(
                               'صفحة ${_juzPages[index]}',
                             ),
-                            onTap: () => Navigator.pop(
-                              sheetContext,
-                              _juzPages[index],
-                            ),
+                            onTap: () {
+                              Navigator.pop(
+                                sheetContext,
+                                _juzPages[index],
+                              );
+                            },
                           );
                         },
                       ),
@@ -753,7 +962,10 @@ class _QuranPageState extends State<QuranPage> {
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage, saveImmediately: true);
+      _selectPage(
+        selectedPage,
+        saveImmediately: true,
+      );
     }
   }
 
@@ -1068,7 +1280,7 @@ class _QuranPageState extends State<QuranPage> {
               child: Directionality(
                 textDirection: TextDirection.rtl,
                 child: QuranMadinaFlutter(
-                  key: ValueKey(_currentPage),
+                  key: ValueKey<int>(_currentPage),
                   page: _currentPage,
                   bundled: true,
                   headless: true,
@@ -1251,6 +1463,7 @@ class _QuranPageState extends State<QuranPage> {
                   label: 'رقم الصفحة',
                   onTap: _goToPage,
                 ),
+              ),
             ],
           ),
         ],
@@ -1288,12 +1501,12 @@ class _QuranPageState extends State<QuranPage> {
         actions: [
           IconButton(
             tooltip: 'العلامات المرجعية',
-            onPressed: _openBookmarks,
+            onPressed: _isLoading ? null : _openBookmarks,
             icon: const Icon(Icons.bookmarks_outlined),
           ),
           IconButton(
             tooltip: 'فهرس المصحف',
-            onPressed: _openIndex,
+            onPressed: _isLoading ? null : _openIndex,
             icon: const Icon(Icons.toc_rounded),
           ),
         ],
