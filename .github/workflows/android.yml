@@ -71,6 +71,63 @@ jobs:
           test -d assets/quran_madina/assets/img
           test -d assets/quran_madina/dist
 
+      - name: Diagnose Android XML resources
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          root = Path("android/app/src/main")
+          failed = []
+
+          for path in sorted(root.rglob("*.xml")):
+              raw = path.read_bytes()
+
+              print(f"\n--- FILE: {path} ---")
+              print("FIRST 200 BYTES:", repr(raw[:200]))
+
+              try:
+                  content = raw.decode("utf-8-sig")
+
+                  declarations = [
+                      index
+                      for index in range(len(content))
+                      if content.startswith("<?xml", index)
+                  ]
+
+                  print("XML DECLARATION POSITIONS:", declarations)
+
+                  if len(declarations) > 1:
+                      raise ValueError(
+                          "Multiple XML declarations found."
+                      )
+
+                  if declarations and declarations[0] != 0:
+                      raise ValueError(
+                          "XML declaration is not at the beginning "
+                          "of the file."
+                      )
+
+                  ET.fromstring(content)
+                  print("XML STATUS: VALID")
+
+              except Exception as error:
+                  print("XML STATUS: INVALID")
+                  print("ERROR:", error)
+                  failed.append(path)
+
+          if failed:
+              print("\nINVALID XML FILES:")
+              for path in failed:
+                  print(path)
+
+              raise SystemExit(
+                  f"XML validation failed: {len(failed)} file(s)."
+              )
+
+          print("\nAll Android XML files passed validation.")
+          PY
+
       - name: Analyze Dart code
         run: flutter analyze
 
