@@ -1,4 +1,3 @@
-
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,34 +25,6 @@ class HomeScreenPrototype extends StatelessWidget {
 
   String _t(String ar, String en) => isArabic ? ar : en;
 
-  String _prayerName(Prayer? prayer) {
-    switch (prayer) {
-      case Prayer.fajr:
-        return _t('الفجر', 'Fajr');
-      case Prayer.sunrise:
-        return _t('الشروق', 'Sunrise');
-      case Prayer.dhuhr:
-        return _t('الظهر', 'Dhuhr');
-      case Prayer.asr:
-        return _t('العصر', 'Asr');
-      case Prayer.maghrib:
-        return _t('المغرب', 'Maghrib');
-      case Prayer.isha:
-        return _t('العشاء', 'Isha');
-      default:
-        return _t('غير متاح', 'Unavailable');
-    }
-  }
-
-  String _formatTime(DateTime? time) {
-    if (time == null) return '--:--';
-
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-
-    return '$hour:$minute';
-  }
-
   void _openPage(BuildContext context, Widget page) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -64,7 +35,10 @@ class HomeScreenPrototype extends StatelessWidget {
 
   void _showMessage(BuildContext context, String message) {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
+
+    if (messenger == null) {
+      return;
+    }
 
     messenger
       ..hideCurrentSnackBar()
@@ -79,11 +53,9 @@ class HomeScreenPrototype extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Directionality(
-      textDirection:
-          isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
@@ -132,7 +104,10 @@ class HomeScreenPrototype extends StatelessWidget {
                       const SizedBox(height: 30),
 
                       _SectionTitle(
-                        title: _t('مساحتك اليومية', 'Your daily space'),
+                        title: _t(
+                          'مساحتك اليومية',
+                          'Your daily space',
+                        ),
                         subtitle: _t('كل ما تحتاجه', 'Explore'),
                       ),
 
@@ -140,10 +115,14 @@ class HomeScreenPrototype extends StatelessWidget {
 
                       _QuickActions(
                         isArabic: isArabic,
-                        onQuran: () =>
-                            _openPage(context, const QuranPage()),
-                        onQibla: () =>
-                            _openPage(context, const QiblaPage()),
+                        onQuran: () => _openPage(
+                          context,
+                          const QuranPage(),
+                        ),
+                        onQibla: () => _openPage(
+                          context,
+                          const QiblaPage(),
+                        ),
                         onAdhkar: onAdhkarTap ??
                             () => _showMessage(
                                   context,
@@ -164,16 +143,24 @@ class HomeScreenPrototype extends StatelessWidget {
                       const SizedBox(height: 30),
 
                       _SectionTitle(
-                        title: _t('رحلتك مع القرآن', 'Your Quran journey'),
-                        subtitle: _t('متابعة القراءة', 'Continue reading'),
+                        title: _t(
+                          'رحلتك مع القرآن',
+                          'Your Quran journey',
+                        ),
+                        subtitle: _t(
+                          'متابعة القراءة',
+                          'Continue reading',
+                        ),
                       ),
 
                       const SizedBox(height: 15),
 
                       _QuranCard(
                         isArabic: isArabic,
-                        onTap: () =>
-                            _openPage(context, const QuranPage()),
+                        onTap: () => _openPage(
+                          context,
+                          const QuranPage(),
+                        ),
                       ),
 
                       const SizedBox(height: 28),
@@ -303,7 +290,9 @@ class _Header extends StatelessWidget {
 }
 
 class _Greeting extends StatelessWidget {
-  const _Greeting({required this.isArabic});
+  const _Greeting({
+    required this.isArabic,
+  });
 
   final bool isArabic;
 
@@ -360,7 +349,7 @@ class _PrayerCard extends StatelessWidget {
         ? null
         : nextPrayerTime.difference(DateTime.now());
 
-    final validRemaining =
+    final hasValidRemaining =
         remaining != null && !remaining.isNegative;
 
     return Container(
@@ -445,7 +434,6 @@ class _PrayerCard extends StatelessWidget {
               color: AppColors.gold,
               fontSize: 38,
               fontWeight: FontWeight.w700,
-              fontFeatures: [],
             ),
           ),
 
@@ -470,7 +458,7 @@ class _PrayerCard extends StatelessWidget {
 
               Expanded(
                 child: Text(
-                  validRemaining
+                  hasValidRemaining
                       ? _remainingText(remaining)
                       : _t(
                           'سيظهر العد التنازلي عند توفر المواقيت',
@@ -519,7 +507,9 @@ class _PrayerCard extends StatelessWidget {
   }
 
   String _formatTime(DateTime? time) {
-    if (time == null) return '--:--';
+    if (time == null) {
+      return '--:--';
+    }
 
     return '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}';
@@ -528,7 +518,6 @@ class _PrayerCard extends StatelessWidget {
   String _remainingText(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-
     final seconds = duration.inSeconds.remainder(60);
 
     if (isArabic) {
@@ -638,7 +627,9 @@ class _QuickActions extends StatelessWidget {
             childAspectRatio: columns == 2 ? 1.35 : 0.85,
           ),
           itemBuilder: (context, index) {
-            return _QuickActionTile(action: actions[index]);
+            return _QuickActionTile(
+              action: actions[index],
+            );
           },
         );
       },
@@ -837,9 +828,9 @@ class _DailyReminder extends StatelessWidget {
 
               const SizedBox(width: 9),
 
-              Text(
-                isArabic ? 'تذكير اليوم' : 'Daily reminder',
-                style: const TextStyle(
+              const Text(
+                'تذكير اليوم',
+                style: TextStyle(
                   color: AppColors.gold,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
