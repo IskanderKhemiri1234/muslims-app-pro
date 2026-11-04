@@ -1,18 +1,33 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+
+    <!-- Mumin Pro Launch Theme -->
+    <style name="LaunchTheme"
+        parent="@android:style/Theme.Light.NoTitleBar">
+
         <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@drawable/launch_background</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">#071C17</item>
+        <item name="android:statusBarColor">#071C17</item>
         <item name="android:navigationBarColor">#071C17</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+
     </style>
 
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <!-- Mumin Pro Normal Theme -->
+    <style name="NormalTheme"
+        parent="@android:style/Theme.Light.NoTitleBar">
+
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">#071C17</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#071C17</item>
         <item name="android:navigationBarColor">#071C17</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+
     </style>
+
 </resources>
