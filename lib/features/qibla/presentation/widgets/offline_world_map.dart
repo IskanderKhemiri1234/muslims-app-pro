@@ -1,10 +1,8 @@
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:dv_geo_core/dv_geo_core.dart';
 import 'package:dv_map/maps/world/50m.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 /// Offline world atlas using Natural Earth 50m country boundaries.
 ///
@@ -46,16 +44,30 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   String? _selectedCountry;
   double _zoom = 1.0;
 
+  double _normalizeZoom(double value) {
+    if (!value.isFinite) {
+      return 1.0;
+    }
+
+    return value.clamp(_minZoom, _maxZoom).toDouble();
+  }
+
+  Matrix4 _createZoomMatrix(double zoom) {
+    return Matrix4.diagonal3Values(
+      zoom,
+      zoom,
+      1.0,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
 
-    _zoom = widget.initialScale
-        .clamp(_minZoom, _maxZoom)
-        .toDouble();
+    _zoom = _normalizeZoom(widget.initialScale);
 
     _transformController = TransformationController(
-      Matrix4.identity()..scale(_zoom),
+      _createZoomMatrix(_zoom),
     );
 
     _transformController.addListener(_handleTransformChanged);
@@ -66,14 +78,11 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.initialScale != widget.initialScale) {
-      final nextZoom = widget.initialScale
-          .clamp(_minZoom, _maxZoom)
-          .toDouble();
+      final nextZoom = _normalizeZoom(widget.initialScale);
 
       _zoom = nextZoom;
 
-      _transformController.value = Matrix4.identity()
-        ..scale(nextZoom);
+      _transformController.value = _createZoomMatrix(nextZoom);
     }
   }
 
@@ -81,18 +90,22 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   void dispose() {
     _transformController.removeListener(_handleTransformChanged);
     _transformController.dispose();
+
     super.dispose();
   }
 
   void _handleTransformChanged() {
-    final currentZoom = _transformController.value
-        .getMaxScaleOnAxis()
-        .clamp(_minZoom, _maxZoom)
-        .toDouble();
+    final currentZoom = _normalizeZoom(
+      _transformController.value.getMaxScaleOnAxis(),
+    );
 
-    if ((_zoom - currentZoom).abs() < 0.01) return;
+    if ((_zoom - currentZoom).abs() < 0.01) {
+      return;
+    }
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _zoom = currentZoom;
@@ -100,10 +113,9 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   }
 
   void _setZoom(double value) {
-    final nextZoom = value.clamp(_minZoom, _maxZoom).toDouble();
+    final nextZoom = _normalizeZoom(value);
 
-    _transformController.value = Matrix4.identity()
-      ..scale(nextZoom);
+    _transformController.value = _createZoomMatrix(nextZoom);
   }
 
   void _zoomIn() {
@@ -118,16 +130,22 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
     _setZoom(widget.initialScale);
   }
 
-  void _handleCountryTap(
-    GeoJsonFeature feature,
-    math.Point position,
-  ) {
-    final properties = feature.properties;
-    final name = properties?['name']?.toString().trim();
+  void _handleCountryTap(GeoJsonFeature feature) {
+    final rawName = feature.properties['name'];
 
-    if (name == null || name.isEmpty) return;
+    if (rawName == null) {
+      return;
+    }
 
-    if (!mounted) return;
+    final name = rawName.toString().trim();
+
+    if (name.isEmpty) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _selectedCountry = name;
@@ -137,6 +155,10 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   }
 
   void _clearSelectedCountry() {
+    if (!mounted || _selectedCountry == null) {
+      return;
+    }
+
     setState(() {
       _selectedCountry = null;
     });
@@ -297,7 +319,9 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
                   strokeColor: _borderColor,
                   strokeWidth: 0.65,
                   antiAlias: true,
-                  onFeatureTap: _handleCountryTap,
+                  onFeatureTap: (feature, _) {
+                    _handleCountryTap(feature);
+                  },
                 ),
               ],
             ),
@@ -369,6 +393,12 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   }
 
   Widget _buildSelectedCountry() {
+    final selectedCountry = _selectedCountry;
+
+    if (selectedCountry == null) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 14,
@@ -391,7 +421,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              _selectedCountry!,
+              selectedCountry,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -498,7 +528,9 @@ class _CoordinateGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CoordinateGridPainter oldDelegate) {
+  bool shouldRepaint(
+    covariant _CoordinateGridPainter oldDelegate,
+  ) {
     return false;
   }
 }
