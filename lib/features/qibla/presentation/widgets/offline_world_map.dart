@@ -62,6 +62,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   static const Color _landColor = Color(0xFF244C57);
   static const Color _borderColor = Color(0xFF6F9D9A);
   static const Color _accentColor = Color(0xFF53D6B2);
+  // ignore: unused_field
   static const Color _goldColor = Color(0xFFD9B45B);
 
   static const double _minZoom = 0.5;
