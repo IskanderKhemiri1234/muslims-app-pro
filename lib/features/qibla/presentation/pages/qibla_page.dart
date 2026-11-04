@@ -2017,17 +2017,12 @@ class _QiblaPageState extends State<QiblaPage>
                         turns: _relativeQiblaAngle! / 360.0,
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,
-                        child: const Icon(
-                          Icons.navigation_rounded,
-                          color: _gold,
-                          size: 82,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black45,
-                              blurRadius: 8,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
+                        child: SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CustomPaint(
+                            painter: _AnimeSajdahCompassPainter(),
+                          ),
                         ),
                       ),
                       Container(
@@ -3184,6 +3179,70 @@ class _QiblaPageState extends State<QiblaPage>
       ),
     );
   }
+}
+
+/// Custom painter for elite anime-style prostrating avatar (Sajdah) inside the live compass dial.
+class _AnimeSajdahCompassPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Glow aura
+    final glowPaint = Paint()
+      ..color = const Color(0xFFD8B66A).withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    canvas.drawCircle(center, 24, glowPaint);
+
+    // Directional pointer needle pointing North/Qibla direction
+    final needlePath = Path()
+      ..moveTo(center.dx, center.dy - 32)
+      ..lineTo(center.dx - 9, center.dy + 8)
+      ..lineTo(center.dx, center.dy + 3)
+      ..lineTo(center.dx + 9, center.dy + 8)
+      ..close();
+
+    final needlePaint = Paint()
+      ..color = const Color(0xFFD8B66A)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(needlePath, needlePaint);
+
+    // Anime Sajdah Avatar inside the compass center
+    final bodyPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final headPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    // Head in sajdah
+    canvas.drawCircle(center.translate(-6, 2), 3.0, headPaint);
+
+    // Prostrating silhouette curve
+    final path = Path()
+      ..moveTo(center.dx + 8, center.dy + 6)
+      ..quadraticBezierTo(
+        center.dx + 2,
+        center.dy - 4,
+        center.dx - 4,
+        center.dy + 2,
+      );
+    canvas.drawPath(path, bodyPaint);
+
+    // Hands on ground
+    canvas.drawLine(
+      center.translate(-3, 3),
+      center.translate(-7, 6),
+      bodyPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CompassTicksPainter extends CustomPainter {
