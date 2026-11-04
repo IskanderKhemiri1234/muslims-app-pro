@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +7,6 @@ import 'core/theme/app_theme.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
-/// Application entry point.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -21,141 +19,187 @@ Future<void> main() async {
   );
 }
 
-/// Loads application settings safely before rendering the application.
 Future<SettingsController> _initializeSettings() async {
-  try {
-    final preferences = await SharedPreferences.getInstance();
+  SharedPreferences? preferences;
 
-    return SettingsController(
-      preferences: preferences,
-      initialArabic: preferences.getBool('app_language_ar') ?? true,
-      initialDark: preferences.getBool('app_theme_dark') ?? true,
-    );
+  try {
+    preferences = await SharedPreferences.getInstance();
   } catch (error, stackTrace) {
     debugPrint('Settings initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
-
-    // The application can still start with safe default settings.
-    return SettingsController(
-      preferences: null,
-      initialArabic: true,
-      initialDark: true,
-    );
   }
+
+  final savedLanguageCode =
+      preferences?.getString('app_language_code');
+
+  final legacyArabicSetting =
+      preferences?.getBool('app_language_ar');
+
+  final String initialLanguage;
+
+  if (savedLanguageCode == 'ar' ||
+      savedLanguageCode == 'en' ||
+      savedLanguageCode == 'fr') {
+    initialLanguage = savedLanguageCode;
+  } else if (legacyArabicSetting != null) {
+    initialLanguage = legacyArabicSetting ? 'ar' : 'en';
+  } else {
+    initialLanguage = 'ar';
+  }
+
+  final initialDarkMode =
+      preferences?.getBool('app_theme_dark') ?? true;
+
+  return SettingsController(
+    preferences: preferences,
+    languageCode: initialLanguage,
+    isDark: initialDarkMode,
+  );
 }
 
-// ============================================================
-// APPLICATION SETTINGS
-// ============================================================
-
-/// Centralized settings controller.
-///
-/// Responsible for:
-/// - Application language
-/// - Light / dark appearance
-/// - Persistent settings
-/// - Notifying dependent widgets
 class SettingsController extends ChangeNotifier {
   SettingsController({
     required SharedPreferences? preferences,
-    required bool initialArabic,
-    required bool initialDark,
+    required String languageCode,
+    required bool isDark,
   })  : _preferences = preferences,
-        _isArabic = initialArabic,
-        _isDark = initialDark;
+        _languageCode = _normalizeLanguage(languageCode),
+        _isDark = isDark;
 
-  static const String _languageKey = 'app_language_ar';
-  static const String _themeKey = 'app_theme_dark';
+  static const String _languageCodeKey = 'app_language_code';
+  static const String _legacyArabicKey = 'app_language_ar';
+  static const String _darkModeKey = 'app_theme_dark';
 
   final SharedPreferences? _preferences;
 
-  bool _isArabic;
+  String _languageCode;
   bool _isDark;
 
   Future<void> _pendingWrites = Future<void>.value();
 
-  bool get isArabic => _isArabic;
+  static String _normalizeLanguage(String? languageCode) {
+    switch (languageCode) {
+      case 'ar':
+      case 'en':
+      case 'fr':
+        return languageCode!;
+      default:
+        return 'ar';
+    }
+  }
+
+  String get languageCode => _languageCode;
+
+  bool get isArabic => _languageCode == 'ar';
 
   bool get isDark => _isDark;
 
-  ThemeMode get themeMode {
-    return _isDark ? ThemeMode.dark : ThemeMode.light;
-  }
+  ThemeMode get themeMode =>
+      _isDark ? ThemeMode.dark : ThemeMode.light;
 
-  Locale get locale {
-    return Locale(_isArabic ? 'ar' : 'en');
-  }
+  Locale get locale => Locale(_languageCode);
 
-  TextDirection get textDirection {
-    return _isArabic ? TextDirection.rtl : TextDirection.ltr;
-  }
+  TextDirection get textDirection =>
+      isArabic ? TextDirection.rtl : TextDirection.ltr;
 
-  /// Switches between Arabic and English.
   void toggleLanguage() {
-    setLanguage(isArabic: !_isArabic);
+    setLanguage(isArabic ? 'en' : 'ar');
   }
 
-  /// Sets the application language explicitly.
-  void setLanguage({required bool isArabic}) {
-    if (_isArabic == isArabic) return;
+  void setLanguage(String languageCode) {
+    if (languageCode != 'ar' &&
+        languageCode != 'en' &&
+        languageCode != 'fr') {
+      return;
+    }
 
-    _isArabic = isArabic;
+    if (_languageCode == languageCode) {
+      return;
+    }
+
+    _languageCode = languageCode;
 
     notifyListeners();
 
-    _saveSetting(
-      _languageKey,
-      _isArabic,
-    );
+    _queuePreferenceWrite(() async {
+      final preferences = _preferences;
+
+      if (preferences == null) {
+        return;
+      }
+
+      await preferences.setString(
+        _languageCodeKey,
+        languageCode,
+      );
+
+      // Keep the legacy preference synchronized.
+      await preferences.setBool(
+        _legacyArabicKey,
+        languageCode == 'ar',
+      );
+    });
   }
 
-  /// Switches between light and dark appearance.
   void toggleTheme() {
-    setDarkMode(isDark: !_isDark);
+    setDarkMode(!_isDark);
   }
 
-  /// Sets the application appearance explicitly.
-  void setDarkMode({required bool isDark}) {
-    if (_isDark == isDark) return;
+  void setDarkMode(bool isDark) {
+    if (_isDark == isDark) {
+      return;
+    }
 
     _isDark = isDark;
 
     notifyListeners();
 
-    _saveSetting(
-      _themeKey,
-      _isDark,
-    );
+    _queuePreferenceWrite(() async {
+      final preferences = _preferences;
+
+      if (preferences == null) {
+        return;
+      }
+
+      await preferences.setBool(
+        _darkModeKey,
+        isDark,
+      );
+    });
   }
 
-  /// Serializes preference writes to avoid overlapping updates.
-  void _saveSetting(String key, bool value) {
-    final preferences = _preferences;
-
-    if (preferences == null) return;
-
+  void _queuePreferenceWrite(
+    Future<void> Function() operation,
+  ) {
     _pendingWrites = _pendingWrites.then((_) async {
       try {
-        await preferences.setBool(key, value);
+        await operation();
       } catch (error, stackTrace) {
-        debugPrint('Could not save setting "$key": $error');
+        debugPrint('Could not save application settings: $error');
         debugPrintStack(stackTrace: stackTrace);
       }
     });
   }
 }
 
-// ============================================================
-// APPLICATION ROOT
-// ============================================================
-
-class MuslimsApp extends StatelessWidget {
+class MuslimsApp extends StatefulWidget {
   const MuslimsApp({
-    super.key,
     required this.settingsController,
+    super.key,
   });
 
   final SettingsController settingsController;
+
+  @override
+  State<MuslimsApp> createState() => _MuslimsAppState();
+}
+
+class _MuslimsAppState extends State<MuslimsApp> {
+  @override
+  void dispose() {
+    widget.settingsController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,38 +208,31 @@ class MuslimsApp extends StatelessWidget {
         ChangeNotifierProvider<PrayerController>(
           create: (_) => PrayerController(),
         ),
-
         ChangeNotifierProvider<SettingsController>.value(
-          value: settingsController,
+          value: widget.settingsController,
         ),
       ],
       child: Consumer<SettingsController>(
         builder: (context, settings, child) {
           return MaterialApp(
-            // Application identity.
             title: 'Muslims Pro',
             debugShowCheckedModeBanner: false,
 
-            // Appearance.
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: settings.themeMode,
 
-            // Localization.
             locale: settings.locale,
+
             supportedLocales: const [
               Locale('ar'),
               Locale('en'),
+              Locale('fr'),
             ],
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
 
-            // Smooth theme transitions.
-            themeAnimationDuration: const Duration(
-              milliseconds: 300,
-            ),
-            themeAnimationCurve: Curves.easeInOut,
+            localizationsDelegates:
+                GlobalMaterialLocalizations.delegates,
 
-            // Preserve the existing home page API.
             home: PrayerHomePage(
               isArabic: settings.isArabic,
               onLanguageToggle: settings.toggleLanguage,
