@@ -34,7 +34,9 @@ class PrayerHomePage extends StatefulWidget {
 class _PrayerHomePageState extends State<PrayerHomePage>
     with WidgetsBindingObserver {
   late DateTime _currentDate;
+
   Timer? _midnightTimer;
+
   bool _isRetrying = false;
 
   bool get _isArabic => widget.isArabic;
@@ -54,21 +56,24 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 
   @override
-  void didUpdateWidget(covariant PrayerHomePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.isArabic != widget.isArabic ||
-        oldWidget.isDark != widget.isDark) {
-      // The framework rebuilds this widget automatically.
-      // No additional synchronization is required here.
-    }
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _refreshDate();
-      _scheduleMidnightRefresh();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _refreshDate();
+        _scheduleMidnightRefresh();
+        break;
+
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _midnightTimer?.cancel();
+        _midnightTimer = null;
+        break;
+
+      case AppLifecycleState.hidden:
+        _midnightTimer?.cancel();
+        _midnightTimer = null;
+        break;
     }
   }
 
@@ -234,6 +239,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   @override
   void dispose() {
     _midnightTimer?.cancel();
+    _midnightTimer = null;
+
     WidgetsBinding.instance.removeObserver(this);
 
     super.dispose();
@@ -800,9 +807,8 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayMessage = message?.trim();
-    final hasError =
-        displayMessage != null && displayMessage.isNotEmpty;
+    final errorMessage = message?.trim() ?? '';
+    final hasError = errorMessage.isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -849,11 +855,11 @@ class _LoadingView extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
 
-                  if (hasError && displayMessage != null) ...[
+                  if (hasError) ...[
                     const SizedBox(height: 12),
 
                     Text(
-                      displayMessage,
+                      errorMessage,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
