@@ -29,7 +29,6 @@ class _QiblaPageState extends State<QiblaPage>
 
   static const String _languageKey = 'qibla_page_language';
 
-  // لا نعتبر قراءة null واحدة دليلاً على تعطل الحساس.
   static const int _invalidCompassReadingsThreshold = 3;
 
   late final QiblaLandmarkRepositoryImpl _landmarkRepository;
@@ -61,27 +60,27 @@ class _QiblaPageState extends State<QiblaPage>
         : landmark.nameAr;
   }
 
- Future<void> _loadSavedLanguage() async {
-  final revision = _languageRevision;
+  Future<void> _loadSavedLanguage() async {
+    final revision = _languageRevision;
 
-  try {
-    final preferences = await SharedPreferences.getInstance();
-    final String? saved = preferences.getString(_languageKey);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final String? saved = preferences.getString(_languageKey);
 
-    if (!mounted || revision != _languageRevision) {
-      return;
+      if (!mounted || revision != _languageRevision) {
+        return;
+      }
+
+      if (saved == 'ar' || saved == 'en' || saved == 'fr') {
+        setState(() {
+          _language = saved!;
+        });
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Could not load saved language: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
-
-    if (saved == 'ar' || saved == 'en' || saved == 'fr') {
-      setState(() {
-        _language = saved!;
-      });
-    }
-  } catch (error, stackTrace) {
-    debugPrint('Could not load saved language: $error');
-    debugPrintStack(stackTrace: stackTrace);
   }
-}
 
   Future<void> _changeLanguage(String language) async {
     if (!['ar', 'en', 'fr'].contains(language)) return;
@@ -177,7 +176,6 @@ class _QiblaPageState extends State<QiblaPage>
   double? _distanceKm;
   double? _declination;
 
-  // آخر قراءة مغناطيسية صالحة فقط.
   double? _magneticHeading;
   double? _trueHeading;
   double? _relativeQiblaAngle;
@@ -227,7 +225,6 @@ class _QiblaPageState extends State<QiblaPage>
     _isAppActive = false;
     _isCompassConnecting = false;
 
-    // إبطال جميع callbacks القديمة قبل إلغاء الاشتراك.
     _compassGeneration++;
 
     final subscription = _compassSubscription;
@@ -260,10 +257,6 @@ class _QiblaPageState extends State<QiblaPage>
     }
   }
 
-  /// إنشاء اشتراك واحد فقط في حساس البوصلة.
-  ///
-  /// لا يسمح هذا الإجراء بإنشاء اشتراك مكرر أثناء الاتصال
-  /// أو أثناء وجود اشتراك سابق صالح.
   Future<void> _connectCompass() async {
     if (!mounted || !_isAppActive) return;
 
@@ -332,7 +325,6 @@ class _QiblaPageState extends State<QiblaPage>
         cancelOnError: false,
       );
 
-      // قد تكون دورة حياة التطبيق تغيرت أثناء إنشاء الاشتراك.
       if (!mounted ||
           !_isAppActive ||
           generation != _compassGeneration) {
@@ -378,7 +370,6 @@ class _QiblaPageState extends State<QiblaPage>
     }
   }
 
-  /// إعلان عدم توفر الحساس دون إنشاء قراءة اصطناعية.
   void _setCompassUnavailable() {
     if (!mounted) return;
 
@@ -393,7 +384,6 @@ class _QiblaPageState extends State<QiblaPage>
     });
   }
 
-  /// إيقاف الاشتراك وإبطال callbacks المرتبطة به.
   void _disconnectCompass() {
     _compassGeneration++;
     _isCompassConnecting = false;
@@ -420,8 +410,6 @@ class _QiblaPageState extends State<QiblaPage>
     });
   }
 
-  /// إعادة الاتصال الحقيقية:
-  /// إلغاء الاشتراك السابق أولاً ثم إنشاء اشتراك جديد.
   Future<void> _reconnectCompass() async {
     if (!mounted || !_isAppActive || _isCompassConnecting) {
       return;
@@ -443,7 +431,6 @@ class _QiblaPageState extends State<QiblaPage>
 
     final heading = event.heading;
 
-    // null أو NaN أو Infinity ليست قراءات صالحة.
     if (heading == null || !heading.isFinite) {
       _invalidCompassReadings++;
 
@@ -451,7 +438,6 @@ class _QiblaPageState extends State<QiblaPage>
           _invalidCompassReadingsThreshold) {
         _setCompassUnavailable();
       } else {
-        // لا نعرض آخر اتجاه باعتباره قراءة حية مؤكدة.
         setState(() {
           _magneticHeading = null;
           _trueHeading = null;
@@ -500,11 +486,6 @@ class _QiblaPageState extends State<QiblaPage>
     }
   }
 
-  /// إعادة حساب الاتجاه الحقيقي والانحراف النسبي.
-  ///
-  /// تستخدم هذه الدالة آخر قراءة مغناطيسية صالحة،
-  /// لذلك يمكن استدعاؤها بعد تحديث bearing أو declination
-  /// دون إنشاء CompassEvent اصطناعي.
   void _recalculateCompassHeading() {
     if (!mounted) return;
 
@@ -669,7 +650,6 @@ class _QiblaPageState extends State<QiblaPage>
 
       if (!mounted) return;
 
-      // لا نطلب الإذن تلقائياً عند استئناف التطبيق.
       if (permission == LocationPermission.denied &&
           !silent) {
         permission = await Geolocator.requestPermission();
@@ -747,8 +727,6 @@ class _QiblaPageState extends State<QiblaPage>
 
       double? bearing;
 
-      // عند الاقتراب الشديد من الكعبة لا نعرض اتجاهاً
-      // جغرافياً غير معرف للمسار.
       if (distance > 0.001) {
         try {
           final calculatedBearing =
@@ -797,7 +775,6 @@ class _QiblaPageState extends State<QiblaPage>
         _locationPermissionPermanentlyDenied = false;
       });
 
-      // يعيد استخدام آخر قراءة صالحة من الحساس.
       _recalculateCompassHeading();
     } on _LocationException catch (error) {
       if (!mounted) return;
@@ -1940,17 +1917,11 @@ class _QiblaPageState extends State<QiblaPage>
     required Color secondaryColor,
   }) {
     final hasQibla = _qiblaBearing != null;
-
     final hasLiveDirection =
         hasQibla && _relativeQiblaAngle != null;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        18,
-        22,
-        18,
-        24,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(28),
@@ -2028,33 +1999,23 @@ class _QiblaPageState extends State<QiblaPage>
                       _buildCompassTicks(),
                       Positioned(
                         top: 20,
-                        child: _compassLabel(
-                          _tr('شمال', 'N', 'N'),
-                        ),
+                        child: _compassLabel(_tr('شمال', 'N', 'N')),
                       ),
                       Positioned(
                         bottom: 20,
-                        child: _compassLabel(
-                          _tr('جنوب', 'S', 'S'),
-                        ),
+                        child: _compassLabel(_tr('جنوب', 'S', 'S')),
                       ),
                       Positioned(
                         right: 20,
-                        child: _compassLabel(
-                          _tr('شرق', 'E', 'E'),
-                        ),
+                        child: _compassLabel(_tr('شرق', 'E', 'E')),
                       ),
                       Positioned(
                         left: 20,
-                        child: _compassLabel(
-                          _tr('غرب', 'W', 'O'),
-                        ),
+                        child: _compassLabel(_tr('غرب', 'W', 'O')),
                       ),
                       AnimatedRotation(
                         turns: _relativeQiblaAngle! / 360.0,
-                        duration: const Duration(
-                          milliseconds: 180,
-                        ),
+                        duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,
                         child: const Icon(
                           Icons.navigation_rounded,
@@ -2110,9 +2071,7 @@ class _QiblaPageState extends State<QiblaPage>
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  _directionInstruction(
-                    _relativeQiblaAngle!,
-                  ),
+                  _directionInstruction(_relativeQiblaAngle!),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: textColor,
@@ -2151,9 +2110,7 @@ class _QiblaPageState extends State<QiblaPage>
               'Geographic Qibla bearing',
               'Azimut géographique de la Qibla',
             ),
-            _qiblaBearing == null
-                ? '--'
-                : _formatBearing(_qiblaBearing!),
+            _qiblaBearing == null ? '--' : _formatBearing(_qiblaBearing!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
@@ -2163,9 +2120,7 @@ class _QiblaPageState extends State<QiblaPage>
               'True phone heading',
               'Cap du téléphone (vrai nord)',
             ),
-            _trueHeading == null
-                ? '--'
-                : _formatBearing(_trueHeading!),
+            _trueHeading == null ? '--' : _formatBearing(_trueHeading!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
@@ -2175,9 +2130,7 @@ class _QiblaPageState extends State<QiblaPage>
               'Magnetic sensor reading',
               'Lecture du capteur magnétique',
             ),
-            _magneticHeading == null
-                ? '--'
-                : _formatBearing(_magneticHeading!),
+            _magneticHeading == null ? '--' : _formatBearing(_magneticHeading!),
             secondaryColor,
           ),
         ],
@@ -2384,9 +2337,7 @@ class _QiblaPageState extends State<QiblaPage>
     Color secondaryColor,
   ) {
     final angle = _relativeQiblaAngle;
-
-    final isAligned =
-        angle != null && angle.abs() <= 3;
+    final isAligned = angle != null && angle.abs() <= 3;
 
     final steps = [
       _tr(
@@ -3061,8 +3012,7 @@ class _QiblaPageState extends State<QiblaPage>
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: landmarks.length,
-        separatorBuilder: (_, __) =>
-            const SizedBox(width: 11),
+        separatorBuilder: (_, __) => const SizedBox(width: 11),
         itemBuilder: (context, index) {
           final landmark = landmarks[index];
           final color = _landmarkColor(landmark);
@@ -3086,8 +3036,7 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -3095,11 +3044,8 @@ class _QiblaPageState extends State<QiblaPage>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: color.withValues(
-                                alpha: 0.11,
-                              ),
-                              borderRadius:
-                                  BorderRadius.circular(12),
+                              color: color.withValues(alpha: 0.11),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               _landmarkIcon(landmark),
@@ -3153,10 +3099,7 @@ class _QiblaPageState extends State<QiblaPage>
   Widget _buildAccuracyNote(Color secondaryColor) {
     final accuracy = _position?.accuracy;
 
-    // لا نعرض بطاقة دقة GPS عند غياب قراءة صالحة.
-    if (accuracy == null ||
-        !accuracy.isFinite ||
-        accuracy < 0) {
+    if (accuracy == null || !accuracy.isFinite || accuracy < 0) {
       return const SizedBox.shrink();
     }
 
