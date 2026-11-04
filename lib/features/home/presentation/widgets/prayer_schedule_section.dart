@@ -1,4 +1,3 @@
-import 'dart:ui' show FontFeature;
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
@@ -53,9 +52,11 @@ class PrayerScheduleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
+    final isDark = theme.brightness == Brightness.dark;
     final currentNextPrayer = nextPrayer;
 
     final entries = prayers
@@ -111,7 +112,7 @@ class PrayerScheduleSection extends StatelessWidget {
               name: prayerName(entry.prayer),
               formattedTime: formatTime(entry.time),
               isNext: isNext,
-              isDark: theme.brightness == Brightness.dark,
+              isDark: isDark,
               isArabic: isArabic,
               icon: _iconFor(entry.prayer),
               reduceMotion: reduceMotion,
@@ -213,15 +214,17 @@ class _PrayerScheduleTile extends StatelessWidget {
         ? Duration.zero
         : _animationDuration;
 
+    final semanticLabel = isNext
+        ? (isArabic
+            ? '$name، الصلاة القادمة، $formattedTime'
+            : '$name, next prayer, $formattedTime')
+        : (isArabic
+            ? '$name، $formattedTime'
+            : '$name, $formattedTime');
+
     return Semantics(
       container: true,
-      label: isNext
-          ? (isArabic
-              ? '$name، الصلاة القادمة، $formattedTime'
-              : '$name, next prayer, $formattedTime')
-          : (isArabic
-              ? '$name، $formattedTime'
-              : '$name, $formattedTime'),
+      label: semanticLabel,
       child: ExcludeSemantics(
         child: GlassContainer(
           radius: 19,
