@@ -40,7 +40,7 @@ Future<SettingsController> _initializeSettings() async {
   if (savedLanguageCode == 'ar' ||
       savedLanguageCode == 'en' ||
       savedLanguageCode == 'fr') {
-    initialLanguage = savedLanguageCode;
+    initialLanguage = savedLanguageCode!;
   } else if (legacyArabicSetting != null) {
     initialLanguage = legacyArabicSetting ? 'ar' : 'en';
   } else {
