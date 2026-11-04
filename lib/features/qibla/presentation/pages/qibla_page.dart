@@ -62,22 +62,27 @@ class _QiblaPageState extends State<QiblaPage>
         : landmark.nameAr;
   }
 
-  Future<void> _loadSavedLanguage() async {
-    final revision = _languageRevision;
+ Future<void> _loadSavedLanguage() async {
+  final revision = _languageRevision;
 
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      final saved = preferences.getString(_languageKey);
+  try {
+    final preferences = await SharedPreferences.getInstance();
+    final String? saved = preferences.getString(_languageKey);
 
-      if (!mounted || revision != _languageRevision) return;
-
-      if (saved == 'ar' || saved == 'en' || saved == 'fr') {
-        setState(() => _language = saved);
-      }
-    } catch (error) {
-      debugPrint('Could not load saved language: $error');
+    if (!mounted || revision != _languageRevision) {
+      return;
     }
+
+    if (saved == 'ar' || saved == 'en' || saved == 'fr') {
+      setState(() {
+        _language = saved!;
+      });
+    }
+  } catch (error, stackTrace) {
+    debugPrint('Could not load saved language: $error');
+    debugPrintStack(stackTrace: stackTrace);
   }
+}
 
   Future<void> _changeLanguage(String language) async {
     if (!['ar', 'en', 'fr'].contains(language)) return;
