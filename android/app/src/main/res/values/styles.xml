@@ -1,8 +1,6 @@
 
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <!-- Native Android launch screen theme -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -11,7 +9,6 @@
         <item name="android:windowActionModeOverlay">true</item>
     </style>
 
-    <!-- Theme displayed after Flutter initializes -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
@@ -19,5 +16,4 @@
         <item name="android:navigationBarColor">#071C17</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
-
 </resources>
