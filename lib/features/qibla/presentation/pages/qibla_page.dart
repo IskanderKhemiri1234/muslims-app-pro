@@ -30,6 +30,9 @@ class _QiblaPageState extends State<QiblaPage>
 
   static const String _languageKey = 'qibla_page_language';
 
+  // لا نعتبر قراءة null واحدة دليلاً على تعطل الحساس.
+  static const int _invalidCompassReadingsThreshold = 3;
+
   late final QiblaLandmarkRepositoryImpl _landmarkRepository;
 
   String _language = 'ar';
@@ -53,6 +56,7 @@ class _QiblaPageState extends State<QiblaPage>
 
   String _localizedLandmarkName(QiblaLandmark landmark) {
     if (_language == 'ar') return landmark.nameAr;
+
     return landmark.nameEn.trim().isNotEmpty
         ? landmark.nameEn
         : landmark.nameAr;
@@ -77,7 +81,7 @@ class _QiblaPageState extends State<QiblaPage>
 
   Future<void> _changeLanguage(String language) async {
     if (!['ar', 'en', 'fr'].contains(language)) return;
-    if (_language == language) return;
+    if (_language == language || !mounted) return;
 
     _languageRevision++;
 
@@ -85,9 +89,15 @@ class _QiblaPageState extends State<QiblaPage>
 
     try {
       final preferences = await SharedPreferences.getInstance();
+
+      if (!mounted) return;
+
       await preferences.setString(_languageKey, language);
     } catch (error) {
       debugPrint('Could not save language: $error');
+
+      if (!mounted) return;
+
       _showMessage(
         _tr(
           'تعذر حفظ اختيار اللغة.',
@@ -115,7 +125,11 @@ class _QiblaPageState extends State<QiblaPage>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _tr('لغة الصفحة', 'Page language', 'Langue de la page'),
+                    _tr(
+                      'لغة الصفحة',
+                      'Page language',
+                      'Langue de la page',
+                    ),
                     style: TextStyle(
                       color: textColor,
                       fontSize: 17,
@@ -141,7 +155,10 @@ class _QiblaPageState extends State<QiblaPage>
     return ListTile(
       title: Text(label),
       trailing: selected
-          ? const Icon(Icons.check_circle_rounded, color: _gold)
+          ? const Icon(
+              Icons.check_circle_rounded,
+              color: _gold,
+            )
           : null,
       onTap: () {
         Navigator.pop(context);
@@ -156,6 +173,7 @@ class _QiblaPageState extends State<QiblaPage>
   double? _distanceKm;
   double? _declination;
 
+  // آخر قراءة مغناطيسية صالحة فقط.
   double? _magneticHeading;
   double? _trueHeading;
   double? _relativeQiblaAngle;
@@ -164,9 +182,15 @@ class _QiblaPageState extends State<QiblaPage>
   bool _isRefreshing = false;
   bool _isLoadingLandmarks = true;
   bool _isAppActive = true;
+
   bool _isCompassUnavailable = false;
+  bool _isCompassConnecting = false;
+
   bool _locationPermissionPermanentlyDenied = false;
   bool _locationServiceDisabled = false;
+
+  int _invalidCompassReadings = 0;
+  int _compassGeneration = 0;
 
   String? _locationError;
   String? _landmarkError;
@@ -175,7 +199,6 @@ class _QiblaPageState extends State<QiblaPage>
   List<QiblaLandmark> _landmarks = [];
 
   StreamSubscription<CompassEvent>? _compassSubscription;
-  int _compassGeneration = 0;
 
   @override
   void initState() {
@@ -198,6 +221,9 @@ class _QiblaPageState extends State<QiblaPage>
     WidgetsBinding.instance.removeObserver(this);
 
     _isAppActive = false;
+    _isCompassConnecting = false;
+
+    // إبطال جميع callbacks القديمة قبل إلغاء الاشتراك.
     _compassGeneration++;
 
     final subscription = _compassSubscription;
@@ -213,32 +239,55 @@ class _QiblaPageState extends State<QiblaPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _isAppActive = true;
-      unawaited(_connectCompass());
-      unawaited(_loadLocation(silent: true));
-    } else {
+      if (!_isAppActive) {
+        _isAppActive = true;
+        _invalidCompassReadings = 0;
+
+        unawaited(_connectCompass());
+        unawaited(_loadLocation(silent: true));
+      }
+
+      return;
+    }
+
+    if (_isAppActive) {
       _isAppActive = false;
       _disconnectCompass();
     }
   }
 
+  /// إنشاء اشتراك واحد فقط في حساس البوصلة.
+  ///
+  /// لا يسمح هذا الإجراء بإنشاء اشتراك مكرر أثناء الاتصال
+  /// أو أثناء وجود اشتراك سابق صالح.
   Future<void> _connectCompass() async {
     if (!mounted || !_isAppActive) return;
-    if (_compassSubscription != null) return;
+
+    if (_compassSubscription != null ||
+        _isCompassConnecting) {
+      return;
+    }
+
+    _isCompassConnecting = true;
 
     final generation = ++_compassGeneration;
+
+    StreamSubscription<CompassEvent>? newSubscription;
 
     try {
       final stream = FlutterCompass.events;
 
       if (stream == null) {
-        _setCompassUnavailable();
+        if (mounted &&
+            _isAppActive &&
+            generation == _compassGeneration) {
+          _setCompassUnavailable();
+        }
+
         return;
       }
 
-      late final StreamSubscription<CompassEvent> subscription;
-
-      subscription = stream.listen(
+      newSubscription = stream.listen(
         (event) {
           if (!mounted ||
               !_isAppActive ||
@@ -249,49 +298,88 @@ class _QiblaPageState extends State<QiblaPage>
           _onCompassEvent(event);
         },
         onError: (Object error, StackTrace stackTrace) {
-          if (!mounted || generation != _compassGeneration) return;
+          if (!mounted ||
+              !_isAppActive ||
+              generation != _compassGeneration) {
+            return;
+          }
+
+          debugPrint('Compass stream error: $error');
+
           _setCompassUnavailable();
         },
         onDone: () {
-          if (!mounted || generation != _compassGeneration) return;
+          if (!mounted ||
+              generation != _compassGeneration) {
+            return;
+          }
 
-          if (identical(_compassSubscription, subscription)) {
+          if (identical(
+            _compassSubscription,
+            newSubscription,
+          )) {
             _compassSubscription = null;
           }
+
+          _isCompassConnecting = false;
 
           _setCompassUnavailable();
         },
         cancelOnError: false,
       );
 
+      // قد تكون دورة حياة التطبيق تغيرت أثناء إنشاء الاشتراك.
       if (!mounted ||
           !_isAppActive ||
           generation != _compassGeneration) {
-        await subscription.cancel();
+        await newSubscription.cancel();
         return;
       }
 
       if (_compassSubscription != null) {
-        await subscription.cancel();
+        await newSubscription.cancel();
         return;
       }
 
-      _compassSubscription = subscription;
+      _compassSubscription = newSubscription;
+      _invalidCompassReadings = 0;
 
-      if (_isCompassUnavailable) {
-        setState(() => _isCompassUnavailable = false);
+      if (mounted && _isCompassUnavailable) {
+        setState(() {
+          _isCompassUnavailable = false;
+        });
       }
     } catch (error) {
       debugPrint('Compass connection error: $error');
 
-      if (mounted && generation == _compassGeneration) {
+      if (mounted &&
+          _isAppActive &&
+          generation == _compassGeneration) {
         _setCompassUnavailable();
+      }
+
+      if (newSubscription != null) {
+        try {
+          await newSubscription.cancel();
+        } catch (cancelError) {
+          debugPrint(
+            'Compass subscription cancellation error: $cancelError',
+          );
+        }
+      }
+    } finally {
+      if (generation == _compassGeneration) {
+        _isCompassConnecting = false;
       }
     }
   }
 
+  /// إعلان عدم توفر الحساس دون إنشاء قراءة اصطناعية.
   void _setCompassUnavailable() {
     if (!mounted) return;
+
+    _invalidCompassReadings =
+        _invalidCompassReadingsThreshold;
 
     setState(() {
       _isCompassUnavailable = true;
@@ -301,8 +389,11 @@ class _QiblaPageState extends State<QiblaPage>
     });
   }
 
+  /// إيقاف الاشتراك وإبطال callbacks المرتبطة به.
   void _disconnectCompass() {
     _compassGeneration++;
+    _isCompassConnecting = false;
+    _invalidCompassReadings = 0;
 
     final subscription = _compassSubscription;
     _compassSubscription = null;
@@ -325,34 +416,103 @@ class _QiblaPageState extends State<QiblaPage>
     });
   }
 
-  void _onCompassEvent(CompassEvent event) {
-    final heading = event.heading;
-
-    if (heading == null || !heading.isFinite) {
-      if (!mounted) return;
-
-      setState(() {
-        _magneticHeading = null;
-        _trueHeading = null;
-        _relativeQiblaAngle = null;
-      });
+  /// إعادة الاتصال الحقيقية:
+  /// إلغاء الاشتراك السابق أولاً ثم إنشاء اشتراك جديد.
+  Future<void> _reconnectCompass() async {
+    if (!mounted || !_isAppActive || _isCompassConnecting) {
       return;
     }
 
-    _magneticHeading = QiblaService.normalize(heading);
-    _recalculateCompassHeading();
+    _disconnectCompass();
+
+    if (!mounted || !_isAppActive) return;
+
+    setState(() {
+      _isCompassUnavailable = false;
+    });
+
+    await _connectCompass();
   }
 
+  void _onCompassEvent(CompassEvent event) {
+    if (!mounted || !_isAppActive) return;
+
+    final heading = event.heading;
+
+    // null أو NaN أو Infinity ليست قراءات صالحة.
+    if (heading == null || !heading.isFinite) {
+      _invalidCompassReadings++;
+
+      if (_invalidCompassReadings >=
+          _invalidCompassReadingsThreshold) {
+        _setCompassUnavailable();
+      } else {
+        // لا نعرض آخر اتجاه باعتباره قراءة حية مؤكدة.
+        setState(() {
+          _magneticHeading = null;
+          _trueHeading = null;
+          _relativeQiblaAngle = null;
+        });
+      }
+
+      return;
+    }
+
+    try {
+      final normalizedHeading =
+          QiblaService.normalize(heading);
+
+      if (!normalizedHeading.isFinite) {
+        _invalidCompassReadings++;
+
+        if (_invalidCompassReadings >=
+            _invalidCompassReadingsThreshold) {
+          _setCompassUnavailable();
+        }
+
+        return;
+      }
+
+      _invalidCompassReadings = 0;
+
+      _magneticHeading = normalizedHeading;
+
+      if (_isCompassUnavailable) {
+        setState(() {
+          _isCompassUnavailable = false;
+        });
+      }
+
+      _recalculateCompassHeading();
+    } catch (error) {
+      debugPrint('Invalid compass heading: $error');
+
+      _invalidCompassReadings++;
+
+      if (_invalidCompassReadings >=
+          _invalidCompassReadingsThreshold) {
+        _setCompassUnavailable();
+      }
+    }
+  }
+
+  /// إعادة حساب الاتجاه الحقيقي والانحراف النسبي.
+  ///
+  /// تستخدم هذه الدالة آخر قراءة مغناطيسية صالحة،
+  /// لذلك يمكن استدعاؤها بعد تحديث bearing أو declination
+  /// دون إنشاء CompassEvent اصطناعي.
   void _recalculateCompassHeading() {
+    if (!mounted) return;
+
     final magneticHeading = _magneticHeading;
 
-    if (magneticHeading == null || !magneticHeading.isFinite) {
-      if (!mounted) return;
-
+    if (magneticHeading == null ||
+        !magneticHeading.isFinite) {
       setState(() {
         _trueHeading = null;
         _relativeQiblaAngle = null;
       });
+
       return;
     }
 
@@ -361,26 +521,44 @@ class _QiblaPageState extends State<QiblaPage>
     try {
       final declination = _declination;
 
-      trueHeading = declination != null && declination.isFinite
-          ? QiblaService.magneticToTrueHeading(
-              magneticHeading: magneticHeading,
-              declination: declination,
-            )
-          : QiblaService.normalize(magneticHeading);
-    } catch (_) {
-      trueHeading = QiblaService.normalize(magneticHeading);
+      trueHeading =
+          declination != null && declination.isFinite
+              ? QiblaService.magneticToTrueHeading(
+                  magneticHeading: magneticHeading,
+                  declination: declination,
+                )
+              : QiblaService.normalize(magneticHeading);
+
+      if (!trueHeading.isFinite) {
+        trueHeading = QiblaService.normalize(
+          magneticHeading,
+        );
+      }
+    } catch (error) {
+      debugPrint('True heading calculation error: $error');
+
+      trueHeading = QiblaService.normalize(
+        magneticHeading,
+      );
     }
 
     double? relativeAngle;
+
     final bearing = _qiblaBearing;
 
     if (bearing != null && bearing.isFinite) {
       try {
-        relativeAngle = QiblaService.shortestAngleDifference(
+        final calculatedAngle =
+            QiblaService.shortestAngleDifference(
           bearing,
           trueHeading,
         );
-      } catch (_) {
+
+        if (calculatedAngle.isFinite) {
+          relativeAngle = calculatedAngle;
+        }
+      } catch (error) {
+        debugPrint('Relative Qibla angle error: $error');
         relativeAngle = null;
       }
     }
@@ -408,9 +586,16 @@ class _QiblaPageState extends State<QiblaPage>
       if (!mounted) return;
 
       final validResults = results.where((landmark) {
-        return landmark.hasValidBasicData &&
-            landmark.hasValidCoordinates;
+        try {
+          return landmark.hasValidBasicData &&
+              landmark.hasValidCoordinates;
+        } catch (error) {
+          debugPrint('Invalid landmark record: $error');
+          return false;
+        }
       }).toList(growable: false);
+
+      if (!mounted) return;
 
       setState(() {
         _landmarks = validResults;
@@ -435,6 +620,7 @@ class _QiblaPageState extends State<QiblaPage>
           'Could not load local landmark data.',
           'Impossible de charger les données locales des monuments.',
         );
+
         _isLoadingLandmarks = false;
       });
     }
@@ -459,6 +645,8 @@ class _QiblaPageState extends State<QiblaPage>
       final serviceEnabled =
           await Geolocator.isLocationServiceEnabled();
 
+      if (!mounted) return;
+
       if (!serviceEnabled) {
         _locationServiceDisabled = true;
 
@@ -475,9 +663,14 @@ class _QiblaPageState extends State<QiblaPage>
 
       var permission = await Geolocator.checkPermission();
 
+      if (!mounted) return;
+
       // لا نطلب الإذن تلقائياً عند استئناف التطبيق.
-      if (permission == LocationPermission.denied && !silent) {
+      if (permission == LocationPermission.denied &&
+          !silent) {
         permission = await Geolocator.requestPermission();
+
+        if (!mounted) return;
       }
 
       if (permission == LocationPermission.denied) {
@@ -521,6 +714,8 @@ class _QiblaPageState extends State<QiblaPage>
         ),
       );
 
+      if (!mounted) return;
+
       if (!_isValidPosition(position)) {
         throw _LocationException(
           _tr(
@@ -536,15 +731,35 @@ class _QiblaPageState extends State<QiblaPage>
         longitude: position.longitude,
       );
 
+      if (!distance.isFinite || distance < 0) {
+        throw _LocationException(
+          _tr(
+            'تعذر حساب المسافة الجغرافية إلى الكعبة.',
+            'Could not calculate the geographic distance to the Kaaba.',
+            'Impossible de calculer la distance géographique jusqu’à la Kaaba.',
+          ),
+        );
+      }
+
       double? bearing;
 
+      // عند الاقتراب الشديد من الكعبة لا نعرض اتجاهاً
+      // جغرافياً غير معرف للمسار.
       if (distance > 0.001) {
         try {
-          bearing = QiblaService.calculateQiblaBearing(
+          final calculatedBearing =
+              QiblaService.calculateQiblaBearing(
             latitude: position.latitude,
             longitude: position.longitude,
           );
-        } catch (_) {
+
+          if (calculatedBearing.isFinite) {
+            bearing = QiblaService.normalize(
+              calculatedBearing,
+            );
+          }
+        } catch (error) {
+          debugPrint('Qibla bearing calculation error: $error');
           bearing = null;
         }
       }
@@ -552,7 +767,8 @@ class _QiblaPageState extends State<QiblaPage>
       double? declination;
 
       try {
-        final value = QiblaService.calculateMagneticDeclination(
+        final value =
+            QiblaService.calculateMagneticDeclination(
           latitude: position.latitude,
           longitude: position.longitude,
         );
@@ -560,7 +776,8 @@ class _QiblaPageState extends State<QiblaPage>
         if (value.isFinite && value.abs() <= 180) {
           declination = value;
         }
-      } catch (_) {
+      } catch (error) {
+        debugPrint('Magnetic declination error: $error');
         declination = null;
       }
 
@@ -576,6 +793,7 @@ class _QiblaPageState extends State<QiblaPage>
         _locationPermissionPermanentlyDenied = false;
       });
 
+      // يعيد استخدام آخر قراءة صالحة من الحساس.
       _recalculateCompassHeading();
     } on _LocationException catch (error) {
       if (!mounted) return;
@@ -638,7 +856,11 @@ class _QiblaPageState extends State<QiblaPage>
   Future<void> _openLocationSettings() async {
     try {
       await Geolocator.openLocationSettings();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Open location settings error: $error');
+
+      if (!mounted) return;
+
       _showMessage(
         _tr(
           'تعذر فتح إعدادات الموقع على هذا الجهاز.',
@@ -652,7 +874,11 @@ class _QiblaPageState extends State<QiblaPage>
   Future<void> _openAppSettings() async {
     try {
       await Geolocator.openAppSettings();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Open app settings error: $error');
+
+      if (!mounted) return;
+
       _showMessage(
         _tr(
           'تعذر فتح إعدادات التطبيق.',
@@ -668,7 +894,9 @@ class _QiblaPageState extends State<QiblaPage>
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(content: Text(message)),
+      );
   }
 
   String _formatBearing(double bearing) =>
@@ -698,6 +926,7 @@ class _QiblaPageState extends State<QiblaPage>
       case QiblaLandmarkCategory.mosque:
       case QiblaLandmarkCategory.historicalMosque:
         return true;
+
       case QiblaLandmarkCategory.historicalSite:
       case QiblaLandmarkCategory.landmark:
         return false;
@@ -707,15 +936,35 @@ class _QiblaPageState extends State<QiblaPage>
   String _localizedCategory(QiblaLandmark landmark) {
     switch (landmark.category) {
       case QiblaLandmarkCategory.holyMosque:
-        return _tr('مسجد مقدس', 'Holy mosque', 'Mosquée sacrée');
+        return _tr(
+          'مسجد مقدس',
+          'Holy mosque',
+          'Mosquée sacrée',
+        );
+
       case QiblaLandmarkCategory.mosque:
         return _tr('مسجد', 'Mosque', 'Mosquée');
+
       case QiblaLandmarkCategory.historicalMosque:
-        return _tr('مسجد تاريخي', 'Historic mosque', 'Mosquée historique');
+        return _tr(
+          'مسجد تاريخي',
+          'Historic mosque',
+          'Mosquée historique',
+        );
+
       case QiblaLandmarkCategory.landmark:
-        return _tr('معلم تاريخي', 'Historic landmark', 'Monument historique');
+        return _tr(
+          'معلم تاريخي',
+          'Historic landmark',
+          'Monument historique',
+        );
+
       case QiblaLandmarkCategory.historicalSite:
-        return _tr('موقع تاريخي', 'Historic site', 'Site historique');
+        return _tr(
+          'موقع تاريخي',
+          'Historic site',
+          'Site historique',
+        );
     }
   }
 
@@ -725,29 +974,37 @@ class _QiblaPageState extends State<QiblaPage>
       case QiblaLandmarkCategory.mosque:
       case QiblaLandmarkCategory.historicalMosque:
         return Icons.mosque_rounded;
+
       case QiblaLandmarkCategory.historicalSite:
       case QiblaLandmarkCategory.landmark:
         if (landmark.id.contains('pyramid')) {
           return Icons.account_balance_rounded;
         }
+
         if (landmark.id.contains('wall')) {
           return Icons.landscape_rounded;
         }
+
         if (landmark.id.contains('colosseum')) {
           return Icons.stadium_rounded;
         }
+
         if (landmark.id.contains('petra')) {
           return Icons.terrain_rounded;
         }
+
         if (landmark.id.contains('citadel')) {
           return Icons.castle_rounded;
         }
+
         return Icons.account_balance_rounded;
     }
   }
 
   Color _landmarkColor(QiblaLandmark landmark) =>
-      _isIslamicLandmark(landmark) ? _primaryGreen : _historicalColor;
+      _isIslamicLandmark(landmark)
+          ? _primaryGreen
+          : _historicalColor;
 
   String _directionInstruction(double angle) {
     final difference = angle.abs();
@@ -823,6 +1080,7 @@ class _QiblaPageState extends State<QiblaPage>
           'Les données de ce monument sont incomplètes ou invalides.',
         ),
       );
+
       return;
     }
 
@@ -836,8 +1094,10 @@ class _QiblaPageState extends State<QiblaPage>
 
         final sheetColor =
             isDark ? const Color(0xFF172820) : Colors.white;
+
         final mainTextColor =
             isDark ? Colors.white : const Color(0xFF19382E);
+
         final secondaryTextColor =
             isDark ? Colors.white70 : Colors.black54;
 
@@ -860,14 +1120,21 @@ class _QiblaPageState extends State<QiblaPage>
                 ),
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    22,
+                    12,
+                    22,
+                    30,
+                  ),
                   children: [
                     Center(
                       child: Container(
                         width: 42,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: secondaryTextColor.withValues(alpha: 0.3),
+                          color: secondaryTextColor.withValues(
+                            alpha: 0.3,
+                          ),
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -877,7 +1144,9 @@ class _QiblaPageState extends State<QiblaPage>
                     const SizedBox(height: 22),
                     Text(
                       _localizedLandmarkName(landmark),
-                      textAlign: _isArabic ? TextAlign.right : TextAlign.left,
+                      textAlign: _isArabic
+                          ? TextAlign.right
+                          : TextAlign.left,
                       style: TextStyle(
                         color: mainTextColor,
                         fontSize: 22,
@@ -907,7 +1176,9 @@ class _QiblaPageState extends State<QiblaPage>
                       mainTextColor,
                       secondaryTextColor,
                     ),
-                    if (landmark.historicalPeriodAr?.trim().isNotEmpty ==
+                    if (landmark.historicalPeriodAr
+                            ?.trim()
+                            .isNotEmpty ==
                         true)
                       _detailRow(
                         Icons.history_rounded,
@@ -918,13 +1189,19 @@ class _QiblaPageState extends State<QiblaPage>
                     if (landmark.establishedYear != null)
                       _detailRow(
                         Icons.calendar_today_outlined,
-                        _formatHistoricalYear(landmark.establishedYear!),
+                        _formatHistoricalYear(
+                          landmark.establishedYear!,
+                        ),
                         mainTextColor,
                         secondaryTextColor,
                       ),
                     const SizedBox(height: 18),
                     _sectionHeading(
-                      _tr('نبذة تاريخية', 'Historical overview', 'Aperçu historique'),
+                      _tr(
+                        'نبذة تاريخية',
+                        'Historical overview',
+                        'Aperçu historique',
+                      ),
                       mainTextColor,
                     ),
                     const SizedBox(height: 9),
@@ -947,7 +1224,11 @@ class _QiblaPageState extends State<QiblaPage>
                     if (landmark.chronologicalEvents.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       _sectionHeading(
-                        _tr('المحطات التاريخية', 'Historical timeline', 'Chronologie historique'),
+                        _tr(
+                          'المحطات التاريخية',
+                          'Historical timeline',
+                          'Chronologie historique',
+                        ),
                         mainTextColor,
                       ),
                       const SizedBox(height: 13),
@@ -961,7 +1242,11 @@ class _QiblaPageState extends State<QiblaPage>
                     ],
                     const SizedBox(height: 22),
                     _sectionHeading(
-                      _tr('الموقع الجغرافي', 'Geographic location', 'Emplacement géographique'),
+                      _tr(
+                        'الموقع الجغرافي',
+                        'Geographic location',
+                        'Emplacement géographique',
+                      ),
                       mainTextColor,
                     ),
                     const SizedBox(height: 9),
@@ -977,7 +1262,11 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                     const SizedBox(height: 22),
                     _sectionHeading(
-                      _tr('المصادر والمراجع', 'Sources and references', 'Sources et références'),
+                      _tr(
+                        'المصادر والمراجع',
+                        'Sources and references',
+                        'Sources et références',
+                      ),
                       mainTextColor,
                     ),
                     const SizedBox(height: 10),
@@ -998,7 +1287,8 @@ class _QiblaPageState extends State<QiblaPage>
                         final sourceName = source.name.trim();
                         final sourceUrl = source.url.trim();
 
-                        if (sourceName.isEmpty && sourceUrl.isEmpty) {
+                        if (sourceName.isEmpty &&
+                            sourceUrl.isEmpty) {
                           return const SizedBox.shrink();
                         }
 
@@ -1006,11 +1296,14 @@ class _QiblaPageState extends State<QiblaPage>
                           margin: const EdgeInsets.only(bottom: 9),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: secondaryTextColor.withValues(alpha: 0.06),
+                            color: secondaryTextColor.withValues(
+                              alpha: 0.06,
+                            ),
                             borderRadius: BorderRadius.circular(13),
                           ),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               const Icon(
                                 Icons.menu_book_rounded,
@@ -1020,7 +1313,8 @@ class _QiblaPageState extends State<QiblaPage>
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     if (sourceName.isNotEmpty)
                                       Text(
@@ -1035,33 +1329,46 @@ class _QiblaPageState extends State<QiblaPage>
                                       const SizedBox(height: 4),
                                       SelectableText(
                                         sourceUrl,
-                                        textDirection: TextDirection.ltr,
+                                        textDirection:
+                                            TextDirection.ltr,
                                         style: const TextStyle(
                                           color: _primaryGreen,
                                           fontSize: 10,
                                         ),
                                       ),
                                     ],
-                                    if (source.publisher?.trim().isNotEmpty ==
+                                    if (source.publisher
+                                            ?.trim()
+                                            .isNotEmpty ==
                                         true)
                                       Padding(
-                                        padding: const EdgeInsets.only(top: 5),
+                                        padding:
+                                            const EdgeInsets.only(
+                                          top: 5,
+                                        ),
                                         child: Text(
                                           source.publisher!.trim(),
                                           style: TextStyle(
-                                            color: secondaryTextColor,
+                                            color:
+                                                secondaryTextColor,
                                             fontSize: 10,
                                           ),
                                         ),
                                       ),
-                                    if (source.license?.trim().isNotEmpty ==
+                                    if (source.license
+                                            ?.trim()
+                                            .isNotEmpty ==
                                         true)
                                       Padding(
-                                        padding: const EdgeInsets.only(top: 4),
+                                        padding:
+                                            const EdgeInsets.only(
+                                          top: 4,
+                                        ),
                                         child: Text(
                                           '${_tr('الترخيص', 'License', 'Licence')}: ${source.license!.trim()}',
                                           style: TextStyle(
-                                            color: secondaryTextColor,
+                                            color:
+                                                secondaryTextColor,
                                             fontSize: 10,
                                           ),
                                         ),
@@ -1077,15 +1384,23 @@ class _QiblaPageState extends State<QiblaPage>
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                        },
                         icon: const Icon(Icons.arrow_back_rounded),
                         label: Text(
-                          _tr('العودة إلى الأطلس', 'Back to atlas', 'Retour à l’atlas'),
+                          _tr(
+                            'العودة إلى الأطلس',
+                            'Back to atlas',
+                            'Retour à l’atlas',
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _primaryGreen,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
@@ -1196,7 +1511,9 @@ class _QiblaPageState extends State<QiblaPage>
     final description = event.descriptionAr.trim();
     final dateLabel = event.dateLabelAr.trim();
 
-    if (title.isEmpty && description.isEmpty && dateLabel.isEmpty) {
+    if (title.isEmpty &&
+        description.isEmpty &&
+        dateLabel.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -1267,7 +1584,9 @@ class _QiblaPageState extends State<QiblaPage>
     Color textColor,
     Color secondaryColor,
   ) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
+    if (value.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1291,14 +1610,18 @@ class _QiblaPageState extends State<QiblaPage>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark =
+        Theme.of(context).brightness == Brightness.dark;
 
     final backgroundColor =
         isDark ? const Color(0xFF101C18) : _background;
+
     final cardColor =
         isDark ? const Color(0xFF1A2B24) : Colors.white;
+
     final textColor =
         isDark ? Colors.white : const Color(0xFF19382E);
+
     final secondaryColor =
         isDark ? Colors.white70 : Colors.black54;
 
@@ -1312,7 +1635,11 @@ class _QiblaPageState extends State<QiblaPage>
           elevation: 0,
           centerTitle: true,
           title: Text(
-            _tr('قبلة وأطلس', 'Qibla & Atlas', 'Qibla et Atlas'),
+            _tr(
+              'قبلة وأطلس',
+              'Qibla & Atlas',
+              'Qibla et Atlas',
+            ),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 19,
@@ -1320,13 +1647,23 @@ class _QiblaPageState extends State<QiblaPage>
           ),
           actions: [
             IconButton(
-              tooltip: _tr('تغيير اللغة', 'Change language', 'Changer de langue'),
+              tooltip: _tr(
+                'تغيير اللغة',
+                'Change language',
+                'Changer de langue',
+              ),
               onPressed: _showLanguageSelector,
               icon: const Icon(Icons.language_rounded),
             ),
             IconButton(
-              tooltip: _tr('تحديث الموقع', 'Refresh location', 'Actualiser la position'),
-              onPressed: _isRefreshing ? null : () => _loadLocation(),
+              tooltip: _tr(
+                'تحديث الموقع',
+                'Refresh location',
+                'Actualiser la position',
+              ),
+              onPressed: _isRefreshing
+                  ? null
+                  : () => _loadLocation(),
               icon: _isRefreshing
                   ? const SizedBox(
                       width: 19,
@@ -1351,11 +1688,20 @@ class _QiblaPageState extends State<QiblaPage>
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+              padding: const EdgeInsets.fromLTRB(
+                18,
+                18,
+                18,
+                30,
+              ),
               children: [
                 _buildIntro(textColor, secondaryColor),
                 const SizedBox(height: 18),
-                _buildLocationStatus(cardColor, textColor, secondaryColor),
+                _buildLocationStatus(
+                  cardColor,
+                  textColor,
+                  secondaryColor,
+                ),
                 const SizedBox(height: 22),
                 _buildCompassCard(
                   cardColor: cardColor,
@@ -1375,9 +1721,16 @@ class _QiblaPageState extends State<QiblaPage>
                   secondaryColor,
                 ),
                 const SizedBox(height: 25),
-                _buildAtlasHeader(textColor, secondaryColor),
+                _buildAtlasHeader(
+                  textColor,
+                  secondaryColor,
+                ),
                 const SizedBox(height: 13),
-                _buildAtlasMap(cardColor, textColor, secondaryColor),
+                _buildAtlasMap(
+                  cardColor,
+                  textColor,
+                  secondaryColor,
+                ),
                 const SizedBox(height: 22),
                 _buildLandmarkCollection(
                   cardColor,
@@ -1434,8 +1787,16 @@ class _QiblaPageState extends State<QiblaPage>
               children: [
                 Text(
                   hasError
-                      ? _tr('تعذر تحديد الموقع', 'Location unavailable', 'Position indisponible')
-                      : _tr('جارٍ تحديد موقعك', 'Finding your location', 'Recherche de votre position'),
+                      ? _tr(
+                          'تعذر تحديد الموقع',
+                          'Location unavailable',
+                          'Position indisponible',
+                        )
+                      : _tr(
+                          'جارٍ تحديد موقعك',
+                          'Finding your location',
+                          'Recherche de votre position',
+                        ),
                   style: TextStyle(
                     color: textColor,
                     fontWeight: FontWeight.bold,
@@ -1467,21 +1828,33 @@ class _QiblaPageState extends State<QiblaPage>
                             ? null
                             : () => _loadLocation(),
                         child: Text(
-                          _tr('إعادة المحاولة', 'Try again', 'Réessayer'),
+                          _tr(
+                            'إعادة المحاولة',
+                            'Try again',
+                            'Réessayer',
+                          ),
                         ),
                       ),
                       if (_locationServiceDisabled)
                         TextButton(
                           onPressed: _openLocationSettings,
                           child: Text(
-                            _tr('إعدادات الموقع', 'Location settings', 'Paramètres de localisation'),
+                            _tr(
+                              'إعدادات الموقع',
+                              'Location settings',
+                              'Paramètres de localisation',
+                            ),
                           ),
                         ),
                       if (_locationPermissionPermanentlyDenied)
                         TextButton(
                           onPressed: _openAppSettings,
                           child: Text(
-                            _tr('صلاحيات التطبيق', 'App permissions', 'Autorisations de l’application'),
+                            _tr(
+                              'صلاحيات التطبيق',
+                              'App permissions',
+                              'Autorisations de l’application',
+                            ),
                           ),
                         ),
                       if (!_locationServiceDisabled &&
@@ -1489,7 +1862,11 @@ class _QiblaPageState extends State<QiblaPage>
                         TextButton(
                           onPressed: _openAppSettings,
                           child: Text(
-                            _tr('إعدادات الصلاحيات', 'Permission settings', 'Paramètres des autorisations'),
+                            _tr(
+                              'إعدادات الصلاحيات',
+                              'Permission settings',
+                              'Paramètres des autorisations',
+                            ),
                           ),
                         ),
                     ],
@@ -1510,10 +1887,17 @@ class _QiblaPageState extends State<QiblaPage>
     );
   }
 
-  Widget _buildIntro(Color textColor, Color secondaryColor) {
+  Widget _buildIntro(
+    Color textColor,
+    Color secondaryColor,
+  ) {
     return Column(
       children: [
-        const Icon(Icons.mosque_rounded, color: _gold, size: 38),
+        const Icon(
+          Icons.mosque_rounded,
+          color: _gold,
+          size: 38,
+        ),
         const SizedBox(height: 9),
         Text(
           _tr(
@@ -1552,11 +1936,17 @@ class _QiblaPageState extends State<QiblaPage>
     required Color secondaryColor,
   }) {
     final hasQibla = _qiblaBearing != null;
+
     final hasLiveDirection =
         hasQibla && _relativeQiblaAngle != null;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
+      padding: const EdgeInsets.fromLTRB(
+        18,
+        22,
+        18,
+        24,
+      ),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(28),
@@ -1573,10 +1963,18 @@ class _QiblaPageState extends State<QiblaPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.explore_rounded, color: _gold, size: 19),
+              const Icon(
+                Icons.explore_rounded,
+                color: _gold,
+                size: 19,
+              ),
               const SizedBox(width: 7),
               Text(
-                _tr('البوصلة الحية', 'Live compass', 'Boussole en direct'),
+                _tr(
+                  'البوصلة الحية',
+                  'Live compass',
+                  'Boussole en direct',
+                ),
                 style: TextStyle(
                   color: textColor,
                   fontWeight: FontWeight.bold,
@@ -1614,7 +2012,9 @@ class _QiblaPageState extends State<QiblaPage>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: _primaryGreen.withValues(alpha: 0.2),
+                              color: _primaryGreen.withValues(
+                                alpha: 0.2,
+                              ),
                               blurRadius: 22,
                               spreadRadius: 2,
                             ),
@@ -1648,7 +2048,9 @@ class _QiblaPageState extends State<QiblaPage>
                       ),
                       AnimatedRotation(
                         turns: _relativeQiblaAngle! / 360.0,
-                        duration: const Duration(milliseconds: 180),
+                        duration: const Duration(
+                          milliseconds: 180,
+                        ),
                         curve: Curves.easeOut,
                         child: const Icon(
                           Icons.navigation_rounded,
@@ -1669,7 +2071,10 @@ class _QiblaPageState extends State<QiblaPage>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white,
-                          border: Border.all(color: _gold, width: 3),
+                          border: Border.all(
+                            color: _gold,
+                            width: 3,
+                          ),
                         ),
                       ),
                     ],
@@ -1694,12 +2099,16 @@ class _QiblaPageState extends State<QiblaPage>
                     color: _primaryGreen,
                     fontSize: 29,
                     fontWeight: FontWeight.bold,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: [
+                      FontFeature.tabularFigures(),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  _directionInstruction(_relativeQiblaAngle!),
+                  _directionInstruction(
+                    _relativeQiblaAngle!,
+                  ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: textColor,
@@ -1733,20 +2142,38 @@ class _QiblaPageState extends State<QiblaPage>
       child: Column(
         children: [
           _headingRow(
-            _tr('اتجاه القبلة الجغرافي', 'Geographic Qibla bearing', 'Azimut géographique de la Qibla'),
-            _qiblaBearing == null ? '--' : _formatBearing(_qiblaBearing!),
+            _tr(
+              'اتجاه القبلة الجغرافي',
+              'Geographic Qibla bearing',
+              'Azimut géographique de la Qibla',
+            ),
+            _qiblaBearing == null
+                ? '--'
+                : _formatBearing(_qiblaBearing!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
           _headingRow(
-            _tr('اتجاه الهاتف الحقيقي', 'True phone heading', 'Cap du téléphone (vrai nord)'),
-            _trueHeading == null ? '--' : _formatBearing(_trueHeading!),
+            _tr(
+              'اتجاه الهاتف الحقيقي',
+              'True phone heading',
+              'Cap du téléphone (vrai nord)',
+            ),
+            _trueHeading == null
+                ? '--'
+                : _formatBearing(_trueHeading!),
             secondaryColor,
           ),
           const SizedBox(height: 8),
           _headingRow(
-            _tr('قراءة الحساس المغناطيسية', 'Magnetic sensor reading', 'Lecture du capteur magnétique'),
-            _magneticHeading == null ? '--' : _formatBearing(_magneticHeading!),
+            _tr(
+              'قراءة الحساس المغناطيسية',
+              'Magnetic sensor reading',
+              'Lecture du capteur magnétique',
+            ),
+            _magneticHeading == null
+                ? '--'
+                : _formatBearing(_magneticHeading!),
             secondaryColor,
           ),
         ],
@@ -1764,7 +2191,10 @@ class _QiblaPageState extends State<QiblaPage>
         Expanded(
           child: Text(
             label,
-            style: TextStyle(color: secondaryColor, fontSize: 10),
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 10,
+            ),
           ),
         ),
         Text(
@@ -1773,7 +2203,9 @@ class _QiblaPageState extends State<QiblaPage>
             color: _gold,
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            fontFeatures: [FontFeature.tabularFigures()],
+            fontFeatures: [
+              FontFeature.tabularFigures(),
+            ],
           ),
         ),
       ],
@@ -1784,7 +2216,9 @@ class _QiblaPageState extends State<QiblaPage>
     return SizedBox(
       width: 244,
       height: 244,
-      child: CustomPaint(painter: _CompassTicksPainter()),
+      child: CustomPaint(
+        painter: _CompassTicksPainter(),
+      ),
     );
   }
 
@@ -1804,13 +2238,32 @@ class _QiblaPageState extends State<QiblaPage>
     Color secondaryColor, {
     required bool hasQibla,
   }) {
-    final isAtKaaba = _distanceKm != null && _distanceKm! <= 0.001;
+    final isAtKaaba =
+        _distanceKm != null && _distanceKm! <= 0.001;
 
     final title = isAtKaaba
-        ? _tr('أنت عند الكعبة تقريباً', 'You are near the Kaaba', 'Vous êtes près de la Kaaba')
-        : hasQibla
-            ? _tr('حساس البوصلة غير متاح', 'Compass sensor unavailable', 'Capteur de boussole indisponible')
-            : _tr('اتجاه القبلة غير متاح بعد', 'Qibla direction not available yet', 'Direction de la Qibla non disponible');
+        ? _tr(
+            'أنت عند الكعبة تقريباً',
+            'You are near the Kaaba',
+            'Vous êtes près de la Kaaba',
+          )
+        : !hasQibla
+            ? _tr(
+                'اتجاه القبلة غير متاح بعد',
+                'Qibla direction not available yet',
+                'Direction de la Qibla non disponible',
+              )
+            : _isCompassUnavailable
+                ? _tr(
+                    'حساس البوصلة غير متاح',
+                    'Compass sensor unavailable',
+                    'Capteur de boussole indisponible',
+                  )
+                : _tr(
+                    'في انتظار قراءة البوصلة',
+                    'Waiting for compass reading',
+                    'En attente de la lecture de la boussole',
+                  );
 
     final message = isAtKaaba
         ? _tr(
@@ -1818,27 +2271,39 @@ class _QiblaPageState extends State<QiblaPage>
             'The calculated distance indicates that you are very close to the Kaaba, so a route direction is not defined.',
             'La distance calculée indique que vous êtes très proche de la Kaaba ; un azimut de trajet n’est donc pas défini.',
           )
-        : hasQibla
+        : !hasQibla
             ? _tr(
-                'اتجاه القبلة الجغرافي محسوب، لكن التوجيه المباشر يحتاج إلى حساس بوصلة متاح ويقدم قراءة صالحة.',
-                'The geographic Qibla bearing is calculated, but live guidance requires an available compass sensor with a valid reading.',
-                'L’azimut géographique de la Qibla est calculé, mais le guidage en direct nécessite un capteur de boussole disponible avec une lecture valide.',
-              )
-            : _tr(
                 'يلزم تحديد موقعك أولاً لحساب اتجاه القبلة. يمكنك استخدام الأطلس والمعالم دون GPS.',
                 'Your location is required to calculate the Qibla. You can use the atlas and landmarks without GPS.',
                 'Votre position est nécessaire pour calculer la Qibla. Vous pouvez utiliser l’atlas et les monuments sans GPS.',
-              );
+              )
+            : _isCompassUnavailable
+                ? _tr(
+                    'اتجاه القبلة الجغرافي محسوب، لكن حساس البوصلة لا يقدم حالياً قراءات صالحة. تحقق من الحساس وحاول إعادة الاتصال.',
+                    'The geographic Qibla bearing is calculated, but the compass sensor is not currently providing valid readings. Check the sensor and try reconnecting.',
+                    'L’azimut géographique de la Qibla est calculé, mais le capteur ne fournit pas actuellement de lectures valides. Vérifiez le capteur et réessayez.',
+                  )
+                : _tr(
+                    'تم الاتصال بحساس البوصلة. ينتظر التطبيق أول قراءة صالحة لتفعيل التوجيه المباشر.',
+                    'The compass sensor is connected. The app is waiting for its first valid reading to enable live guidance.',
+                    'Le capteur de boussole est connecté. L’application attend sa première lecture valide pour activer le guidage en direct.',
+                  );
 
     return Column(
       children: [
         Icon(
           isAtKaaba
               ? Icons.mosque_rounded
-              : hasQibla
-                  ? Icons.sensors_off_rounded
-                  : Icons.location_searching_rounded,
-          color: isAtKaaba ? _gold : Colors.orange,
+              : !hasQibla
+                  ? Icons.location_searching_rounded
+                  : _isCompassUnavailable
+                      ? Icons.sensors_off_rounded
+                      : Icons.explore_rounded,
+          color: isAtKaaba
+              ? _gold
+              : _isCompassUnavailable
+                  ? Colors.orange
+                  : _gold,
           size: 45,
         ),
         const SizedBox(height: 12),
@@ -1863,16 +2328,42 @@ class _QiblaPageState extends State<QiblaPage>
         if (!hasQibla && !isAtKaaba) ...[
           const SizedBox(height: 12),
           TextButton.icon(
-            onPressed: _isRefreshing ? null : () => _loadLocation(),
+            onPressed: _isRefreshing
+                ? null
+                : () => _loadLocation(),
             icon: const Icon(Icons.refresh_rounded),
-            label: Text(_tr('تحديث الموقع', 'Refresh location', 'Actualiser la position')),
+            label: Text(
+              _tr(
+                'تحديث الموقع',
+                'Refresh location',
+                'Actualiser la position',
+              ),
+            ),
           ),
-        ] else if (hasQibla && _isCompassUnavailable) ...[
+        ] else if (hasQibla &&
+            !isAtKaaba &&
+            _isCompassUnavailable) ...[
           const SizedBox(height: 12),
           TextButton.icon(
-            onPressed: _connectCompass,
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text(_tr('إعادة الاتصال بالحساس', 'Reconnect sensor', 'Reconnecter le capteur')),
+            onPressed: _isCompassConnecting
+                ? null
+                : _reconnectCompass,
+            icon: _isCompassConnecting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            label: Text(
+              _tr(
+                'إعادة الاتصال بالحساس',
+                'Reconnect sensor',
+                'Reconnecter le capteur',
+              ),
+            ),
           ),
         ],
         if (hasQibla) ...[
@@ -1889,7 +2380,9 @@ class _QiblaPageState extends State<QiblaPage>
     Color secondaryColor,
   ) {
     final angle = _relativeQiblaAngle;
-    final isAligned = angle != null && angle.abs() <= 3;
+
+    final isAligned =
+        angle != null && angle.abs() <= 3;
 
     final steps = [
       _tr(
@@ -1927,7 +2420,9 @@ class _QiblaPageState extends State<QiblaPage>
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(23),
-        border: Border.all(color: _gold.withValues(alpha: 0.24)),
+        border: Border.all(
+          color: _gold.withValues(alpha: 0.24),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1955,7 +2450,10 @@ class _QiblaPageState extends State<QiblaPage>
                 ),
               ),
               if (isAligned)
-                const Icon(Icons.check_circle_rounded, color: _primaryGreen),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: _primaryGreen,
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1977,15 +2475,23 @@ class _QiblaPageState extends State<QiblaPage>
                           ? _primaryGreen
                           : active
                               ? _gold.withValues(alpha: 0.22)
-                              : secondaryColor.withValues(alpha: 0.10),
+                              : secondaryColor.withValues(
+                                  alpha: 0.10,
+                                ),
                       shape: BoxShape.circle,
                     ),
                     child: completed
-                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          )
                         : Text(
                             '${index + 1}',
                             style: TextStyle(
-                              color: active ? _historicalColor : textColor,
+                              color: active
+                                  ? _historicalColor
+                                  : textColor,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2040,7 +2546,11 @@ class _QiblaPageState extends State<QiblaPage>
             textColor: textColor,
             secondaryColor: secondaryColor,
             icon: Icons.explore_rounded,
-            title: _tr('اتجاه القبلة', 'Qibla bearing', 'Direction de la Qibla'),
+            title: _tr(
+              'اتجاه القبلة',
+              'Qibla bearing',
+              'Direction de la Qibla',
+            ),
             value: _qiblaBearing == null
                 ? '--'
                 : _formatBearing(_qiblaBearing!),
@@ -2053,7 +2563,11 @@ class _QiblaPageState extends State<QiblaPage>
             textColor: textColor,
             secondaryColor: secondaryColor,
             icon: Icons.straighten_rounded,
-            title: _tr('المسافة إلى الكعبة', 'Distance to Kaaba', 'Distance jusqu’à la Kaaba'),
+            title: _tr(
+              'المسافة إلى الكعبة',
+              'Distance to Kaaba',
+              'Distance jusqu’à la Kaaba',
+            ),
             value: _distanceKm == null
                 ? '--'
                 : _formatDistance(_distanceKm!),
@@ -2072,7 +2586,10 @@ class _QiblaPageState extends State<QiblaPage>
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 17),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 17,
+      ),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -2084,7 +2601,10 @@ class _QiblaPageState extends State<QiblaPage>
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(color: secondaryColor, fontSize: 11),
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(height: 7),
           FittedBox(
@@ -2112,7 +2632,11 @@ class _QiblaPageState extends State<QiblaPage>
       children: [
         Row(
           children: [
-            const Icon(Icons.public_rounded, color: _gold, size: 25),
+            const Icon(
+              Icons.public_rounded,
+              color: _gold,
+              size: 25,
+            ),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
@@ -2129,7 +2653,10 @@ class _QiblaPageState extends State<QiblaPage>
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
               decoration: BoxDecoration(
                 color: _primaryGreen.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(20),
@@ -2193,7 +2720,10 @@ class _QiblaPageState extends State<QiblaPage>
                 initialScale: 1,
                 onCountrySelected: (country) {
                   if (!mounted) return;
-                  setState(() => _selectedCountry = country);
+
+                  setState(() {
+                    _selectedCountry = country;
+                  });
                 },
               ),
             ),
@@ -2202,14 +2732,21 @@ class _QiblaPageState extends State<QiblaPage>
           if (_selectedCountry != null)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 13,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 color: _primaryGreen.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on_rounded, color: _primaryGreen, size: 20),
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: _primaryGreen,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -2222,9 +2759,20 @@ class _QiblaPageState extends State<QiblaPage>
                     ),
                   ),
                   IconButton(
-                    tooltip: _tr('مسح التحديد', 'Clear selection', 'Effacer la sélection'),
-                    onPressed: () => setState(() => _selectedCountry = null),
-                    icon: const Icon(Icons.close_rounded, size: 18),
+                    tooltip: _tr(
+                      'مسح التحديد',
+                      'Clear selection',
+                      'Effacer la sélection',
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _selectedCountry = null;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                    ),
                   ),
                 ],
               ),
@@ -2232,7 +2780,11 @@ class _QiblaPageState extends State<QiblaPage>
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.touch_app_rounded, color: _gold, size: 18),
+              const Icon(
+                Icons.touch_app_rounded,
+                color: _gold,
+                size: 18,
+              ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
@@ -2253,7 +2805,11 @@ class _QiblaPageState extends State<QiblaPage>
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.offline_pin_rounded, color: _primaryGreen, size: 18),
+              const Icon(
+                Icons.offline_pin_rounded,
+                color: _primaryGreen,
+                size: 18,
+              ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
@@ -2285,7 +2841,9 @@ class _QiblaPageState extends State<QiblaPage>
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
-          child: CircularProgressIndicator(color: _gold),
+          child: CircularProgressIndicator(
+            color: _gold,
+          ),
         ),
       );
     }
@@ -2299,34 +2857,57 @@ class _QiblaPageState extends State<QiblaPage>
         ),
         child: Column(
           children: [
-            const Icon(Icons.travel_explore_rounded, color: _gold, size: 35),
+            const Icon(
+              Icons.travel_explore_rounded,
+              color: _gold,
+              size: 35,
+            ),
             const SizedBox(height: 10),
             Text(
-              _tr('لا توجد معالم متاحة حالياً', 'No landmarks available', 'Aucun monument disponible'),
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+              _tr(
+                'لا توجد معالم متاحة حالياً',
+                'No landmarks available',
+                'Aucun monument disponible',
+              ),
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             if (_landmarkError != null) ...[
               const SizedBox(height: 8),
               Text(
                 _landmarkError!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: secondaryColor, fontSize: 11),
+                style: TextStyle(
+                  color: secondaryColor,
+                  fontSize: 11,
+                ),
               ),
             ],
             TextButton.icon(
-              onPressed: _loadLandmarks,
+              onPressed: () => _loadLandmarks(),
               icon: const Icon(Icons.refresh_rounded),
-              label: Text(_tr('إعادة تحميل البيانات', 'Reload data', 'Recharger les données')),
+              label: Text(
+                _tr(
+                  'إعادة تحميل البيانات',
+                  'Reload data',
+                  'Recharger les données',
+                ),
+              ),
             ),
           ],
         ),
       );
     }
 
-    final islamicLandmarks =
-        _landmarks.where(_isIslamicLandmark).toList(growable: false);
-    final wonders =
-        _landmarks.where((item) => !_isIslamicLandmark(item)).toList(growable: false);
+    final islamicLandmarks = _landmarks
+        .where(_isIslamicLandmark)
+        .toList(growable: false);
+
+    final wonders = _landmarks
+        .where((item) => !_isIslamicLandmark(item))
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2334,13 +2915,24 @@ class _QiblaPageState extends State<QiblaPage>
         if (_landmarkError != null) ...[
           Text(
             _landmarkError!,
-            style: TextStyle(color: secondaryColor, fontSize: 11),
+            style: TextStyle(
+              color: secondaryColor,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(height: 10),
         ],
         _collectionTitle(
-          _tr('المعالم الإسلامية', 'Islamic landmarks', 'Monuments islamiques'),
-          _tr('${islamicLandmarks.length} مواقع', '${islamicLandmarks.length} places', '${islamicLandmarks.length} lieux'),
+          _tr(
+            'المعالم الإسلامية',
+            'Islamic landmarks',
+            'Monuments islamiques',
+          ),
+          _tr(
+            '${islamicLandmarks.length} مواقع',
+            '${islamicLandmarks.length} places',
+            '${islamicLandmarks.length} lieux',
+          ),
           textColor,
         ),
         const SizedBox(height: 11),
@@ -2363,8 +2955,16 @@ class _QiblaPageState extends State<QiblaPage>
           ),
         const SizedBox(height: 22),
         _collectionTitle(
-          _tr('العجائب والمواقع التاريخية', 'Wonders and historic sites', 'Merveilles et sites historiques'),
-          _tr('${wonders.length} مواقع', '${wonders.length} places', '${wonders.length} lieux'),
+          _tr(
+            'العجائب والمواقع التاريخية',
+            'Wonders and historic sites',
+            'Merveilles et sites historiques',
+          ),
+          _tr(
+            '${wonders.length} مواقع',
+            '${wonders.length} places',
+            '${wonders.length} lieux',
+          ),
           textColor,
         ),
         const SizedBox(height: 11),
@@ -2448,14 +3048,17 @@ class _QiblaPageState extends State<QiblaPage>
     Color textColor,
     Color secondaryColor,
   ) {
-    if (landmarks.isEmpty) return const SizedBox.shrink();
+    if (landmarks.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return SizedBox(
       height: 158,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: landmarks.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 11),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: 11),
         itemBuilder: (context, index) {
           final landmark = landmarks[index];
           final color = _landmarkColor(landmark);
@@ -2473,11 +3076,14 @@ class _QiblaPageState extends State<QiblaPage>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: secondaryColor.withValues(alpha: 0.10),
+                      color: secondaryColor.withValues(
+                        alpha: 0.10,
+                      ),
                     ),
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -2485,8 +3091,11 @@ class _QiblaPageState extends State<QiblaPage>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.11),
-                              borderRadius: BorderRadius.circular(12),
+                              color: color.withValues(
+                                alpha: 0.11,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(12),
                             ),
                             child: Icon(
                               _landmarkIcon(landmark),
@@ -2541,7 +3150,9 @@ class _QiblaPageState extends State<QiblaPage>
     final accuracy = _position?.accuracy;
 
     // لا نعرض بطاقة دقة GPS عند غياب قراءة صالحة.
-    if (accuracy == null || !accuracy.isFinite || accuracy < 0) {
+    if (accuracy == null ||
+        !accuracy.isFinite ||
+        accuracy < 0) {
       return const SizedBox.shrink();
     }
 
@@ -2568,7 +3179,9 @@ class _QiblaPageState extends State<QiblaPage>
       decoration: BoxDecoration(
         color: _gold.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _gold.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: _gold.withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2576,7 +3189,11 @@ class _QiblaPageState extends State<QiblaPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.gps_fixed_rounded, color: _gold, size: 20),
+              const Icon(
+                Icons.gps_fixed_rounded,
+                color: _gold,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -2594,7 +3211,11 @@ class _QiblaPageState extends State<QiblaPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.tips_and_updates_outlined, color: _gold, size: 20),
+              const Icon(
+                Icons.tips_and_updates_outlined,
+                color: _gold,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -2621,7 +3242,11 @@ class _QiblaPageState extends State<QiblaPage>
 class _CompassTicksPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+    final center = Offset(
+      size.width / 2,
+      size.height / 2,
+    );
+
     final radius = size.width / 2;
 
     final tickPaint = Paint()
@@ -2634,7 +3259,8 @@ class _CompassTicksPainter extends CustomPainter {
       final isMajor = i % 5 == 0;
 
       final outerRadius = radius - 4;
-      final innerRadius = outerRadius - (isMajor ? 12 : 6);
+      final innerRadius =
+          outerRadius - (isMajor ? 12 : 6);
 
       final start = Offset(
         center.dx + innerRadius * math.cos(angle),
@@ -2647,12 +3273,16 @@ class _CompassTicksPainter extends CustomPainter {
       );
 
       tickPaint.strokeWidth = isMajor ? 2.2 : 1.1;
+
       canvas.drawLine(start, end, tickPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _CompassTicksPainter oldDelegate) => false;
+  bool shouldRepaint(
+    covariant _CompassTicksPainter oldDelegate,
+  ) =>
+      false;
 }
 
 class _LocationException implements Exception {
