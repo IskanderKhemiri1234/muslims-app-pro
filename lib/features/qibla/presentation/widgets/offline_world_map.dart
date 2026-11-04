@@ -1,4 +1,3 @@
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -14,9 +13,9 @@ import 'package:dv_map/maps/world/50m.dart';
 /// - Zoom controls.
 /// - Live zoom percentage.
 /// - Optional coordinate grid.
-/// - Optional user location marker.
-/// - Optional Qibla direction indicator.
-/// - Optional Kaaba marker.
+/// - Optional user location marker with an elite anime-style prostrating avatar.
+/// - Optional Qibla direction indicator with glowing divine laser vector.
+/// - Optional Kaaba marker with sacred illumination.
 class OfflineWorldMap extends StatefulWidget {
   const OfflineWorldMap({
     super.key,
@@ -288,7 +287,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Qibla Atlas',
+                  'Qibla Atlas Pro',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -297,7 +296,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'WORLD EXPLORER · OFFLINE MAP',
+                  'WORLD EXPLORER · ELITE OFFLINE MAP',
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 9,
@@ -561,9 +560,8 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
 
 /// Paints the user's position, the Kaaba, and the Qibla direction.
 ///
-/// Coordinates are projected using normalized spherical Mercator
-/// coordinates. The overlay assumes the underlying world atlas fills
-/// the available map area using the same world-coordinate extent.
+/// Features an exclusive high-end Anime-style prostrating avatar (Sajdah)
+/// and divine illuminated vector laser pointing straight towards the Kaaba.
 class _QiblaMapOverlayPainter extends CustomPainter {
   const _QiblaMapOverlayPainter({
     required this.userLatitude,
@@ -619,8 +617,13 @@ class _QiblaMapOverlayPainter extends CustomPainter {
     Canvas canvas,
     Offset position,
   ) {
+    final outerGlow = Paint()
+      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+      ..style = PaintingStyle.fill;
+
     final glowPaint = Paint()
-      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.22)
+      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.25)
       ..style = PaintingStyle.fill;
 
     final outerPaint = Paint()
@@ -631,30 +634,22 @@ class _QiblaMapOverlayPainter extends CustomPainter {
       ..color = const Color(0xFF18232D)
       ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(
-      position,
-      12,
-      glowPaint,
-    );
-
-    canvas.drawCircle(
-      position,
-      7,
-      outerPaint,
-    );
+    canvas.drawCircle(position, 16, outerGlow);
+    canvas.drawCircle(position, 12, glowPaint);
+    canvas.drawCircle(position, 8, outerPaint);
 
     canvas.drawRect(
       Rect.fromCenter(
         center: position,
-        width: 5,
-        height: 5,
+        width: 6,
+        height: 6,
       ),
       innerPaint,
     );
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..strokeWidth = 1.0
+      ..color = Colors.white.withValues(alpha: 0.95)
+      ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
 
     canvas.drawLine(
@@ -664,75 +659,65 @@ class _QiblaMapOverlayPainter extends CustomPainter {
     );
   }
 
+  /// Draws an elite exclusive anime-style avatar of a person in Sajdah (prostration)
   void _drawUserMarker(
     Canvas canvas,
     Offset position,
   ) {
+    // Sacred aura shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.35)
-      ..maskFilter = const MaskFilter.blur(
-        BlurStyle.normal,
-        5,
-      );
+      ..color = const Color(0xFF53D6B2).withValues(alpha: 0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
 
-    final outerPaint = Paint()
-      ..color = const Color(0xFF071C17)
-      ..style = PaintingStyle.fill;
+    canvas.drawCircle(position, 14, shadowPaint);
 
-    final innerPaint = Paint()
-      ..color = const Color(0xFF53D6B2)
-      ..style = PaintingStyle.fill;
-
-    final figurePaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round
+    // Outer radar ring
+    final outerRing = Paint()
+      ..color = const Color(0xFF53D6B2).withValues(alpha: 0.8)
+      ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    canvas.drawCircle(
-      position.translate(0, 2),
-      12,
-      shadowPaint,
-    );
+    canvas.drawCircle(position, 11, outerRing);
 
-    canvas.drawCircle(
-      position,
-      10,
-      outerPaint,
-    );
+    // Background core badge
+    final corePaint = Paint()
+      ..color = const Color(0xFF0C1B2A)
+      ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(
-      position,
-      8,
-      innerPaint,
-    );
+    canvas.drawCircle(position, 9.5, corePaint);
 
-    final headCenter = position.translate(0, -3);
+    // Anime-style Prostrating Silhouette (Tajweed / Sajdah icon style)
+    final animePaint = Paint()
+      ..color = const Color(0xFF53D6B2)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
 
-    canvas.drawCircle(
-      headCenter,
-      1.8,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
+    final headPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
 
+    // Head (down in sajdah)
+    canvas.drawCircle(position.translate(-4, 1), 2.2, headPaint);
+
+    // Back & body curve path in prostration
+    final path = Path()
+      ..moveTo(position.dx + 5, position.dy + 3) // feet/legs folded
+      ..quadraticBezierTo(
+        position.dx + 1,
+        position.dy - 3,
+        position.dx - 3,
+        position.dy + 1,
+      ); // curved back
+
+    canvas.drawPath(path, animePaint);
+
+    // Hands placed forward on ground in sajdah
     canvas.drawLine(
-      position.translate(0, -1),
-      position.translate(0, 3),
-      figurePaint,
-    );
-
-    canvas.drawLine(
-      position.translate(0, 1),
-      position.translate(-3, 4),
-      figurePaint,
-    );
-
-    canvas.drawLine(
-      position.translate(0, 1),
-      position.translate(3, 4),
-      figurePaint,
+      position.translate(-2, 2),
+      position.translate(-5, 4),
+      animePaint,
     );
   }
 
@@ -811,29 +796,21 @@ class _QiblaMapOverlayPainter extends CustomPainter {
     Offset origin,
     Offset endpoint,
   ) {
-    final glowPaint = Paint()
-      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.22)
+    final divineGlow = Paint()
+      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4)
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     final linePaint = Paint()
       ..color = const Color(0xFFD9B45B)
-      ..strokeWidth = 2.2
+      ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(
-      origin,
-      endpoint,
-      glowPaint,
-    );
-
-    canvas.drawLine(
-      origin,
-      endpoint,
-      linePaint,
-    );
+    canvas.drawLine(origin, endpoint, divineGlow);
+    canvas.drawLine(origin, endpoint, linePaint);
 
     final direction = endpoint - origin;
     final length = direction.distance;
@@ -849,8 +826,8 @@ class _QiblaMapOverlayPainter extends CustomPainter {
       unitDirection.dx,
     );
 
-    const arrowLength = 10.0;
-    const arrowWidth = 5.5;
+    const arrowLength = 12.0;
+    const arrowWidth = 6.0;
 
     final arrowBase = endpoint - unitDirection * arrowLength;
 
@@ -944,7 +921,7 @@ class _QiblaMapOverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
+    bool shouldRepaint(
     covariant _QiblaMapOverlayPainter oldDelegate,
   ) {
     return oldDelegate.userLatitude != userLatitude ||
