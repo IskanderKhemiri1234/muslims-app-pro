@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+
+    <!-- Keep all external HTTP traffic blocked. -->
     <base-config cleartextTrafficPermitted="false" />
+
+    <!-- Allow HTTP only for the Quran package's local server. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+
 </network-security-config>
