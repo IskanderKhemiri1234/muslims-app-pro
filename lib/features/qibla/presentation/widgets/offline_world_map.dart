@@ -1,3 +1,4 @@
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -13,17 +14,44 @@ import 'package:dv_map/maps/world/50m.dart';
 /// - Zoom controls.
 /// - Live zoom percentage.
 /// - Optional coordinate grid.
+/// - Optional user location marker.
+/// - Optional Qibla direction indicator.
+/// - Optional Kaaba marker.
 class OfflineWorldMap extends StatefulWidget {
   const OfflineWorldMap({
     super.key,
     this.showGrid = true,
     this.initialScale = 1.0,
     this.onCountrySelected,
+    this.userLatitude,
+    this.userLongitude,
+    this.qiblaBearing,
+    this.showKaabaMarker = true,
+    this.showUserMarker = true,
+    this.showQiblaDirection = true,
   });
 
   final bool showGrid;
   final double initialScale;
   final ValueChanged<String>? onCountrySelected;
+
+  /// User latitude in decimal degrees.
+  final double? userLatitude;
+
+  /// User longitude in decimal degrees.
+  final double? userLongitude;
+
+  /// True geographic Qibla bearing in degrees.
+  final double? qiblaBearing;
+
+  /// Whether the Kaaba marker should be rendered.
+  final bool showKaabaMarker;
+
+  /// Whether the user's location marker should be rendered.
+  final bool showUserMarker;
+
+  /// Whether the Qibla direction arrow should be rendered.
+  final bool showQiblaDirection;
 
   @override
   State<OfflineWorldMap> createState() => _OfflineWorldMapState();
@@ -34,6 +62,7 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
   static const Color _landColor = Color(0xFF244C57);
   static const Color _borderColor = Color(0xFF6F9D9A);
   static const Color _accentColor = Color(0xFF53D6B2);
+  static const Color _goldColor = Color(0xFFD9B45B);
 
   static const double _minZoom = 0.5;
   static const double _maxZoom = 8.0;
@@ -58,6 +87,28 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
       zoom,
       1.0,
     );
+  }
+
+  bool get _hasValidUserLocation {
+    final latitude = widget.userLatitude;
+    final longitude = widget.userLongitude;
+
+    if (latitude == null || longitude == null) {
+      return false;
+    }
+
+    return latitude.isFinite &&
+        longitude.isFinite &&
+        latitude >= -90.0 &&
+        latitude <= 90.0 &&
+        longitude >= -180.0 &&
+        longitude <= 180.0;
+  }
+
+  bool get _hasValidQiblaBearing {
+    final bearing = widget.qiblaBearing;
+
+    return bearing != null && bearing.isFinite;
   }
 
   @override
@@ -296,6 +347,13 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
 
+        if (!width.isFinite ||
+            !height.isFinite ||
+            width <= 0 ||
+            height <= 0) {
+          return const SizedBox.shrink();
+        }
+
         return InteractiveViewer(
           transformationController: _transformController,
           minScale: _minZoom,
@@ -323,6 +381,27 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
                     _handleCountryTap(feature);
                   },
                 ),
+                if (_hasValidUserLocation ||
+                    widget.showKaabaMarker)
+                  IgnorePointer(
+                    child: CustomPaint(
+                      painter: _QiblaMapOverlayPainter(
+                        userLatitude: _hasValidUserLocation
+                            ? widget.userLatitude
+                            : null,
+                        userLongitude: _hasValidUserLocation
+                            ? widget.userLongitude
+                            : null,
+                        qiblaBearing: _hasValidQiblaBearing
+                            ? widget.qiblaBearing
+                            : null,
+                        showUserMarker: widget.showUserMarker,
+                        showKaabaMarker: widget.showKaabaMarker,
+                        showQiblaDirection:
+                            widget.showQiblaDirection,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -476,6 +555,403 @@ class _OfflineWorldMapState extends State<OfflineWorldMap> {
         ],
       ),
     );
+  }
+}
+
+/// Paints the user's position, the Kaaba, and the Qibla direction.
+///
+/// Coordinates are projected using normalized spherical Mercator
+/// coordinates. The overlay assumes the underlying world atlas fills
+/// the available map area using the same world-coordinate extent.
+class _QiblaMapOverlayPainter extends CustomPainter {
+  const _QiblaMapOverlayPainter({
+    required this.userLatitude,
+    required this.userLongitude,
+    required this.qiblaBearing,
+    required this.showUserMarker,
+    required this.showKaabaMarker,
+    required this.showQiblaDirection,
+  });
+
+  static const double _kaabaLatitude = 21.4225;
+  static const double _kaabaLongitude = 39.8262;
+  static const double _maximumMercatorLatitude = 85.05112878;
+
+  final double? userLatitude;
+  final double? userLongitude;
+  final double? qiblaBearing;
+  final bool showUserMarker;
+  final bool showKaabaMarker;
+  final bool showQiblaDirection;
+
+  Offset _projectCoordinate({
+    required double latitude,
+    required double longitude,
+    required Size size,
+  }) {
+    final safeLatitude = latitude.clamp(
+      -_maximumMercatorLatitude,
+      _maximumMercatorLatitude,
+    );
+
+    final safeLongitude = longitude.clamp(-180.0, 180.0);
+
+    final latitudeRadians = safeLatitude * math.pi / 180.0;
+
+    final mercatorY = math.log(
+      math.tan(
+        math.pi / 4.0 + latitudeRadians / 2.0,
+      ),
+    );
+
+    final normalizedX = (safeLongitude + 180.0) / 360.0;
+
+    final normalizedY = 0.5 - mercatorY / (2.0 * math.pi);
+
+    return Offset(
+      normalizedX * size.width,
+      normalizedY * size.height,
+    );
+  }
+
+  void _drawKaaba(
+    Canvas canvas,
+    Offset position,
+  ) {
+    final glowPaint = Paint()
+      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.22)
+      ..style = PaintingStyle.fill;
+
+    final outerPaint = Paint()
+      ..color = const Color(0xFFD9B45B)
+      ..style = PaintingStyle.fill;
+
+    final innerPaint = Paint()
+      ..color = const Color(0xFF18232D)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(
+      position,
+      12,
+      glowPaint,
+    );
+
+    canvas.drawCircle(
+      position,
+      7,
+      outerPaint,
+    );
+
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: position,
+        width: 5,
+        height: 5,
+      ),
+      innerPaint,
+    );
+
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      Offset(position.dx - 3, position.dy - 2),
+      Offset(position.dx + 3, position.dy - 2),
+      highlightPaint,
+    );
+  }
+
+  void _drawUserMarker(
+    Canvas canvas,
+    Offset position,
+  ) {
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(
+        BlurStyle.normal,
+        5,
+      );
+
+    final outerPaint = Paint()
+      ..color = const Color(0xFF071C17)
+      ..style = PaintingStyle.fill;
+
+    final innerPaint = Paint()
+      ..color = const Color(0xFF53D6B2)
+      ..style = PaintingStyle.fill;
+
+    final figurePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(
+      position.translate(0, 2),
+      12,
+      shadowPaint,
+    );
+
+    canvas.drawCircle(
+      position,
+      10,
+      outerPaint,
+    );
+
+    canvas.drawCircle(
+      position,
+      8,
+      innerPaint,
+    );
+
+    final headCenter = position.translate(0, -3);
+
+    canvas.drawCircle(
+      headCenter,
+      1.8,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+
+    canvas.drawLine(
+      position.translate(0, -1),
+      position.translate(0, 3),
+      figurePaint,
+    );
+
+    canvas.drawLine(
+      position.translate(0, 1),
+      position.translate(-3, 4),
+      figurePaint,
+    );
+
+    canvas.drawLine(
+      position.translate(0, 1),
+      position.translate(3, 4),
+      figurePaint,
+    );
+  }
+
+  Offset? _calculateArrowEndpoint({
+    required Offset origin,
+    required double bearing,
+    required Size size,
+  }) {
+    if (!bearing.isFinite ||
+        !origin.dx.isFinite ||
+        !origin.dy.isFinite ||
+        size.width <= 0 ||
+        size.height <= 0) {
+      return null;
+    }
+
+    final radians = bearing * math.pi / 180.0;
+
+    final direction = Offset(
+      math.sin(radians),
+      -math.cos(radians),
+    );
+
+    const inset = 18.0;
+
+    final minimumX = inset;
+    final maximumX = size.width - inset;
+    final minimumY = inset;
+    final maximumY = size.height - inset;
+
+    if (minimumX >= maximumX || minimumY >= maximumY) {
+      return null;
+    }
+
+    double distance = double.infinity;
+
+    if (direction.dx > 0) {
+      distance = math.min(
+        distance,
+        (maximumX - origin.dx) / direction.dx,
+      );
+    } else if (direction.dx < 0) {
+      distance = math.min(
+        distance,
+        (minimumX - origin.dx) / direction.dx,
+      );
+    }
+
+    if (direction.dy > 0) {
+      distance = math.min(
+        distance,
+        (maximumY - origin.dy) / direction.dy,
+      );
+    } else if (direction.dy < 0) {
+      distance = math.min(
+        distance,
+        (minimumY - origin.dy) / direction.dy,
+      );
+    }
+
+    if (!distance.isFinite || distance <= 0) {
+      return null;
+    }
+
+    final endpoint = origin + direction * distance;
+
+    if (!endpoint.dx.isFinite || !endpoint.dy.isFinite) {
+      return null;
+    }
+
+    return endpoint;
+  }
+
+  void _drawQiblaDirection(
+    Canvas canvas,
+    Offset origin,
+    Offset endpoint,
+  ) {
+    final glowPaint = Paint()
+      ..color = const Color(0xFFD9B45B).withValues(alpha: 0.22)
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final linePaint = Paint()
+      ..color = const Color(0xFFD9B45B)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      origin,
+      endpoint,
+      glowPaint,
+    );
+
+    canvas.drawLine(
+      origin,
+      endpoint,
+      linePaint,
+    );
+
+    final direction = endpoint - origin;
+    final length = direction.distance;
+
+    if (!length.isFinite || length < 12) {
+      return;
+    }
+
+    final unitDirection = direction / length;
+
+    final perpendicular = Offset(
+      -unitDirection.dy,
+      unitDirection.dx,
+    );
+
+    const arrowLength = 10.0;
+    const arrowWidth = 5.5;
+
+    final arrowBase = endpoint - unitDirection * arrowLength;
+
+    final arrowPath = Path()
+      ..moveTo(endpoint.dx, endpoint.dy)
+      ..lineTo(
+        arrowBase.dx + perpendicular.dx * arrowWidth,
+        arrowBase.dy + perpendicular.dy * arrowWidth,
+      )
+      ..lineTo(
+        arrowBase.dx - perpendicular.dx * arrowWidth,
+        arrowBase.dy - perpendicular.dy * arrowWidth,
+      )
+      ..close();
+
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = const Color(0xFFD9B45B)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return;
+    }
+
+    if (showKaabaMarker) {
+      final kaabaPosition = _projectCoordinate(
+        latitude: _kaabaLatitude,
+        longitude: _kaabaLongitude,
+        size: size,
+      );
+
+      _drawKaaba(
+        canvas,
+        kaabaPosition,
+      );
+    }
+
+    final latitude = userLatitude;
+    final longitude = userLongitude;
+
+    if (latitude == null || longitude == null) {
+      return;
+    }
+
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude < -90.0 ||
+        latitude > 90.0 ||
+        longitude < -180.0 ||
+        longitude > 180.0) {
+      return;
+    }
+
+    final userPosition = _projectCoordinate(
+      latitude: latitude,
+      longitude: longitude,
+      size: size,
+    );
+
+    final bearing = qiblaBearing;
+
+    if (showQiblaDirection &&
+        bearing != null &&
+        bearing.isFinite) {
+      final endpoint = _calculateArrowEndpoint(
+        origin: userPosition,
+        bearing: bearing,
+        size: size,
+      );
+
+      if (endpoint != null) {
+        _drawQiblaDirection(
+          canvas,
+          userPosition,
+          endpoint,
+        );
+      }
+    }
+
+    if (showUserMarker) {
+      _drawUserMarker(
+        canvas,
+        userPosition,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _QiblaMapOverlayPainter oldDelegate,
+  ) {
+    return oldDelegate.userLatitude != userLatitude ||
+        oldDelegate.userLongitude != userLongitude ||
+        oldDelegate.qiblaBearing != qiblaBearing ||
+        oldDelegate.showUserMarker != showUserMarker ||
+        oldDelegate.showKaabaMarker != showKaabaMarker ||
+        oldDelegate.showQiblaDirection != showQiblaDirection;
   }
 }
 
