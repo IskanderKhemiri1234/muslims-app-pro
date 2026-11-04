@@ -1,6 +1,3 @@
-
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -55,7 +52,6 @@ class CountdownWidget extends StatelessWidget {
         valueListenable: controller.clockListenable,
         builder: (context, now, child) {
           final target = controller.nextPrayerTime;
-
           final difference = target?.difference(now);
 
           final duration =
@@ -69,22 +65,27 @@ class CountdownWidget extends StatelessWidget {
           final minutes = duration.inMinutes.remainder(60);
           final seconds = duration.inSeconds.remainder(60);
 
-          final hourValue =
-              hasTarget ? _twoDigits(hours) : '--';
+          final hourValue = hasTarget
+              ? _twoDigits(hours)
+              : '--';
 
-          final minuteValue =
-              hasTarget ? _twoDigits(minutes) : '--';
+          final minuteValue = hasTarget
+              ? _twoDigits(minutes)
+              : '--';
 
-          final secondValue =
-              hasTarget ? _twoDigits(seconds) : '--';
+          final secondValue = hasTarget
+              ? _twoDigits(seconds)
+              : '--';
+
+          final semanticLabel = hasTarget
+              ? _semanticLabel(duration)
+              : isArabic
+                  ? 'لا يوجد موعد صلاة قادم متاح'
+                  : 'No upcoming prayer time available';
 
           return Semantics(
             liveRegion: false,
-            label: hasTarget
-                ? _semanticLabel(duration)
-                : isArabic
-                    ? 'لا يوجد موعد صلاة قادم متاح'
-                    : 'No upcoming prayer time available',
+            label: semanticLabel,
             child: ExcludeSemantics(
               child: Row(
                 textDirection: TextDirection.ltr,
