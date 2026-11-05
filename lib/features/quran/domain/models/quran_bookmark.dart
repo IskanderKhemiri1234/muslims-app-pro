@@ -1,3 +1,4 @@
+
 class QuranBookmark {
   static const int minimumPage = 1;
   static const int maximumPage = 604;
