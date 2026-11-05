@@ -179,10 +179,10 @@ class _QuranPageState extends State<QuranPage>
   String? _loadedDailyDateKey;
 
   double get _khatmaProgress =>
-      (_completedPages.length / _totalPages).clamp(0.0, 1.0);
+      (_completedPages.length / _totalPages).clamp(0.0, 1.0).toDouble();
 
   double get _dailyProgress =>
-      (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
+      (_todayPages.length / _dailyTarget).clamp(0.0, 1.0).toDouble();
 
   bool get _currentPageCompleted =>
       _completedPages.contains(_currentPage);
@@ -237,7 +237,9 @@ class _QuranPageState extends State<QuranPage>
     super.dispose();
   }
 
-  bool _isValidPage(int page) => page >= 1 && page <= _totalPages;
+  bool _isValidPage(int page) =>
+      page >= QuranReadingProgress.minimumPage &&
+      page <= QuranReadingProgress.maximumPage;
 
   Set<int> _validPages(Iterable<int> pages) {
     return pages.where(_isValidPage).toSet();
@@ -269,16 +271,22 @@ class _QuranPageState extends State<QuranPage>
       if (!mounted) return;
 
       setState(() {
-        _currentPage = progress.lastReadPage.clamp(1, _totalPages);
+        _currentPage =
+            progress.lastReadPage.clamp(1, _totalPages).toInt();
+
         _completedPages = _validPages(progress.completedPages);
         _todayPages = _validPages(progress.dailyPages);
+
         _completedKhatmas =
             progress.completedKhatmas < 0 ? 0 : progress.completedKhatmas;
+
         _loadedDailyDateKey = progress.dailyDateKey;
+
         _bookmarks = bookmarks
             .map((bookmark) => bookmark.pageNumber)
             .where(_isValidPage)
             .toSet();
+
         _isLoading = false;
       });
     } catch (_) {
@@ -296,6 +304,7 @@ class _QuranPageState extends State<QuranPage>
     if (_isLoading || !mounted) return;
 
     final dateKey = _todayDateKey;
+
     if (_loadedDailyDateKey == dateKey) return;
 
     try {
@@ -334,11 +343,13 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _savePage(int page) async {
-    final safePage = page.clamp(1, _totalPages);
+    final safePage = page.clamp(1, _totalPages).toInt();
 
     try {
       await _queueWrite(() async {
-        final current = await _progressRepository.getProgress();
+        final current = await _progressRepository.getProgress(
+          date: DateTime.now(),
+        );
 
         final updated = current.copyWith(
           lastReadPage: safePage,
@@ -393,7 +404,9 @@ class _QuranPageState extends State<QuranPage>
   }
 
   void _changePage(int amount) {
-    final page = (_currentPage + amount).clamp(1, _totalPages);
+    final page =
+        (_currentPage + amount).clamp(1, _totalPages).toInt();
+
     _selectPage(page, saveImmediately: true);
   }
 
@@ -411,10 +424,25 @@ class _QuranPageState extends State<QuranPage>
 
     try {
       await _queueWrite(() async {
-        final latest = await _progressRepository.getProgress();
+        final latest = await _progressRepository.getProgress(
+          date: DateTime.now(),
+        );
 
         final completed = _validPages(latest.completedPages);
         final today = _validPages(latest.dailyPages);
+
+        if (completed.contains(pageToMark)) {
+          if (!mounted) return;
+
+          setState(() {
+            _completedPages = completed;
+            _todayPages = today;
+            _completedKhatmas = latest.completedKhatmas;
+            _loadedDailyDateKey = latest.dailyDateKey;
+          });
+
+          return;
+        }
 
         completed.add(pageToMark);
         today.add(pageToMark);
@@ -479,7 +507,9 @@ class _QuranPageState extends State<QuranPage>
 
     try {
       await _queueWrite(() async {
-        final latest = await _progressRepository.getProgress();
+        final latest = await _progressRepository.getProgress(
+          date: DateTime.now(),
+        );
 
         final completed = _validPages(latest.completedPages)
           ..remove(pageToUndo);
@@ -501,10 +531,13 @@ class _QuranPageState extends State<QuranPage>
         setState(() {
           _completedPages = completed;
           _todayPages = today;
+          _loadedDailyDateKey = updated.dailyDateKey;
         });
       });
 
-      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
+      if (mounted) {
+        _showMessage('تم إلغاء تسجيل قراءة الصفحة');
+      }
     } catch (_) {
       _showMessage('تعذر تحديث سجل القراءة');
     } finally {
@@ -561,13 +594,19 @@ class _QuranPageState extends State<QuranPage>
   }
 
   Future<void> _toggleBookmark() async {
-    if (_isLoading) return;
+    if (_isLoading || _isSaving) return;
 
     final page = _currentPage;
 
     try {
       await _queueWrite(() async {
-        if (_bookmarks.contains(page)) {
+        final existing = await _bookmarkRepository.getBookmarks();
+
+        final exists = existing.any(
+          (bookmark) => bookmark.pageNumber == page,
+        );
+
+        if (exists) {
           await _bookmarkRepository.removeBookmark(page);
         } else {
           await _bookmarkRepository.addBookmark(
