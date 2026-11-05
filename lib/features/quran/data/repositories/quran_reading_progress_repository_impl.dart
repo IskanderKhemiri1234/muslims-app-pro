@@ -19,7 +19,9 @@ class QuranReadingProgressRepositoryImpl
   }
 
   @override
-  Future<void> saveProgress(QuranReadingProgress progress) {
+  Future<void> saveProgress(
+    QuranReadingProgress progress,
+  ) {
     return localDataSource.saveProgress(progress);
   }
 }
