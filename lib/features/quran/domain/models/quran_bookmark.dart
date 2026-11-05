@@ -1,106 +1,58 @@
 
 class QuranBookmark {
-  final String id;
+  static const int minimumPage = 1;
+  static const int maximumPage = 604;
+
   final int pageNumber;
-  final int? surahNumber;
-  final int? ayahNumber;
-  final DateTime createdAt;
-  final String? note;
 
-  QuranBookmark({
-    required this.id,
+  const QuranBookmark({
     required this.pageNumber,
-    required this.createdAt,
-    this.surahNumber,
-    this.ayahNumber,
-    this.note,
-  }) {
-    if (id.trim().isEmpty) {
-      throw ArgumentError.value(id, 'id', 'Bookmark ID cannot be empty.');
-    }
+  }) : assert(
+          pageNumber >= minimumPage &&
+              pageNumber <= maximumPage,
+          'Quran bookmark page must be between 1 and 604.',
+        );
 
-    if (pageNumber < 1 || pageNumber > 604) {
-      throw RangeError.range(pageNumber, 1, 604, 'pageNumber');
-    }
-
-    if ((surahNumber == null) != (ayahNumber == null)) {
-      throw ArgumentError(
-        'Surah number and ayah number must either both be provided or both be null.',
+  factory QuranBookmark.fromPage(int page) {
+    if (page < minimumPage || page > maximumPage) {
+      throw RangeError.range(
+        page,
+        minimumPage,
+        maximumPage,
+        'page',
+        'Invalid Quran bookmark page.',
       );
     }
 
-    if (surahNumber != null &&
-        (surahNumber < 1 || surahNumber > 114)) {
-      throw RangeError.range(surahNumber, 1, 114, 'surahNumber');
-    }
-
-    if (ayahNumber != null && ayahNumber < 1) {
-      throw RangeError.value(ayahNumber, 'ayahNumber');
-    }
+    return QuranBookmark(pageNumber: page);
   }
 
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'id': id,
-      'pageNumber': pageNumber,
-      'surahNumber': surahNumber,
-      'ayahNumber': ayahNumber,
-      'createdAt': createdAt.toUtc().toIso8601String(),
-      'note': note,
-    };
+  factory QuranBookmark.fromStorage(String value) {
+    final page = int.tryParse(value);
+
+    if (page == null) {
+      throw FormatException(
+        'Invalid Quran bookmark value: $value',
+      );
+    }
+
+    return QuranBookmark.fromPage(page);
   }
 
-  factory QuranBookmark.fromJson(Map<String, dynamic> json) {
-    final Object? rawId = json['id'];
-    final Object? rawPage = json['pageNumber'];
-    final Object? rawSurah = json['surahNumber'];
-    final Object? rawAyah = json['ayahNumber'];
-    final Object? rawDate = json['createdAt'];
-    final Object? rawNote = json['note'];
+  String toStorage() => pageNumber.toString();
 
-    if (rawId is! String ||
-        rawPage is! int ||
-        rawDate is! String) {
-      throw const FormatException(
-        'Invalid Quran bookmark data: required fields are missing or have incorrect types.',
-      );
-    }
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is QuranBookmark &&
+            other.pageNumber == pageNumber;
+  }
 
-    if (rawSurah != null && rawSurah is! int) {
-      throw const FormatException(
-        'Invalid Quran bookmark data: surahNumber must be an integer or null.',
-      );
-    }
+  @override
+  int get hashCode => pageNumber.hashCode;
 
-    if (rawAyah != null && rawAyah is! int) {
-      throw const FormatException(
-        'Invalid Quran bookmark data: ayahNumber must be an integer or null.',
-      );
-    }
-
-    if (rawNote != null && rawNote is! String) {
-      throw const FormatException(
-        'Invalid Quran bookmark data: note must be a string or null.',
-      );
-    }
-
-    final DateTime parsedDate;
-
-    try {
-      parsedDate = DateTime.parse(rawDate).toUtc();
-    } on FormatException {
-      throw const FormatException(
-        'Invalid Quran bookmark data: createdAt is not a valid ISO 8601 date.',
-      );
-    }
-
-    return QuranBookmark(
-      id: rawId,
-      pageNumber: rawPage,
-      surahNumber: rawSurah as int?,
-      ayahNumber: rawAyah as int?,
-      createdAt: parsedDate,
-      note: rawNote as String?,
-    );
+  @override
+  String toString() {
+    return 'QuranBookmark(pageNumber: $pageNumber)';
   }
 }
