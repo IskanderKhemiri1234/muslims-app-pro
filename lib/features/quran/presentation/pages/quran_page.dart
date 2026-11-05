@@ -1,8 +1,17 @@
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quran_madina_flutter/quran_madina_flutter.dart';
+
+import '../../data/datasources/quran_bookmark_local_data_source.dart';
+import '../../data/datasources/quran_reading_progress_local_data_source.dart';
+import '../../data/repositories/quran_bookmark_repository_impl.dart';
+import '../../data/repositories/quran_reading_progress_repository_impl.dart';
+import '../../domain/models/quran_bookmark.dart';
+import '../../domain/models/quran_reading_progress.dart';
+import '../../domain/repositories/quran_bookmark_repository.dart';
+import '../../domain/repositories/quran_reading_progress_repository.dart';
 
 class _SurahInfo {
   final String name;
@@ -22,11 +31,6 @@ class _QuranPageState extends State<QuranPage>
     with WidgetsBindingObserver {
   static const int _totalPages = 604;
   static const int _dailyTarget = 5;
-
-  static const String _savedPageKey = 'quran_last_read_page';
-  static const String _completedPagesKey = 'quran_completed_pages';
-  static const String _completedKhatmasKey = 'quran_completed_khatmas';
-  static const String _bookmarksKey = 'quran_bookmarks';
 
   static const Color _green = Color(0xFF075B46);
   static const Color _deepGreen = Color(0xFF063E31);
@@ -150,37 +154,13 @@ class _QuranPageState extends State<QuranPage>
   ];
 
   static const List<int> _juzPages = [
-    1,
-    22,
-    42,
-    62,
-    82,
-    102,
-    121,
-    142,
-    162,
-    182,
-    201,
-    222,
-    242,
-    262,
-    282,
-    302,
-    322,
-    342,
-    362,
-    382,
-    402,
-    422,
-    442,
-    462,
-    482,
-    502,
-    522,
-    542,
-    562,
-    582,
+    1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+    201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+    402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
   ];
+
+  late final QuranBookmarkRepository _bookmarkRepository;
+  late final QuranReadingProgressRepository _progressRepository;
 
   int _currentPage = 1;
   int _completedKhatmas = 0;
@@ -194,34 +174,38 @@ class _QuranPageState extends State<QuranPage>
 
   Timer? _saveDebounce;
 
-  // All preference writes are serialized through this queue.
   Future<void> _writeQueue = Future<void>.value();
 
-  String? _loadedDailyKey;
+  String? _loadedDailyDateKey;
 
-  String get _todayStorageKey => _dateKeyFor(DateTime.now());
+  double get _khatmaProgress =>
+      (_completedPages.length / _totalPages).clamp(0.0, 1.0);
 
-  double get _khatmaProgress {
-    return (_completedPages.length / _totalPages).clamp(0.0, 1.0);
-  }
+  double get _dailyProgress =>
+      (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
 
-  double get _dailyProgress {
-    return (_todayPages.length / _dailyTarget).clamp(0.0, 1.0);
-  }
+  bool get _currentPageCompleted =>
+      _completedPages.contains(_currentPage);
 
-  bool get _currentPageCompleted {
-    return _completedPages.contains(_currentPage);
-  }
+  bool get _currentPageBookmarked =>
+      _bookmarks.contains(_currentPage);
 
-  bool get _currentPageBookmarked {
-    return _bookmarks.contains(_currentPage);
-  }
+  String get _todayDateKey =>
+      QuranReadingProgress.dateKeyFor(DateTime.now());
 
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
+
+    _bookmarkRepository = QuranBookmarkRepositoryImpl(
+      localDataSource: QuranBookmarkLocalDataSource(),
+    );
+
+    _progressRepository = QuranReadingProgressRepositoryImpl(
+      localDataSource: QuranReadingProgressLocalDataSource(),
+    );
 
     _restoreData();
   }
@@ -246,43 +230,19 @@ class _QuranPageState extends State<QuranPage>
     _saveDebounce?.cancel();
     _saveDebounce = null;
 
-    // Queue the final save without using BuildContext after disposal.
     if (!_isLoading) {
-      _enqueuePageSave(_currentPage);
+      unawaited(_savePage(_currentPage));
     }
 
     super.dispose();
   }
 
-  String _dateKeyFor(DateTime date) {
-    final year = date.year.toString();
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
+  bool _isValidPage(int page) => page >= 1 && page <= _totalPages;
 
-    return 'quran_daily_pages_$year-$month-$day';
+  Set<int> _validPages(Iterable<int> pages) {
+    return pages.where(_isValidPage).toSet();
   }
 
-  bool _isValidPage(int page) {
-    return page >= 1 && page <= _totalPages;
-  }
-
-  Set<int> _parsePages(List<String> values) {
-    return values
-        .map(int.tryParse)
-        .whereType<int>()
-        .where(_isValidPage)
-        .toSet();
-  }
-
-  List<String> _serializePages(Set<int> pages) {
-    final sorted = pages.toList()..sort();
-
-    return sorted.map((page) => page.toString()).toList();
-  }
-
-  /// Adds an operation to the sequential storage queue.
-  ///
-  /// A failed previous operation will not permanently block future writes.
   Future<void> _queueWrite(
     Future<void> Function() operation,
   ) {
@@ -293,43 +253,32 @@ class _QuranPageState extends State<QuranPage>
         });
 
     _writeQueue = nextWrite;
-
     return nextWrite;
   }
 
   Future<void> _restoreData() async {
     try {
-      final preferences = await SharedPreferences.getInstance();
+      final results = await Future.wait<Object>([
+        _progressRepository.getProgress(),
+        _bookmarkRepository.getBookmarks(),
+      ]);
 
-      final savedPage = preferences.getInt(_savedPageKey) ?? 1;
-
-      final completed = _parsePages(
-        preferences.getStringList(_completedPagesKey) ?? <String>[],
-      );
-
-      final dailyKey = _todayStorageKey;
-
-      final today = _parsePages(
-        preferences.getStringList(dailyKey) ?? <String>[],
-      );
-
-      final bookmarks = _parsePages(
-        preferences.getStringList(_bookmarksKey) ?? <String>[],
-      );
-
-      final completedKhatmas =
-          preferences.getInt(_completedKhatmasKey) ?? 0;
+      final progress = results[0] as QuranReadingProgress;
+      final bookmarks = results[1] as List<QuranBookmark>;
 
       if (!mounted) return;
 
       setState(() {
-        _currentPage = savedPage.clamp(1, _totalPages).toInt();
-        _completedPages = completed;
-        _todayPages = today;
-        _bookmarks = bookmarks;
+        _currentPage = progress.lastReadPage.clamp(1, _totalPages);
+        _completedPages = _validPages(progress.completedPages);
+        _todayPages = _validPages(progress.dailyPages);
         _completedKhatmas =
-            completedKhatmas < 0 ? 0 : completedKhatmas;
-        _loadedDailyKey = dailyKey;
+            progress.completedKhatmas < 0 ? 0 : progress.completedKhatmas;
+        _loadedDailyDateKey = progress.dailyDateKey;
+        _bookmarks = bookmarks
+            .map((bookmark) => bookmark.pageNumber)
+            .where(_isValidPage)
+            .toSet();
         _isLoading = false;
       });
     } catch (_) {
@@ -343,30 +292,23 @@ class _QuranPageState extends State<QuranPage>
     }
   }
 
-  /// Refreshes the daily reading set when the calendar day changes.
-  ///
-  /// The operation is serialized with other preference writes so it cannot
-  /// overwrite a newer daily-reading update.
   Future<void> _refreshTodayPages() async {
     if (_isLoading || !mounted) return;
 
-    final dailyKey = _todayStorageKey;
-
-    if (_loadedDailyKey == dailyKey) return;
+    final dateKey = _todayDateKey;
+    if (_loadedDailyDateKey == dateKey) return;
 
     try {
       await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
-
-        final today = _parsePages(
-          preferences.getStringList(dailyKey) ?? <String>[],
+        final progress = await _progressRepository.getProgress(
+          date: DateTime.now(),
         );
 
         if (!mounted) return;
 
         setState(() {
-          _todayPages = today;
-          _loadedDailyKey = dailyKey;
+          _todayPages = _validPages(progress.dailyPages);
+          _loadedDailyDateKey = progress.dailyDateKey;
         });
       });
     } catch (_) {
@@ -391,26 +333,19 @@ class _QuranPageState extends State<QuranPage>
       );
   }
 
-  Future<void> _enqueuePageSave(int page) {
-    final safePage = page.clamp(1, _totalPages).toInt();
-
-    return _queueWrite(() async {
-      final preferences = await SharedPreferences.getInstance();
-
-      final saved = await preferences.setInt(
-        _savedPageKey,
-        safePage,
-      );
-
-      if (!saved) {
-        throw StateError('Unable to save the current Quran page');
-      }
-    });
-  }
-
   Future<void> _savePage(int page) async {
+    final safePage = page.clamp(1, _totalPages);
+
     try {
-      await _enqueuePageSave(page);
+      await _queueWrite(() async {
+        final current = await _progressRepository.getProgress();
+
+        final updated = current.copyWith(
+          lastReadPage: safePage,
+        );
+
+        await _progressRepository.saveProgress(updated);
+      });
     } catch (_) {
       _showMessage('تعذر حفظ موضع القراءة');
     }
@@ -458,13 +393,8 @@ class _QuranPageState extends State<QuranPage>
   }
 
   void _changePage(int amount) {
-    final newPage =
-        (_currentPage + amount).clamp(1, _totalPages).toInt();
-
-    _selectPage(
-      newPage,
-      saveImmediately: true,
-    );
+    final page = (_currentPage + amount).clamp(1, _totalPages);
+    _selectPage(page, saveImmediately: true);
   }
 
   Future<void> _markCurrentPageRead() async {
@@ -477,89 +407,106 @@ class _QuranPageState extends State<QuranPage>
     });
 
     var khatmaFinished = false;
-    var completedKhatmasAfterSave = _completedKhatmas;
+    var resultingKhatmas = _completedKhatmas;
 
     try {
       await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
+        final latest = await _progressRepository.getProgress();
 
-        // Read the latest persisted state inside the queue.
-        final completed = _parsePages(
-          preferences.getStringList(_completedPagesKey) ?? <String>[],
-        );
-
-        final dailyKey = _todayStorageKey;
-
-        final today = _parsePages(
-          preferences.getStringList(dailyKey) ?? <String>[],
-        );
+        final completed = _validPages(latest.completedPages);
+        final today = _validPages(latest.dailyPages);
 
         completed.add(pageToMark);
         today.add(pageToMark);
 
         khatmaFinished = completed.length >= _totalPages;
 
-        final storedKhatmas =
-            preferences.getInt(_completedKhatmasKey) ?? 0;
+        resultingKhatmas = latest.completedKhatmas < 0
+            ? 0
+            : latest.completedKhatmas;
 
-        completedKhatmasAfterSave =
-            (storedKhatmas < 0 ? 0 : storedKhatmas) +
-                (khatmaFinished ? 1 : 0);
-
-        // A completed khatma starts a new reading cycle.
         if (khatmaFinished) {
+          resultingKhatmas++;
           completed.clear();
         }
 
-        final completedSaved = await preferences.setStringList(
-          _completedPagesKey,
-          _serializePages(completed),
+        final updated = latest.copyWith(
+          lastReadPage: _currentPage,
+          completedPages: completed,
+          completedKhatmas: resultingKhatmas,
+          dailyPages: today,
+          dailyDateKey: latest.dailyDateKey,
         );
 
-        if (!completedSaved) {
-          throw StateError('Failed to save completed pages');
-        }
-
-        final todaySaved = await preferences.setStringList(
-          dailyKey,
-          _serializePages(today),
-        );
-
-        if (!todaySaved) {
-          throw StateError('Failed to save daily pages');
-        }
-
-        if (khatmaFinished) {
-          final khatmaSaved = await preferences.setInt(
-            _completedKhatmasKey,
-            completedKhatmasAfterSave,
-          );
-
-          if (!khatmaSaved) {
-            throw StateError('Failed to save khatma count');
-          }
-        }
+        await _progressRepository.saveProgress(updated);
 
         if (!mounted) return;
 
         setState(() {
           _completedPages = completed;
           _todayPages = today;
-          _loadedDailyKey = dailyKey;
-          _completedKhatmas = completedKhatmasAfterSave;
+          _completedKhatmas = resultingKhatmas;
+          _loadedDailyDateKey = updated.dailyDateKey;
         });
       });
 
       if (!mounted) return;
 
       if (khatmaFinished) {
-        // Show the dialog after the storage queue has completed.
-        await _showKhatmaDialog(completedKhatmasAfterSave);
+        await _showKhatmaDialog(resultingKhatmas);
       } else {
         _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
       }
     } catch (_) {
       _showMessage('تعذر حفظ تقدم القراءة. حاول مرة أخرى.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _undoCurrentPageRead() async {
+    if (!_currentPageCompleted || _isSaving || _isLoading) return;
+
+    final pageToUndo = _currentPage;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await _queueWrite(() async {
+        final latest = await _progressRepository.getProgress();
+
+        final completed = _validPages(latest.completedPages)
+          ..remove(pageToUndo);
+
+        final today = _validPages(latest.dailyPages)
+          ..remove(pageToUndo);
+
+        final updated = latest.copyWith(
+          lastReadPage: _currentPage,
+          completedPages: completed,
+          dailyPages: today,
+          dailyDateKey: latest.dailyDateKey,
+        );
+
+        await _progressRepository.saveProgress(updated);
+
+        if (!mounted) return;
+
+        setState(() {
+          _completedPages = completed;
+          _todayPages = today;
+        });
+      });
+
+      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
+    } catch (_) {
+      _showMessage('تعذر تحديث سجل القراءة');
     } finally {
       if (mounted) {
         setState(() {
@@ -604,80 +551,13 @@ class _QuranPageState extends State<QuranPage>
               style: FilledButton.styleFrom(
                 backgroundColor: _green,
               ),
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('الحمد لله'),
             ),
           ],
         );
       },
     );
-  }
-
-  Future<void> _undoCurrentPageRead() async {
-    if (!_currentPageCompleted || _isSaving || _isLoading) return;
-
-    final pageToUndo = _currentPage;
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
-      await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
-
-        final completed = _parsePages(
-          preferences.getStringList(_completedPagesKey) ?? <String>[],
-        );
-
-        final dailyKey = _todayStorageKey;
-
-        final today = _parsePages(
-          preferences.getStringList(dailyKey) ?? <String>[],
-        );
-
-        completed.remove(pageToUndo);
-        today.remove(pageToUndo);
-
-        final completedSaved = await preferences.setStringList(
-          _completedPagesKey,
-          _serializePages(completed),
-        );
-
-        if (!completedSaved) {
-          throw StateError('Failed to save completed pages');
-        }
-
-        final todaySaved = await preferences.setStringList(
-          dailyKey,
-          _serializePages(today),
-        );
-
-        if (!todaySaved) {
-          throw StateError('Failed to save daily pages');
-        }
-
-        if (!mounted) return;
-
-        setState(() {
-          _completedPages = completed;
-          _todayPages = today;
-          _loadedDailyKey = dailyKey;
-        });
-      });
-
-      _showMessage('تم إلغاء تسجيل قراءة الصفحة');
-    } catch (_) {
-      _showMessage('تعذر تحديث سجل القراءة');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
-    }
   }
 
   Future<void> _toggleBookmark() async {
@@ -687,40 +567,29 @@ class _QuranPageState extends State<QuranPage>
 
     try {
       await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
-
-        // Read bookmarks from storage to avoid stale in-memory snapshots.
-        final updated = _parsePages(
-          preferences.getStringList(_bookmarksKey) ?? <String>[],
-        );
-
-        final wasBookmarked = updated.contains(page);
-
-        if (wasBookmarked) {
-          updated.remove(page);
+        if (_bookmarks.contains(page)) {
+          await _bookmarkRepository.removeBookmark(page);
         } else {
-          updated.add(page);
+          await _bookmarkRepository.addBookmark(
+            QuranBookmark.fromPage(page),
+          );
         }
 
-        final saved = await preferences.setStringList(
-          _bookmarksKey,
-          _serializePages(updated),
-        );
-
-        if (!saved) {
-          throw StateError('Failed to save bookmarks');
-        }
+        final latest = await _bookmarkRepository.getBookmarks();
 
         if (!mounted) return;
 
         setState(() {
-          _bookmarks = updated;
+          _bookmarks = latest
+              .map((bookmark) => bookmark.pageNumber)
+              .where(_isValidPage)
+              .toSet();
         });
 
         _showMessage(
-          wasBookmarked
-              ? 'تم حذف العلامة المرجعية'
-              : 'تم حفظ الصفحة في العلامات المرجعية',
+          _bookmarks.contains(page)
+              ? 'تم حفظ الصفحة في العلامات المرجعية'
+              : 'تم حذف العلامة المرجعية',
         );
       });
     } catch (_) {
@@ -733,25 +602,17 @@ class _QuranPageState extends State<QuranPage>
 
     try {
       await _queueWrite(() async {
-        final preferences = await SharedPreferences.getInstance();
+        await _bookmarkRepository.removeBookmark(page);
 
-        final updated = _parsePages(
-          preferences.getStringList(_bookmarksKey) ?? <String>[],
-        )..remove(page);
-
-        final saved = await preferences.setStringList(
-          _bookmarksKey,
-          _serializePages(updated),
-        );
-
-        if (!saved) {
-          throw StateError('Failed to remove bookmark');
-        }
+        final latest = await _bookmarkRepository.getBookmarks();
 
         if (!mounted) return;
 
         setState(() {
-          _bookmarks = updated;
+          _bookmarks = latest
+              .map((bookmark) => bookmark.pageNumber)
+              .where(_isValidPage)
+              .toSet();
         });
       });
     } catch (_) {
@@ -763,7 +624,6 @@ class _QuranPageState extends State<QuranPage>
     if (_isLoading || !mounted) return;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final pages = _bookmarks.toList()..sort();
 
     final selectedPage = await showModalBottomSheet<int>(
@@ -783,9 +643,7 @@ class _QuranPageState extends State<QuranPage>
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: pages.length,
-                  separatorBuilder: (_, index) {
-                    return const Divider(height: 1);
-                  },
+                  separatorBuilder: (_, index) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final page = pages[index];
 
@@ -803,9 +661,7 @@ class _QuranPageState extends State<QuranPage>
                             ? 'الصفحة الحالية'
                             : 'الانتقال إلى الصفحة',
                       ),
-                      onTap: () {
-                        Navigator.pop(sheetContext, page);
-                      },
+                      onTap: () => Navigator.pop(sheetContext, page),
                       trailing: IconButton(
                         tooltip: 'حذف العلامة',
                         icon: const Icon(
@@ -832,10 +688,7 @@ class _QuranPageState extends State<QuranPage>
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(
-        selectedPage,
-        saveImmediately: true,
-      );
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
@@ -865,9 +718,7 @@ class _QuranPageState extends State<QuranPage>
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                },
+                onPressed: () => Navigator.pop(dialogContext),
                 child: const Text('إلغاء'),
               ),
               FilledButton(
@@ -875,9 +726,7 @@ class _QuranPageState extends State<QuranPage>
                   backgroundColor: _green,
                 ),
                 onPressed: () {
-                  final page = int.tryParse(
-                    controller.text.trim(),
-                  );
+                  final page = int.tryParse(controller.text.trim());
 
                   if (page == null || !_isValidPage(page)) {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -901,10 +750,7 @@ class _QuranPageState extends State<QuranPage>
     }
 
     if (selectedPage != null && mounted) {
-      _selectPage(
-        selectedPage,
-        saveImmediately: true,
-      );
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
@@ -940,9 +786,8 @@ class _QuranPageState extends State<QuranPage>
                     children: [
                       ListView.separated(
                         itemCount: _surahs.length,
-                        separatorBuilder: (_, index) {
-                          return const Divider(height: 1);
-                        },
+                        separatorBuilder: (_, index) =>
+                            const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final surah = _surahs[index];
 
@@ -965,20 +810,17 @@ class _QuranPageState extends State<QuranPage>
                               ),
                             ),
                             trailing: Text('صفحة ${surah.page}'),
-                            onTap: () {
-                              Navigator.pop(
-                                sheetContext,
-                                surah.page,
-                              );
-                            },
+                            onTap: () => Navigator.pop(
+                              sheetContext,
+                              surah.page,
+                            ),
                           );
                         },
                       ),
                       ListView.separated(
                         itemCount: _juzPages.length,
-                        separatorBuilder: (_, index) {
-                          return const Divider(height: 1);
-                        },
+                        separatorBuilder: (_, index) =>
+                            const Divider(height: 1),
                         itemBuilder: (context, index) {
                           return ListTile(
                             leading: CircleAvatar(
@@ -995,12 +837,10 @@ class _QuranPageState extends State<QuranPage>
                             trailing: Text(
                               'صفحة ${_juzPages[index]}',
                             ),
-                            onTap: () {
-                              Navigator.pop(
-                                sheetContext,
-                                _juzPages[index],
-                              );
-                            },
+                            onTap: () => Navigator.pop(
+                              sheetContext,
+                              _juzPages[index],
+                            ),
                           );
                         },
                       ),
@@ -1015,10 +855,7 @@ class _QuranPageState extends State<QuranPage>
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(
-        selectedPage,
-        saveImmediately: true,
-      );
+      _selectPage(selectedPage, saveImmediately: true);
     }
   }
 
@@ -1134,8 +971,7 @@ class _QuranPageState extends State<QuranPage>
               value: _khatmaProgress,
               minHeight: 8,
               backgroundColor: Colors.white.withValues(alpha: 0.16),
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(_gold),
+              valueColor: const AlwaysStoppedAnimation<Color>(_gold),
             ),
           ),
           const SizedBox(height: 12),
@@ -1301,7 +1137,7 @@ class _QuranPageState extends State<QuranPage>
             child: Row(
               children: [
                 const Icon(
-                  Icons.bookmark_outline_rounded,
+                  Icons.menu_book_rounded,
                   color: _gold,
                   size: 18,
                 ),
@@ -1326,21 +1162,15 @@ class _QuranPageState extends State<QuranPage>
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              key: const PageStorageKey<String>('quran_reader_scroll'),
-              padding: const EdgeInsets.all(10),
-              child: Directionality(
-                textDirection: TextDirection.rtl,
-                child: QuranMadinaFlutter(
-                  // Keep this widget mounted while changing pages.
-                  // A page-dependent ValueKey would recreate its WebView.
-                  page: _currentPage,
-                  bundled: true,
-                  headless: true,
-                  fontSize: 22,
-                  textColor: isDark ? '#E8DFC9' : '#26382C',
-                  backgroundColor: isDark ? '#202A23' : '#FFFCF3',
-                ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: QuranMadinaFlutter(
+                page: _currentPage,
+                bundled: true,
+                headless: true,
+                fontSize: 22,
+                textColor: isDark ? '#E8DFC9' : '#26382C',
+                backgroundColor: isDark ? '#202A23' : '#FFFCF3',
               ),
             ),
           ),
@@ -1414,9 +1244,7 @@ class _QuranPageState extends State<QuranPage>
               min: 1,
               max: _totalPages.toDouble(),
               divisions: _totalPages - 1,
-              onChanged: (value) {
-                _selectPage(value.round());
-              },
+              onChanged: (value) => _selectPage(value.round()),
               onChangeEnd: (value) {
                 _selectPage(
                   value.round(),
@@ -1566,18 +1394,14 @@ class _QuranPageState extends State<QuranPage>
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: _gold,
-              ),
+              child: CircularProgressIndicator(color: _gold),
             )
           : SafeArea(
               child: Column(
                 children: [
                   _buildHeader(),
                   _buildDailyCard(isDark),
-                  Expanded(
-                    child: _buildReader(isDark),
-                  ),
+                  Expanded(child: _buildReader(isDark)),
                   _buildReaderControls(isDark),
                 ],
               ),
