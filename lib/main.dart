@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
+import 'core/localization/mumin_localizations_delegate.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
@@ -361,8 +362,10 @@ class _MuminAppState extends State<MuminApp> {
             themeMode: settings.themeMode,
             locale: languages.locale,
             supportedLocales: languages.supportedLocales,
-            localizationsDelegates:
-                GlobalMaterialLocalizations.delegates,
+            localizationsDelegates: const [
+              MuminLocalizationsDelegate(),
+              ...GlobalMaterialLocalizations.delegates,
+            ],
             localeResolutionCallback: (deviceLocale, supportedLocales) {
               for (final supportedLocale in supportedLocales) {
                 if (supportedLocale.languageCode ==
@@ -371,7 +374,7 @@ class _MuminAppState extends State<MuminApp> {
                 }
               }
 
-              return Locale(
+              return const Locale(
                 MuminLocalizations.defaultLanguageCode,
               );
             },
@@ -469,10 +472,6 @@ class _StartupScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MuminLocalizations.fromCode(
-      MuminLocalizations.defaultLanguageCode,
-    );
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar'),
@@ -481,8 +480,10 @@ class _StartupScreen extends StatelessWidget {
         Locale('en'),
         Locale('fr'),
       ],
-      localizationsDelegates:
-          GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: const [
+        MuminLocalizationsDelegate(),
+        ...GlobalMaterialLocalizations.delegates,
+      ],
       theme: MuminTheme.dark,
       home: const Directionality(
         textDirection: TextDirection.rtl,
