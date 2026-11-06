@@ -1741,31 +1741,38 @@ title: Text(
 
     return Scaffold(
       backgroundColor: background,
-      appBar: AppBar(
-        backgroundColor: background,
-        foregroundColor: foreground,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'القرآن الكريم',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'الآيات المحفوظة',
-            onPressed: _isLoading ? null : _openVerseBookmarks,
-            icon: const Icon(Icons.bookmark_outline_rounded),
-          ),
-          IconButton(
-            tooltip: 'العلامات المرجعية',
-            onPressed: _isLoading ? null : _openBookmarks,
-            icon: const Icon(Icons.bookmarks_outlined),
-          ),
-        ],
+      
+appBar: AppBar(
+  backgroundColor: background,
+  foregroundColor: foreground,
+  elevation: 0,
+  centerTitle: true,
+  title: Text(
+    QuranPageLocalization.text(context, 'quran_title'),
+    style: const TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 18,
+    ),
+  ),
+  actions: [
+    IconButton(
+      tooltip: QuranPageLocalization.text(
+        context,
+        'quran_saved_verses',
       ),
+      onPressed: _isLoading ? null : _openVerseBookmarks,
+      icon: const Icon(Icons.bookmark_outline_rounded),
+    ),
+    IconButton(
+      tooltip: QuranPageLocalization.text(
+        context,
+        'quran_bookmarks',
+      ),
+      onPressed: _isLoading ? null : _openBookmarks,
+      icon: const Icon(Icons.bookmarks_outlined),
+    ),
+  ],
+),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: _gold),
