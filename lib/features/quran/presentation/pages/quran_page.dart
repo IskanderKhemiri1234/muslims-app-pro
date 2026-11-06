@@ -1102,7 +1102,7 @@ class _QuranPageState extends State<QuranPage>
       _selectPage(selectedPage, saveImmediately: true);
     }
   }
-
+  
   Future<void> _openIndex() async {
     if (_isLoading || !mounted) return;
 
@@ -1116,7 +1116,10 @@ class _QuranPageState extends State<QuranPage>
         return DefaultTabController(
           length: 2,
           child: _BottomSheetShell(
-            title: 'فهرس المصحف',
+            title: QuranPageLocalization.text(
+              context,
+              'quran_index_title',
+            ),
             isDark: isDark,
             child: Column(
               children: [
@@ -1125,9 +1128,19 @@ class _QuranPageState extends State<QuranPage>
                   unselectedLabelColor:
                       isDark ? Colors.white60 : Colors.black54,
                   indicatorColor: _gold,
-                  tabs: const [
-                    Tab(text: 'السور'),
-                    Tab(text: 'الأجزاء'),
+                  tabs: [
+                    Tab(
+                      text: QuranPageLocalization.text(
+                        context,
+                        'quran_surahs_tab',
+                      ),
+                    ),
+                    Tab(
+                      text: QuranPageLocalization.text(
+                        context,
+                        'quran_juz_tab',
+                      ),
+                    ),
                   ],
                 ),
                 Expanded(
@@ -1142,7 +1155,8 @@ class _QuranPageState extends State<QuranPage>
 
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: const Color(0x1FD8B66A),
+                              backgroundColor:
+                                  const Color(0x1FD8B66A),
                               child: Text(
                                 '${index + 1}',
                                 style: const TextStyle(
@@ -1151,21 +1165,28 @@ class _QuranPageState extends State<QuranPage>
                                 ),
                               ),
                             ),
-                            
-                            
-title: Text(
-  QuranPageLocalization.surahName(
-    context,
-    index + 1,
-  ),
-  textDirection:
-      QuranPageLocalization.textDirectionOf(context),
-  style: const TextStyle(
-    fontWeight: FontWeight.w600,
-  ),
-),
-
-                            trailing: Text('صفحة ${surah.page}'),
+                            title: Text(
+                              QuranPageLocalization.surahName(
+                                context,
+                                index + 1,
+                              ),
+                              textDirection:
+                                  QuranPageLocalization.textDirectionOf(
+                                context,
+                              ),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            trailing: Text(
+                              QuranPageLocalization.text(
+                                context,
+                                'quran_juz_page',
+                                parameters: {
+                                  'page': surah.page,
+                                },
+                              ),
+                            ),
                             onTap: () => Navigator.pop(
                               sheetContext,
                               surah.page,
@@ -1178,24 +1199,42 @@ title: Text(
                         separatorBuilder: (_, index) =>
                             const Divider(height: 1),
                         itemBuilder: (context, index) {
+                          final juzNumber = index + 1;
+                          final page = _juzPages[index];
+
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: const Color(0x1FD8B66A),
+                              backgroundColor:
+                                  const Color(0x1FD8B66A),
                               child: Text(
-                                '${index + 1}',
+                                '$juzNumber',
                                 style: const TextStyle(
                                   color: _gold,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                            title: Text('الجزء ${index + 1}'),
+                            title: Text(
+                              QuranPageLocalization.text(
+                                context,
+                                'quran_juz_number',
+                                parameters: {
+                                  'number': juzNumber,
+                                },
+                              ),
+                            ),
                             trailing: Text(
-                              'صفحة ${_juzPages[index]}',
+                              QuranPageLocalization.text(
+                                context,
+                                'quran_juz_page',
+                                parameters: {
+                                  'page': page,
+                                },
+                              ),
                             ),
                             onTap: () => Navigator.pop(
                               sheetContext,
-                              _juzPages[index],
+                              page,
                             ),
                           );
                         },
