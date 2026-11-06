@@ -1182,6 +1182,7 @@ title: Text(
     }
   }
 
+  
   Widget _buildHeader(bool isDark) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 14),
@@ -1222,54 +1223,80 @@ title: Text(
                 ),
               ),
               const SizedBox(width: 12),
-              
-Expanded(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        QuranPageLocalization.text(context, 'quran_title'),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        QuranPageLocalization.text(
-          context,
-          'quran_madinah_mushaf',
-        ),
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 12,
-        ),
-      ),
-    ],
-  ),
-),
-Text(
-  '604 ${QuranPageLocalization.text(context, 'quran_pages')}',
-  style: const TextStyle(
-    color: _gold,
-    fontWeight: FontWeight.bold,
-    fontSize: 12,
-  ),
-),
-              
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      QuranPageLocalization.text(
+                        context,
+                        'quran_title',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      QuranPageLocalization.text(
+                        context,
+                        'quran_madinah_mushaf',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '604 ${QuranPageLocalization.text(context, 'quran_pages')}',
+                style: const TextStyle(
+                  color: _gold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 19),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                QuranPageLocalization.text(
+                  context,
+                  'quran_khatma_progress',
+                ),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                '${(_khatmaProgress * 100).toStringAsFixed(1)}%',
+                style: const TextStyle(
+                  color: _gold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 9),
-          Text(
-  QuranPageLocalization.text(
-    context,
-    'quran_khatma_progress',
-  ),
-  style: const TextStyle(
-    color: Colors.white70,
-    fontSize: 12,
-  ),
-),
-
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: _khatmaProgress,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(_gold),
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -1279,25 +1306,28 @@ Text(
                 size: 17,
               ),
               const SizedBox(width: 7),
-              
-Text(
-  '${_completedPages.length} '
-  '${QuranPageLocalization.text(context, 'quran_pages_read')}',
-  style: const TextStyle(
-    color: Colors.white,
-    fontSize: 12,
-  ),
-),
+              Text(
+                '${_completedPages.length} '
+                '${QuranPageLocalization.text(context, 'quran_pages_read')}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+              ),
               const Spacer(),
-              
-Text(
-  '$_completedKhatmas '
-  '${QuranPageLocalization.text(context, 'quran_completed_khatmas')}',
-  style: const TextStyle(
-    color: Colors.white70,
-    fontSize: 11,
-  ),
-),
+              Text(
+                '$_completedKhatmas '
+                '${QuranPageLocalization.text(context, 'quran_completed_khatmas')}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDailyCard(bool isDark) {
