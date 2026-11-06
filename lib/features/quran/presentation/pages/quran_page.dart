@@ -781,7 +781,7 @@ class _QuranPageState extends State<QuranPage>
                     final suraName =
                         verse['suraName'] as String? ?? 'سورة';
 
-                    final sura = verse['sura'] as int;
+                    
                     final aya = verse['aya'] as int;
                     final page = verse['page'] as int;
                     final text = verse['text'] as String? ?? '';
