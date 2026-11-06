@@ -143,20 +143,26 @@ class QiblaLandmarkLocalDataSource {
       id: id,
       nameAr: nameAr,
       nameEn: nameEn,
+      nameFr: _optionalString(json, 'nameFr', index),
       category: category,
       latitude: latitude,
       longitude: longitude,
       countryCode: countryCode,
       descriptionAr: _optionalString(json, 'descriptionAr', index),
       descriptionEn: _optionalString(json, 'descriptionEn', index),
+      descriptionFr: _optionalString(json, 'descriptionFr', index),
       cityAr: _optionalString(json, 'cityAr', index),
       cityEn: _optionalString(json, 'cityEn', index),
+      cityFr: _optionalString(json, 'cityFr', index),
       regionAr: _optionalString(json, 'regionAr', index),
       regionEn: _optionalString(json, 'regionEn', index),
+      regionFr: _optionalString(json, 'regionFr', index),
       historicalPeriodAr:
           _optionalString(json, 'historicalPeriodAr', index),
       historicalPeriodEn:
           _optionalString(json, 'historicalPeriodEn', index),
+      historicalPeriodFr:
+          _optionalString(json, 'historicalPeriodFr', index),
       establishedYear:
           _optionalInt(json, 'establishedYear', index),
       images: images,
@@ -214,7 +220,6 @@ class QiblaLandmarkLocalDataSource {
       }
 
       final json = Map<String, dynamic>.from(item);
-
       final id = _requiredString(json, 'id', index);
 
       if (!ids.add(id)) {
@@ -287,10 +292,8 @@ class QiblaLandmarkLocalDataSource {
       }
 
       final creator = _requiredString(json, 'creator', index);
-      final sourceName =
-          _requiredString(json, 'sourceName', index);
-      final sourceUrl =
-          _requiredString(json, 'sourceUrl', index);
+      final sourceName = _requiredString(json, 'sourceName', index);
+      final sourceUrl = _requiredString(json, 'sourceUrl', index);
       final license = _requiredString(json, 'license', index);
 
       _validateUrl(sourceUrl, index, 'image.sourceUrl');
@@ -312,6 +315,8 @@ class QiblaLandmarkLocalDataSource {
               _optionalString(json, 'captionAr', index) ?? '',
           captionEn:
               _optionalString(json, 'captionEn', index) ?? '',
+          captionFr:
+              _optionalString(json, 'captionFr', index),
           creator: creator,
           sourceName: sourceName,
           sourceUrl: sourceUrl,
@@ -380,14 +385,19 @@ class QiblaLandmarkLocalDataSource {
           id: id,
           titleAr: _requiredString(json, 'titleAr', index),
           titleEn: _requiredString(json, 'titleEn', index),
+          titleFr: _optionalString(json, 'titleFr', index),
           descriptionAr:
               _requiredString(json, 'descriptionAr', index),
           descriptionEn:
               _requiredString(json, 'descriptionEn', index),
+          descriptionFr:
+              _optionalString(json, 'descriptionFr', index),
           dateLabelAr:
               _requiredString(json, 'dateLabelAr', index),
           dateLabelEn:
               _requiredString(json, 'dateLabelEn', index),
+          dateLabelFr:
+              _optionalString(json, 'dateLabelFr', index),
           sortOrder: _optionalInt(json, 'sortOrder', index) ?? 0,
           startYear: startYear,
           endYear: endYear,
