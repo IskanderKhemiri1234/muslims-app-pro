@@ -1,154 +1,103 @@
 
 import 'package:flutter/material.dart';
 
-/// Muslims Pro - Global Color System.
+import '../design_system/mumin_design_tokens.dart';
+
+/// Backward-compatible color facade for features not yet migrated.
 ///
-/// Emerald green represents trust and tranquility.
-/// Gold represents elegance and spiritual identity.
-class AppColors {
-  AppColors._();
+/// MuminColors is the single source of truth for the brand palette.
+/// Keep feature-specific Quran colors here until their screens are migrated.
+abstract final class AppColors {
+  // Brand palette.
+  static const Color emerald = MuminColors.emerald;
+  static const Color emeraldLight = MuminColors.emeraldLight;
+  static const Color emeraldDark = MuminColors.deepEmerald;
+  static const Color deepGreen = MuminColors.midnightEmerald;
 
-  // ============================================================
-  // BRAND COLORS
-  // ============================================================
+  // Gold palette.
+  static const Color gold = MuminColors.gold;
+  static const Color goldLight = MuminColors.goldLight;
+  static const Color goldDark = MuminColors.goldDark;
 
-  static const Color emerald = Color(0xFF087F5B);
-  static const Color emeraldLight = Color(0xFF12A77A);
-  static const Color emeraldDark = Color(0xFF064E3B);
-  static const Color deepGreen = Color(0xFF032B25);
+  // Dark surfaces.
+  static const Color darkBackground = MuminColors.darkBackground;
+  static const Color darkSurface = MuminColors.darkSurface;
+  static const Color darkSurfaceLight = MuminColors.darkElevated;
+  static const Color darkSurfaceElevated = MuminColors.darkElevated;
 
-  // ============================================================
-  // GOLD ACCENTS
-  // ============================================================
+  // Light surfaces.
+  static const Color lightBackground = MuminColors.lightBackground;
+  static const Color lightSurface = MuminColors.lightSurface;
+  static const Color lightSurfaceSoft = Color(0xFFECE7DA);
+  static const Color lightSurfaceElevated = MuminColors.lightElevated;
 
-  static const Color gold = Color(0xFFC6A76A);
-  static const Color goldLight = Color(0xFFE3CB91);
-  static const Color goldDark = Color(0xFF9C7A3D);
+  // Text.
+  static const Color textDark = MuminColors.midnightEmerald;
+  static const Color textLight = MuminColors.ivory;
+  static const Color muted = MuminColors.mistEmerald;
+  static const Color mutedDark = MuminColors.mutedText;
+  static const Color mutedLight = MuminColors.mistEmerald;
 
-  // ============================================================
-  // DARK MODE
-  // ============================================================
-
-  static const Color darkBackground = Color(0xFF061713);
-  static const Color darkSurface = Color(0xFF10251F);
-  static const Color darkSurfaceLight = Color(0xFF18352C);
-  static const Color darkSurfaceElevated = Color(0xFF203D32);
-
-  // ============================================================
-  // LIGHT MODE
-  // ============================================================
-
-  static const Color lightBackground = Color(0xFFF3F7F4);
-  static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceSoft = Color(0xFFEAF1EC);
-  static const Color lightSurfaceElevated = Color(0xFFF9FCFA);
-
-  // ============================================================
-  // TEXT COLORS
-  // ============================================================
-
-  static const Color textDark = Color(0xFF17382E);
-  static const Color textLight = Color(0xFFF4F8F5);
-
-  static const Color muted = Color(0xFF91A99E);
-  static const Color mutedDark = Color(0xFF627B70);
-  static const Color mutedLight = Color(0xFFB6C9BF);
-
-  // ============================================================
-  // BORDER COLORS
-  // ============================================================
-
+  // Borders.
   static const Color border = Color(0x337DAE98);
-  static const Color borderLight = Color(0xFFE1EAE3);
-  static const Color borderDark = Color(0xFF29483C);
+  static const Color borderLight = MuminColors.lightBorder;
+  static const Color borderDark = MuminColors.darkBorder;
 
-  // ============================================================
-  // STATUS COLORS
-  // ============================================================
-
-  static const Color success = Color(0xFF2E9D70);
+  // Semantic states.
+  static const Color success = MuminColors.success;
   static const Color successLight = Color(0xFFBCE8D2);
-
-  static const Color warning = Color(0xFFE5A83B);
+  static const Color warning = MuminColors.warning;
   static const Color warningLight = Color(0xFFFFE8B8);
-
-  static const Color error = Color(0xFFE65B5B);
+  static const Color error = MuminColors.error;
   static const Color errorLight = Color(0xFFFFDADA);
-
-  static const Color info = Color(0xFF4D91C7);
+  static const Color info = MuminColors.info;
   static const Color infoLight = Color(0xFFD9ECFA);
 
-  // ============================================================
-  // SPECIAL QURAN COLORS
-  // ============================================================
-
+  // Quran reading surfaces intentionally remain specialized.
   static const Color quranPaper = Color(0xFFFFFCF3);
   static const Color quranInk = Color(0xFF26382C);
   static const Color quranGold = Color(0xFFB99A58);
-
   static const Color quranPaperDark = Color(0xFF202A23);
   static const Color quranInkDark = Color(0xFFE8DFC9);
 
-  // ============================================================
-  // OVERLAYS
-  // ============================================================
-
+  // Overlays and interaction states.
   static const Color overlay = Color(0x80000000);
   static const Color overlayLight = Color(0x14000000);
-
-  // ============================================================
-  // GRADIENTS
-  // ============================================================
-
-  static const List<Color> emeraldGradient = [
-    Color(0xFF12A77A),
-    Color(0xFF087F5B),
-    Color(0xFF064E3B),
-  ];
-  
-  // ============================================================
-  // INTERACTION COLORS
-  // ============================================================
-
-  static const Color focus = Color(0xFF12A77A);
+  static const Color focus = MuminColors.emeraldLight;
   static const Color selection = Color(0x332AA77A);
   static const Color disabled = Color(0xFF82938A);
-  static const Color pressedOverlay = Color(0x1F087F5B);
+  static const Color pressedOverlay = Color(0x1F075B46);
 
-  // ============================================================
-  // SPECIAL SURFACES
-  // ============================================================
+  // Feature surfaces and dividers.
+  static const Color darkCard = Color(0xFF12382D);
+  static const Color lightCard = MuminColors.lightElevated;
+  static const Color darkDivider = MuminColors.darkBorder;
+  static const Color lightDivider = MuminColors.lightBorder;
 
-  static const Color darkCard = Color(0xFF142C24);
-  static const Color lightCard = Color(0xFFFFFFFF);
+  // Prayer experience.
+  static const Color prayerActive = MuminColors.gold;
+  static const Color prayerUpcoming = MuminColors.emeraldLight;
+  static const Color prayerCompleted = MuminColors.mutedText;
 
-  static const Color darkDivider = Color(0xFF294238);
-  static const Color lightDivider = Color(0xFFE5ECE7);
+  // Qibla experience.
+  static const Color qiblaNorth = MuminColors.emerald;
+  static const Color qiblaDirection = MuminColors.gold;
 
-  // ============================================================
-  // PRAYER EXPERIENCE
-  // ============================================================
-
-  static const Color prayerActive = Color(0xFFC6A76A);
-  static const Color prayerUpcoming = Color(0xFF12A77A);
-  static const Color prayerCompleted = Color(0xFF82938A);
-
-  // ============================================================
-  // QIBLA EXPERIENCE
-  // ============================================================
-
-  static const Color qiblaNorth = Color(0xFF087F5B);
-  static const Color qiblaDirection = Color(0xFFC6A76A);
-
+  // Legacy gradient lists retained for existing widget APIs.
+  static const List<Color> emeraldGradient = [
+    MuminColors.emeraldLight,
+    MuminColors.emerald,
+    MuminColors.deepEmerald,
+  ];
 
   static const List<Color> darkGradient = [
-    Color(0xFF18352C),
-    Color(0xFF061713),
+    MuminColors.darkElevated,
+    MuminColors.darkBackground,
   ];
 
   static const List<Color> goldGradient = [
-    Color(0xFFE3CB91),
-    Color(0xFFC6A76A),
-    Color(0xFF9C7A3D),
+    MuminColors.goldLight,
+    MuminColors.gold,
+    MuminColors.goldDark,
   ];
 }
