@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../domain/models/quran_bookmark.dart';
+import 'package:muslims_app/features/quran/domain/models/quran_bookmark.dart';
 
 /// Local persistence for Quran bookmarks.
 ///
