@@ -3,6 +3,7 @@ import 'catalogs/mumin_prayer_settings_catalog.dart';
 import 'catalogs/mumin_qibla_catalog.dart';
 import 'catalogs/mumin_quran_catalog.dart';
 import 'catalogs/mumin_quran_reader_catalog.dart';
+import 'catalogs/mumin_quran_surah_catalog.dart';
 import 'mumin_language_registry.dart';
 
 /// Mumin Pro — Unified Domain Catalog Registry.
@@ -10,7 +11,7 @@ import 'mumin_language_registry.dart';
 /// Owns domain catalog selection, language normalization,
 /// Arabic fallback, interpolation and translation diagnostics.
 ///
-/// Quranic Arabic content is never stored or modified here.
+/// Quranic Arabic verses are never stored or modified here.
 abstract final class MuminDomainCatalogRegistry {
   static const String _quranPrefix = 'quran_';
   static const String _qiblaPrefix = 'qibla_';
@@ -85,6 +86,32 @@ abstract final class MuminDomainCatalogRegistry {
 
     return value;
   }
+
+  /// Resolves the canonical name of a Quran surah.
+  ///
+  /// Surah metadata is separate from interface translation catalogs.
+  static String surahName(
+    int surahNumber, {
+    String? languageCode,
+  }) {
+    return MuminQuranSurahCatalog.nameFor(
+      surahNumber,
+      languageCode: normalizeLanguageCode(languageCode),
+    );
+  }
+
+  /// Returns all 114 surah names in the requested language.
+  static List<String> surahNames({
+    String? languageCode,
+  }) {
+    return MuminQuranSurahCatalog.namesFor(
+      normalizeLanguageCode(languageCode),
+    );
+  }
+
+  /// Checks the integrity of the canonical surah metadata.
+  static bool get surahCatalogIntegrity =>
+      MuminQuranSurahCatalog.hasValidData;
 
   /// Combines the two Quran interface catalogs into one domain.
   ///
