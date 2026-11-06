@@ -1587,8 +1587,10 @@ Text(
     );
   }  
 
+  
   Widget _buildReaderControls(bool isDark) {
     final textColor = isDark ? Colors.white : _deepGreen;
+    final isRtl = QuranPageLocalization.isArabic(context);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 13, 16, 18),
@@ -1613,9 +1615,12 @@ Text(
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _currentPageCompleted
-                      ? 'تم تسجيل قراءة هذه الصفحة'
-                      : 'هل أتممت قراءة هذه الصفحة؟',
+                  QuranPageLocalization.text(
+                    context,
+                    _currentPageCompleted
+                        ? 'quran_page_read'
+                        : 'quran_mark_page_read',
+                  ),
                   style: TextStyle(
                     color: textColor,
                     fontWeight: FontWeight.w600,
@@ -1630,7 +1635,12 @@ Text(
                         ? _undoCurrentPageRead
                         : _markCurrentPageRead,
                 child: Text(
-                  _currentPageCompleted ? 'تراجع' : 'تسجيل',
+                  QuranPageLocalization.text(
+                    context,
+                    _currentPageCompleted
+                        ? 'quran_undo'
+                        : 'quran_mark_read',
+                  ),
                   style: const TextStyle(
                     color: _green,
                     fontWeight: FontWeight.bold,
@@ -1663,16 +1673,22 @@ Text(
           ),
           Row(
             children: [
-              Text(
+              const Text(
                 '1',
                 style: TextStyle(
-                  color: textColor.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),
               const Spacer(),
               Text(
-                '$_currentPage / $_totalPages',
+                QuranPageLocalization.text(
+                  context,
+                  'quran_page_position',
+                  parameters: {
+                    'page': _currentPage,
+                    'total': _totalPages,
+                  },
+                ),
                 style: TextStyle(
                   color: textColor,
                   fontWeight: FontWeight.bold,
@@ -1680,10 +1696,9 @@ Text(
                 ),
               ),
               const Spacer(),
-              Text(
+              const Text(
                 '604',
                 style: TextStyle(
-                  color: textColor.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),
@@ -1697,14 +1712,25 @@ Text(
                   onPressed: _currentPage > 1
                       ? () => _changePage(-1)
                       : null,
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('السابقة'),
+                  icon: Icon(
+                    isRtl
+                        ? Icons.arrow_forward_rounded
+                        : Icons.arrow_back_rounded,
+                  ),
+                  label: Text(
+                    QuranPageLocalization.text(
+                      context,
+                      'quran_previous',
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _green,
                     side: BorderSide(
                       color: _green.withValues(alpha: 0.3),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 11,
+                    ),
                   ),
                 ),
               ),
@@ -1714,12 +1740,23 @@ Text(
                   onPressed: _currentPage < _totalPages
                       ? () => _changePage(1)
                       : null,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('التالية'),
+                  icon: Icon(
+                    isRtl
+                        ? Icons.arrow_back_rounded
+                        : Icons.arrow_forward_rounded,
+                  ),
+                  label: Text(
+                    QuranPageLocalization.text(
+                      context,
+                      'quran_next',
+                    ),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: _green,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 11,
+                    ),
                   ),
                 ),
               ),
@@ -1733,23 +1770,32 @@ Text(
                   icon: _currentPageBookmarked
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_add_outlined,
-                  label: _currentPageBookmarked
-                      ? 'إزالة العلامة'
-                      : 'حفظ الصفحة',
+                  label: QuranPageLocalization.text(
+                    context,
+                    _currentPageBookmarked
+                        ? 'quran_remove_bookmark'
+                        : 'quran_bookmark',
+                  ),
                   onTap: _toggleBookmark,
                 ),
               ),
               Expanded(
                 child: _SmallAction(
                   icon: Icons.menu_book_rounded,
-                  label: 'الفهرس',
+                  label: QuranPageLocalization.text(
+                    context,
+                    'quran_index',
+                  ),
                   onTap: _openIndex,
                 ),
               ),
               Expanded(
                 child: _SmallAction(
                   icon: Icons.bookmarks_outlined,
-                  label: 'الآيات المحفوظة',
+                  label: QuranPageLocalization.text(
+                    context,
+                    'quran_saved_verses',
+                  ),
                   onTap: _openVerseBookmarks,
                 ),
               ),
