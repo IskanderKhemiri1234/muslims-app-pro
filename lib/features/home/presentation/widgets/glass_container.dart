@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/mumin_design_tokens.dart';
 
-/// Reusable premium glass surface for Mumin Pro.
+/// Shared glass surface used throughout Mumin Pro.
 ///
-/// Features:
-/// - Automatically adapts to light and dark themes.
-/// - Uses the central Mumin design palette.
-/// - Supports optional backdrop blur.
-/// - Provides a predictable solid fallback for low-performance devices.
-/// - Preserves the existing public constructor API.
+/// Performance principles:
+/// - Translucent surfaces are used by default without backdrop filtering.
+/// - Backdrop blur remains opt-in for components that genuinely need it.
+/// - A single rounded clipping boundary is used for the surface.
+/// - Colors and borders adapt automatically to the active theme.
+/// - The original public constructor remains backward compatible.
 class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
@@ -21,8 +21,8 @@ class GlassContainer extends StatelessWidget {
     this.radius = 22,
     this.borderColor,
     this.color,
-    this.blurSigma = 16,
-    this.enableBlur = true,
+    this.blurSigma = 12,
+    this.enableBlur = false,
     this.borderWidth = 1,
     this.clipBehavior = Clip.antiAlias,
   })  : assert(radius >= 0),
@@ -47,38 +47,38 @@ class GlassContainer extends StatelessWidget {
 
     final effectiveColor = color ??
         (isDark
-            ? colorScheme.surface.withValues(alpha: 0.76)
-            : colorScheme.surface.withValues(alpha: 0.88));
+            ? colorScheme.surface.withValues(alpha: 0.82)
+            : colorScheme.surface.withValues(alpha: 0.92));
 
     final effectiveBorderColor = borderColor ??
         (isDark
             ? MuminColors.glassBorder.withValues(alpha: 0.72)
             : MuminColors.emerald.withValues(alpha: 0.14));
 
-    final effectiveRadius = BorderRadius.circular(radius);
+    final borderRadius = BorderRadius.circular(radius);
 
     final decoration = BoxDecoration(
       color: effectiveColor,
-      borderRadius: effectiveRadius,
-      border: borderWidth == 0
-          ? null
-          : Border.all(
+      borderRadius: borderRadius,
+      border: borderWidth > 0
+          ? Border.all(
               color: effectiveBorderColor,
               width: borderWidth,
-            ),
+            )
+          : null,
       boxShadow: isDark
           ? const [
               BoxShadow(
-                color: Color(0x18000000),
-                blurRadius: 18,
-                offset: Offset(0, 7),
+                color: Color(0x16000000),
+                blurRadius: 14,
+                offset: Offset(0, 5),
               ),
             ]
           : const [
               BoxShadow(
-                color: Color(0x10071C17),
-                blurRadius: 16,
-                offset: Offset(0, 6),
+                color: Color(0x0D071C17),
+                blurRadius: 12,
+                offset: Offset(0, 4),
               ),
             ],
     );
@@ -91,26 +91,26 @@ class GlassContainer extends StatelessWidget {
       ),
     );
 
-    final shouldBlur = enableBlur && blurSigma > 0;
+    final shouldApplyBlur = enableBlur && blurSigma > 0;
 
-    if (!shouldBlur) {
-      return ClipRRect(
-        borderRadius: effectiveRadius,
-        clipBehavior: clipBehavior,
-        child: surface,
-      );
-    }
+    final Widget content;
 
-    return ClipRRect(
-      borderRadius: effectiveRadius,
-      clipBehavior: clipBehavior,
-      child: BackdropFilter(
+    if (shouldApplyBlur) {
+      content = BackdropFilter(
         filter: ImageFilter.blur(
           sigmaX: blurSigma,
           sigmaY: blurSigma,
         ),
         child: surface,
-      ),
+      );
+    } else {
+      content = surface;
+    }
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      clipBehavior: clipBehavior,
+      child: content,
     );
   }
 }
