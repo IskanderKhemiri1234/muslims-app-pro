@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/localization/mumin_localizations.dart';
+import '../../../../core/localization/mumin_locale_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../qibla/presentation/pages/qibla_page.dart';
@@ -171,14 +172,11 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 
   String _formatTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-
-    final formatted = '$hour:$minute';
-
-    if (!_localizations.isArabic) {
-      return formatted;
-    }
+  return MuminLocaleFormatters.of(context).formatTime(
+    time,
+    alwaysUse24HourFormat: true,
+  );
+}
 
     const westernDigits = '0123456789';
     const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
@@ -193,7 +191,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 
   String _formatDate(BuildContext context, DateTime date) {
-    return MaterialLocalizations.of(context).formatMediumDate(date);
+  return MuminLocaleFormatters.of(context).formatMediumDate(date);
   }
 
   Future<void> _retryInitialization() async {
