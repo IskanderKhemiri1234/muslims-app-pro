@@ -1222,70 +1222,54 @@ title: Text(
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'رحلتك مع القرآن',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'مصحف المدينة المنورة',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Text(
-                '604 صفحة',
-                style: TextStyle(
-                  color: _gold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 19),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'إنجاز الختمة الحالية',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                '${(_khatmaProgress * 100).toStringAsFixed(1)}%',
-                style: const TextStyle(
-                  color: _gold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
+              
+Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        QuranPageLocalization.text(context, 'quran_title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        QuranPageLocalization.text(
+          context,
+          'quran_madinah_mushaf',
+        ),
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 12,
+        ),
+      ),
+    ],
+  ),
+),
+Text(
+  '604 ${QuranPageLocalization.text(context, 'quran_pages')}',
+  style: const TextStyle(
+    color: _gold,
+    fontWeight: FontWeight.bold,
+    fontSize: 12,
+  ),
+),
+              
           const SizedBox(height: 9),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: LinearProgressIndicator(
-              value: _khatmaProgress,
-              minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.16),
-              valueColor: const AlwaysStoppedAnimation<Color>(_gold),
-            ),
-          ),
+          Text(
+  QuranPageLocalization.text(
+    context,
+    'quran_khatma_progress',
+  ),
+  style: const TextStyle(
+    color: Colors.white70,
+    fontSize: 12,
+  ),
+),
+
           const SizedBox(height: 12),
           Row(
             children: [
@@ -1295,26 +1279,25 @@ title: Text(
                 size: 17,
               ),
               const SizedBox(width: 7),
-              Text(
-                '${_completedPages.length} صفحة مكتملة',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
-              ),
+              
+Text(
+  '${_completedPages.length} '
+  '${QuranPageLocalization.text(context, 'quran_pages_read')}',
+  style: const TextStyle(
+    color: Colors.white,
+    fontSize: 12,
+  ),
+),
               const Spacer(),
-              Text(
-                '$_completedKhatmas ختمة مكتملة',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+              
+Text(
+  '$_completedKhatmas '
+  '${QuranPageLocalization.text(context, 'quran_completed_khatmas')}',
+  style: const TextStyle(
+    color: Colors.white70,
+    fontSize: 11,
+  ),
+),
   }
 
   Widget _buildDailyCard(bool isDark) {
@@ -1354,22 +1337,31 @@ title: Text(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'وردك اليومي',
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
+                
+Text(
+  QuranPageLocalization.text(
+    context,
+    'quran_daily_reading',
+  ),
+  style: TextStyle(
+    color: textColor,
+    fontWeight: FontWeight.bold,
+    fontSize: 13,
+  ),
+),
+
                 const SizedBox(height: 4),
-                Text(
-                  '${_todayPages.length} من $_dailyTarget صفحات',
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.65),
-                    fontSize: 11,
-                  ),
-                ),
+                
+Text(
+  '${_todayPages.length} '
+  '${QuranPageLocalization.text(context, 'quran_of')} '
+  '$_dailyTarget '
+  '${QuranPageLocalization.text(context, 'quran_pages')}',
+  style: TextStyle(
+    color: textColor.withValues(alpha: 0.65),
+    fontSize: 11,
+  ),
+),
               ],
             ),
           ),
