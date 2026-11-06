@@ -1,76 +1,109 @@
 
-/// Centralized interface translations for Mumin Pro.
+/// Centralized localization engine for Mumin Pro.
+///
+/// Official launch languages:
+/// - Arabic: ar, RTL
+/// - English: en, LTR
+/// - French: fr, LTR
 ///
 /// This class intentionally has no Flutter dependency.
-/// It can be reused by screens, controllers and presentation widgets
-/// without coupling them to MaterialApp or a specific localization delegate.
+/// It can be used by presentation and application layers.
 ///
-/// Localization strategy:
-/// 1. Use the selected language.
-/// 2. Fall back to English when a translation is missing.
-/// 3. Return the original key as a final safe fallback.
-///
-/// The domain layer must pass stable localization keys instead of
-/// presentation-ready error messages.
+/// Localization policy:
+/// 1. Resolve the selected language.
+/// 2. Fall back to Arabic, the application default.
+/// 3. Use a caller-provided fallback when available.
+/// 4. Never expose an unknown localization key as user-facing text.
 final class MuminLocalizations {
   const MuminLocalizations._(this.languageCode);
 
+  /// Creates a localization instance from a language or locale code.
+  ///
+  /// Examples:
+  /// ar
+  /// ar-TN
+  /// en-US
+  /// fr-FR
+  ///
+  /// Unsupported or missing codes fall back to Arabic.
   factory MuminLocalizations.fromCode(String? code) {
     final normalized = _normalizeLanguageCode(code);
 
     return MuminLocalizations._(
       supportedLanguageCodes.contains(normalized)
           ? normalized!
-          : 'en',
+          : defaultLanguageCode,
     );
   }
 
-  /// Languages supported by the current release.
+  /// Official languages supported by the launch release.
   static const List<String> supportedLanguageCodes = <String>[
     'ar',
     'en',
     'fr',
   ];
 
+  /// Default application language.
+  static const String defaultLanguageCode = 'ar';
+
+  /// Application language preference key.
+  static const String languagePreferenceKey = 'app_language_code';
+
   final String languageCode;
 
   bool get isArabic => languageCode == 'ar';
 
-  bool get isFrench => languageCode == 'fr';
-
   bool get isEnglish => languageCode == 'en';
+
+  bool get isFrench => languageCode == 'fr';
 
   bool get isRightToLeft => isArabic;
 
-  // ---------------------------------------------------------------------------
-  // LANGUAGE INFORMATION
-  // ---------------------------------------------------------------------------
+  bool get isLeftToRight => !isRightToLeft;
 
+  /// Native language name.
   String get languageNativeName {
     switch (languageCode) {
       case 'ar':
         return 'العربية';
-
+      case 'en':
+        return 'English';
       case 'fr':
         return 'Français';
-
       default:
-        return 'English';
+        return 'العربية';
     }
   }
 
+  /// English language name.
   String get languageEnglishName {
     switch (languageCode) {
       case 'ar':
         return 'Arabic';
-
+      case 'en':
+        return 'English';
       case 'fr':
         return 'French';
-
       default:
-        return 'English';
+        return 'Arabic';
     }
   }
+
+  /// Native names of all official languages.
+  static const Map<String, String> languageNativeNames =
+      <String, String>{
+    'ar': 'العربية',
+    'en': 'English',
+    'fr': 'Français',
+  };
+
+  /// English names of all official languages.
+  static const Map<String, String> languageEnglishNames =
+      <String, String>{
+    'ar': 'Arabic',
+    'en': 'English',
+    'fr': 'French',
+  };
 
   static String? _normalizeLanguageCode(String? code) {
     final normalized = code
@@ -86,14 +119,33 @@ final class MuminLocalizations {
     return normalized;
   }
 
+  /// Checks whether a language code is officially supported.
+  static bool isSupported(String? code) {
+    final normalized = _normalizeLanguageCode(code);
+    return supportedLanguageCodes.contains(normalized);
+  }
+
+  /// Normalizes a language code.
+  ///
+  /// Unsupported codes return the official default language.
+  static String normalizeLanguageCode(String? code) {
+    final normalized = _normalizeLanguageCode(code);
+
+    if (supportedLanguageCodes.contains(normalized)) {
+      return normalized!;
+    }
+
+    return defaultLanguageCode;
+  }
+
   // ---------------------------------------------------------------------------
   // CORE TRANSLATION ENGINE
   // ---------------------------------------------------------------------------
 
   /// Resolves a translation using the selected language.
   ///
-  /// Missing translations automatically fall back to English.
-  /// Unknown keys are returned unchanged to avoid null values or crashes.
+  /// Missing translations fall back to Arabic.
+  /// Unknown keys return a safe Arabic message.
   String text(String key) {
     final normalizedKey = key.trim();
 
@@ -102,37 +154,46 @@ final class MuminLocalizations {
     }
 
     final current = _translations[languageCode]!;
-    final english = _translations['en']!;
+    final fallback = _translations[defaultLanguageCode]!;
 
     return current[normalizedKey] ??
-        english[normalizedKey] ??
-        normalizedKey;
+        fallback[normalizedKey] ??
+        fallback['translation_unavailable']!;
   }
 
-  /// Resolves a translation with a caller-provided fallback.
+  /// Resolves a translation with an explicit fallback.
   ///
-  /// Useful for optional labels and dynamically supplied content.
+  /// The explicit fallback is used only when the key does not exist
+  /// in either the selected language or the default dictionary.
   String textOr(
     String key, {
     required String fallback,
   }) {
+    final normalizedKey = key.trim();
+
+    if (normalizedKey.isEmpty) {
+      return fallback;
+    }
+
     final current = _translations[languageCode]!;
-    final english = _translations['en']!;
+    final defaultTranslations = _translations[defaultLanguageCode]!;
 
-    return current[key] ?? english[key] ?? fallback;
+    return current[normalizedKey] ??
+        defaultTranslations[normalizedKey] ??
+        fallback;
   }
 
-  /// Indicates whether a key exists in the selected language.
-  ///
-  /// This checks the selected language only, not the English fallback.
+  /// Indicates whether a translation exists in the selected language.
   bool hasTranslation(String key) {
-    return _translations[languageCode]!.containsKey(key);
+    return _translations[languageCode]!.containsKey(key.trim());
   }
 
-  /// Indicates whether a key exists in any supported dictionary.
+  /// Indicates whether a key exists in any official language.
   bool knowsKey(String key) {
+    final normalizedKey = key.trim();
+
     for (final translations in _translations.values) {
-      if (translations.containsKey(key)) {
+      if (translations.containsKey(normalizedKey)) {
         return true;
       }
     }
@@ -140,13 +201,45 @@ final class MuminLocalizations {
     return false;
   }
 
+  /// Indicates whether a key has a translation in all official languages.
+  static bool isCompleteTranslation(String key) {
+    final normalizedKey = key.trim();
+
+    if (normalizedKey.isEmpty) {
+      return false;
+    }
+
+    for (final language in supportedLanguageCodes) {
+      if (!_translations[language]!.containsKey(normalizedKey)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /// Resolves a domain error code without importing domain classes.
-  ///
-  /// Example:
-  /// text(error.localizationKey)
   String error(String localizationKey) {
     return text(localizationKey);
   }
+
+  // ---------------------------------------------------------------------------
+  // LANGUAGE SELECTION
+  // ---------------------------------------------------------------------------
+
+  String get selectLanguage => text('select_language');
+
+  String get language => text('language');
+
+  String get languageChanged => text('language_changed');
+
+  String get languageChangeFailed => text('language_change_failed');
+
+  String get arabicLanguage => text('language_ar');
+
+  String get englishLanguage => text('language_en');
+
+  String get frenchLanguage => text('language_fr');
 
   // ---------------------------------------------------------------------------
   // APPLICATION
@@ -198,6 +291,8 @@ final class MuminLocalizations {
 
   String get letPrayerIlluminateYourDay =>
       text('let_prayer_illuminate_your_day');
+
+  String get translationUnavailable => text('translation_unavailable');
 
   // ---------------------------------------------------------------------------
   // PRAYER AND LOCATION STATES
@@ -353,13 +448,21 @@ final class MuminLocalizations {
 
   static const Map<String, Map<String, String>> _translations =
       <String, Map<String, String>>{
-    // =======================================================================
+    // =========================================================================
     // ARABIC
-    // =======================================================================
+    // =========================================================================
 
     'ar': <String, String>{
       'app_name': 'Mumin Pro',
       'tagline': 'رفيقك لعبادة أكثر طمأنينة',
+
+      'select_language': 'اختر لغة التطبيق',
+      'language': 'اللغة',
+      'language_changed': 'تم تغيير لغة التطبيق',
+      'language_change_failed': 'تعذر حفظ اللغة المختارة',
+      'language_ar': 'العربية',
+      'language_en': 'الإنجليزية',
+      'language_fr': 'الفرنسية',
 
       'quick_access': 'الوصول السريع',
       'daily_essentials': 'كل ما تحتاجه في يومك',
@@ -369,7 +472,7 @@ final class MuminLocalizations {
 
       'location': 'الموقع',
       'update_location': 'تحديث موقعي الحالي',
-      'updating_location': 'جارٍ تحديث موقعك بكل عناية...',
+      'updating_location': 'جارٍ تحديث موقعك...',
       'loading_prayer_times': 'نهيّئ لك مواقيت الصلاة...',
       'prayer_times_unavailable': 'مواقيت الصلاة غير متاحة حالياً',
 
@@ -388,10 +491,9 @@ final class MuminLocalizations {
 
       'coming_soon': 'هذه الميزة ستتوفر قريباً',
       'let_prayer_illuminate_your_day': 'صلاتك نور يومك',
-
+      'translation_unavailable': 'النص غير متاح حالياً',
       'unavailable': 'غير متاح',
 
-      // Prayer names.
       'prayer_fajr': 'الفجر',
       'prayer_sunrise': 'الشروق',
       'prayer_dhuhr': 'الظهر',
@@ -399,30 +501,26 @@ final class MuminLocalizations {
       'prayer_maghrib': 'المغرب',
       'prayer_isha': 'العشاء',
 
-      // Existing feature states.
       'adhan_in_development': 'خدمة الأذان قيد التطوير',
       'adhkar_in_development': 'قسم الأذكار قيد التطوير',
       'getting_location': 'جارٍ تحديد موقعك...',
       'location_permission_required': 'نحتاج إلى إذن الموقع لعرض المواقيت الدقيقة',
       'retry_location': 'المحاولة مجدداً لتحديد الموقع',
 
-      // Location states.
       'location_unavailable': 'لم نتمكن من تحديد موقعك حالياً',
       'location_permission_denied': 'لم يُسمح بالوصول إلى الموقع. يمكنك تفعيل الإذن للمتابعة',
       'location_permission_permanently_denied': 'إذن الموقع مغلق من إعدادات الجهاز. فعّله متى رغبت في استخدام المواقيت المحلية',
       'location_services_disabled': 'خدمة تحديد الموقع متوقفة. فعّلها لنحدد مواقيت مدينتك',
       'location_temporarily_unavailable': 'إشارة الموقع غير مستقرة الآن. حاول مرة أخرى بعد لحظات',
       'location_updated': 'تم تحديث موقعك بنجاح',
-      'location_update_failed': 'Your location could not be updated. Your previous location is still preserved',
-      'location_saved': 'تم حفظ موقعك لهذا الجهاز',
+      'location_update_failed': 'تعذر تحديث موقعك. احتفظنا بموقعك السابق',
+      'location_saved': 'تم حفظ موقعك على هذا الجهاز',
       'location_save_failed': 'تم تحديث الموقع، لكن تعذر حفظه على الجهاز',
 
-      // Timezone states.
       'timezone_resolving': 'نحدد منطقتك الزمنية لضبط المواقيت بدقة...',
       'timezone_unavailable': 'تعذر تحديد المنطقة الزمنية لهذا الموقع. حاول تحديث موقعك',
       'timezone_updated': 'تم ضبط المنطقة الزمنية المحلية',
 
-      // Prayer calculation states.
       'prayer_calculation_in_progress': 'نحسب المواقيت وفق موقعك وإعداداتك...',
       'prayer_calculation_failed': 'تعذر حساب المواقيت الآن. تحقق من الموقع وإعدادات الحساب',
       'prayer_schedule_refreshed': 'تم تحديث مواقيت الصلاة',
@@ -432,7 +530,6 @@ final class MuminLocalizations {
       'prayer_times_ready': 'مواقيت الصلاة جاهزة',
       'prayer_times_need_location': 'حدد موقعك أولاً لعرض مواقيت الصلاة المحلية',
 
-      // General system states.
       'offline_mode': 'أنت في وضع عدم الاتصال',
       'offline_mode_description': 'يمكنك متابعة استخدام البيانات المحفوظة على جهازك',
       'unexpected_error': 'حدث أمر غير متوقع',
@@ -442,7 +539,6 @@ final class MuminLocalizations {
       'settings_saved': 'تم حفظ إعداداتك',
       'settings_save_failed': 'تعذر حفظ الإعدادات على الجهاز',
 
-      // Prayer rules configuration errors.
       'prayer_rules_invalid_configuration_size': 'ملف إعدادات الحساب غير صالح أو يتجاوز الحجم المسموح',
       'prayer_rules_invalid_json': 'تعذر قراءة ملف إعدادات الحساب. قد يكون تنسيقه غير صحيح',
       'prayer_rules_invalid_configuration_root': 'بنية ملف إعدادات الحساب غير مكتملة',
@@ -459,13 +555,21 @@ final class MuminLocalizations {
       'prayer_rules_unknown_madhab': 'المذهب المحدد غير مدعوم في إعدادات الحساب الحالية',
     },
 
-    // =======================================================================
+    // =========================================================================
     // ENGLISH
-    // =======================================================================
+    // =========================================================================
 
     'en': <String, String>{
       'app_name': 'Mumin Pro',
       'tagline': 'Your companion for a more mindful daily practice',
+
+      'select_language': 'Choose your app language',
+      'language': 'Language',
+      'language_changed': 'App language changed',
+      'language_change_failed': 'The selected language could not be saved',
+      'language_ar': 'Arabic',
+      'language_en': 'English',
+      'language_fr': 'French',
 
       'quick_access': 'Quick access',
       'daily_essentials': 'Your daily essentials',
@@ -494,10 +598,9 @@ final class MuminLocalizations {
 
       'coming_soon': 'This feature will be available soon',
       'let_prayer_illuminate_your_day': 'Let prayer illuminate your day',
-
+      'translation_unavailable': 'This text is currently unavailable',
       'unavailable': 'Unavailable',
 
-      // Prayer names.
       'prayer_fajr': 'Fajr',
       'prayer_sunrise': 'Sunrise',
       'prayer_dhuhr': 'Dhuhr',
@@ -505,30 +608,26 @@ final class MuminLocalizations {
       'prayer_maghrib': 'Maghrib',
       'prayer_isha': 'Isha',
 
-      // Existing feature states.
       'adhan_in_development': 'Adhan service is under development',
       'adhkar_in_development': 'Adhkar section is under development',
       'getting_location': 'Finding your location...',
       'location_permission_required': 'Location access is needed to show accurate local prayer times',
       'retry_location': 'Try locating again',
 
-      // Location states.
       'location_unavailable': 'We could not determine your location right now',
       'location_permission_denied': 'Location access was not granted. You can enable permission to continue',
       'location_permission_permanently_denied': 'Location permission is disabled in your device settings. Enable it whenever you want local prayer times',
       'location_services_disabled': 'Location services are turned off. Enable them to find your local prayer times',
       'location_temporarily_unavailable': 'Your location signal is unavailable right now. Please try again shortly',
       'location_updated': 'Your location has been updated',
-      'location_update_failed': 'Your location could not be updated. Your previous location is still محفوظ',
+      'location_update_failed': 'Your location could not be updated. Your previous location has been preserved',
       'location_saved': 'Your location has been saved on this device',
       'location_save_failed': 'Your location was updated, but could not be saved on this device',
 
-      // Timezone states.
       'timezone_resolving': 'Finding your local time zone to keep prayer times accurate...',
       'timezone_unavailable': 'We could not determine the time zone for this location. Try updating your location',
       'timezone_updated': 'Your local time zone has been applied',
 
-      // Prayer calculation states.
       'prayer_calculation_in_progress': 'Calculating prayer times using your location and preferences...',
       'prayer_calculation_failed': 'We could not calculate prayer times right now. Check your location and calculation settings',
       'prayer_schedule_refreshed': 'Your prayer schedule has been refreshed',
@@ -538,7 +637,6 @@ final class MuminLocalizations {
       'prayer_times_ready': 'Your prayer times are ready',
       'prayer_times_need_location': 'Set your location to see local prayer times',
 
-      // General system states.
       'offline_mode': 'You are offline',
       'offline_mode_description': 'You can continue using the information already saved on your device',
       'unexpected_error': 'Something unexpected happened',
@@ -548,7 +646,6 @@ final class MuminLocalizations {
       'settings_saved': 'Your settings have been saved',
       'settings_save_failed': 'Your settings could not be saved on this device',
 
-      // Prayer rules configuration errors.
       'prayer_rules_invalid_configuration_size': 'The prayer settings file is invalid or exceeds the allowed size',
       'prayer_rules_invalid_json': 'The prayer settings file could not be read. Its format may be invalid',
       'prayer_rules_invalid_configuration_root': 'The prayer settings file has an incomplete structure',
@@ -565,13 +662,21 @@ final class MuminLocalizations {
       'prayer_rules_unknown_madhab': 'The selected madhab is not supported by the current calculation settings',
     },
 
-    // =======================================================================
+    // =========================================================================
     // FRENCH
-    // =======================================================================
+    // =========================================================================
 
     'fr': <String, String>{
       'app_name': 'Mumin Pro',
       'tagline': 'Votre compagnon pour une pratique quotidienne sereine',
+
+      'select_language': 'Choisissez la langue de l’application',
+      'language': 'Langue',
+      'language_changed': 'La langue de l’application a été modifiée',
+      'language_change_failed': 'La langue sélectionnée n’a pas pu être enregistrée',
+      'language_ar': 'Arabe',
+      'language_en': 'Anglais',
+      'language_fr': 'Français',
 
       'quick_access': 'Accès rapide',
       'daily_essentials': 'Vos essentiels au quotidien',
@@ -579,7 +684,7 @@ final class MuminLocalizations {
       'prayer_times': 'Horaires de prière',
       'next_prayer': 'Prochaine prière',
 
-      'location': 'Emplacement',
+      'location': 'Position',
       'update_location': 'Actualiser ma position',
       'updating_location': 'Actualisation de votre position...',
       'loading_prayer_times': 'Préparation de vos horaires de prière...',
@@ -600,10 +705,9 @@ final class MuminLocalizations {
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
       'let_prayer_illuminate_your_day': 'Que la prière illumine votre journée',
-
+      'translation_unavailable': 'Ce texte est actuellement indisponible',
       'unavailable': 'Indisponible',
 
-      // Prayer names.
       'prayer_fajr': 'Fajr',
       'prayer_sunrise': 'Lever du soleil',
       'prayer_dhuhr': 'Dhuhr',
@@ -611,14 +715,12 @@ final class MuminLocalizations {
       'prayer_maghrib': 'Maghrib',
       'prayer_isha': 'Isha',
 
-      // Existing feature states.
       'adhan_in_development': 'Le service d’adhan est en cours de développement',
       'adhkar_in_development': 'La section des invocations est en cours de développement',
       'getting_location': 'Recherche de votre position...',
       'location_permission_required': 'L’accès à votre position est nécessaire pour afficher les horaires locaux avec précision',
       'retry_location': 'Réessayer la localisation',
 
-      // Location states.
       'location_unavailable': 'Nous ne parvenons pas à déterminer votre position pour le moment',
       'location_permission_denied': 'L’accès à la position n’a pas été autorisé. Vous pouvez activer cette autorisation pour continuer',
       'location_permission_permanently_denied': 'L’autorisation de localisation est désactivée dans les paramètres de votre appareil. Activez-la pour obtenir les horaires locaux',
@@ -629,12 +731,10 @@ final class MuminLocalizations {
       'location_saved': 'Votre position a été enregistrée sur cet appareil',
       'location_save_failed': 'Votre position a été actualisée, mais n’a pas pu être enregistrée sur cet appareil',
 
-      // Timezone states.
       'timezone_resolving': 'Identification de votre fuseau horaire pour garantir des horaires précis...',
       'timezone_unavailable': 'Impossible de déterminer le fuseau horaire de cette position. Essayez d’actualiser votre position',
       'timezone_updated': 'Votre fuseau horaire local a été appliqué',
 
-      // Prayer calculation states.
       'prayer_calculation_in_progress': 'Calcul des horaires selon votre position et vos préférences...',
       'prayer_calculation_failed': 'Impossible de calculer les horaires pour le moment. Vérifiez votre position et vos paramètres de calcul',
       'prayer_schedule_refreshed': 'Vos horaires de prière ont été actualisés',
@@ -644,7 +744,6 @@ final class MuminLocalizations {
       'prayer_times_ready': 'Vos horaires de prière sont prêts',
       'prayer_times_need_location': 'Définissez votre position pour afficher les horaires de prière locaux',
 
-      // General system states.
       'offline_mode': 'Vous êtes hors ligne',
       'offline_mode_description': 'Vous pouvez continuer à consulter les informations déjà enregistrées sur votre appareil',
       'unexpected_error': 'Un événement inattendu est survenu',
@@ -654,7 +753,6 @@ final class MuminLocalizations {
       'settings_saved': 'Vos paramètres ont été enregistrés',
       'settings_save_failed': 'Impossible d’enregistrer vos paramètres sur cet appareil',
 
-      // Prayer rules configuration errors.
       'prayer_rules_invalid_configuration_size': 'Le fichier des paramètres de prière est invalide ou dépasse la taille autorisée',
       'prayer_rules_invalid_json': 'Impossible de lire le fichier des paramètres de prière. Son format est peut-être incorrect',
       'prayer_rules_invalid_configuration_root': 'La structure du fichier des paramètres de prière est incomplète',
