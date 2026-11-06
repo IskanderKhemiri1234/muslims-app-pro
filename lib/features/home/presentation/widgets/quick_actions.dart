@@ -1,27 +1,23 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'glass_container.dart';
 
-/// Responsive, localized quick-action shortcuts for the home page.
+/// Responsive quick actions for the Mumin Pro home page.
 ///
-/// The existing constructor API is preserved to avoid breaking callers.
-/// The active language is resolved from the application's current locale.
+/// All visible labels are resolved through the central localization
+/// engine. No feature-level language switch or fallback dictionary
+/// is maintained here.
 class QuickActions extends StatelessWidget {
   const QuickActions({
     super.key,
-    required this.isArabic,
     required this.onAction,
   });
 
-  /// Retained for backward compatibility with existing callers.
-  ///
-  /// The active MaterialApp locale takes precedence when available.
-  final bool isArabic;
-
-  /// Receives the stable action identifier.
+  /// Receives a stable action identifier.
   ///
   /// Supported identifiers: qibla, quran, adhan, adhkar.
   final ValueChanged<String> onAction;
@@ -35,50 +31,31 @@ class QuickActions extends StatelessWidget {
   List<_ActionData> _buildActions(
     MuminLocalizations localizations,
   ) {
-    final isArabicLanguage = localizations.isArabic;
-    final isFrenchLanguage = localizations.isFrench;
-
     return <_ActionData>[
       _ActionData(
         id: 'qibla',
-        title: isArabicLanguage
-            ? 'القبلة'
-            : 'Qibla',
+        title: localizations.qibla,
         semanticLabel: localizations.qibla,
         icon: Icons.explore_rounded,
         color: const Color(0xFF58C9A1),
       ),
       _ActionData(
         id: 'quran',
-        title: isArabicLanguage
-            ? 'القرآن'
-            : isFrenchLanguage
-                ? 'Coran'
-                : 'Quran',
+        title: localizations.quran,
         semanticLabel: localizations.quran,
         icon: Icons.menu_book_rounded,
         color: AppColors.goldLight,
       ),
       _ActionData(
         id: 'adhan',
-        title: isArabicLanguage
-            ? 'الأذان'
-            : 'Adhan',
-        semanticLabel: isArabicLanguage
-            ? 'إعدادات الأذان'
-            : isFrenchLanguage
-                ? 'Paramètres de l’adhan'
-                : 'Adhan settings',
+        title: localizations.text('adhan_in_development'),
+        semanticLabel: localizations.text('adhan_in_development'),
         icon: Icons.notifications_active_rounded,
         color: const Color(0xFF8DB8F1),
       ),
       _ActionData(
         id: 'adhkar',
-        title: isArabicLanguage
-            ? 'الأذكار'
-            : isFrenchLanguage
-                ? 'Invocations'
-                : 'Adhkar',
+        title: localizations.adhkar,
         semanticLabel: localizations.adhkar,
         icon: Icons.auto_awesome_rounded,
         color: const Color(0xFFCB9AE8),
@@ -90,11 +67,14 @@ class QuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
 
-    final languageCode = locale.languageCode.isEmpty
-        ? (isArabic ? 'ar' : 'en')
-        : locale.languageCode;
+    final languageCode =
+        MuminLanguageRegistry.normalizeLanguageCode(
+      locale.languageCode,
+    );
 
-    final localizations = MuminLocalizations.fromCode(languageCode);
+    final localizations =
+        MuminLocalizations.fromCode(languageCode);
+
     final actions = _buildActions(localizations);
 
     return SizedBox(
@@ -103,10 +83,10 @@ class QuickActions extends StatelessWidget {
         builder: (context, constraints) {
           final availableWidth = constraints.maxWidth;
 
-          final calculatedWidth = availableWidth.isFinite &&
-                  availableWidth > 0
-              ? (availableWidth - (_spacing * 3)) / 4
-              : _defaultItemWidth;
+          final calculatedWidth =
+              availableWidth.isFinite && availableWidth > 0
+                  ? (availableWidth - (_spacing * 3)) / 4
+                  : _defaultItemWidth;
 
           final itemWidth = calculatedWidth
               .clamp(
@@ -117,11 +97,7 @@ class QuickActions extends StatelessWidget {
 
           return ListView.separated(
             scrollDirection: Axis.horizontal,
-
-            // Flutter resolves the horizontal scroll direction from the
-            // surrounding Directionality. Do not reverse it a second time.
             reverse: false,
-
             physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.zero,
             itemCount: actions.length,
@@ -233,18 +209,23 @@ class _QuickActionTile extends StatelessWidget {
                       const SizedBox(height: 9),
                       Flexible(
                         child: Center(
-                          child: Text(
-                            action.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: false,
-                            textAlign: TextAlign.center,
-                            textDirection: Directionality.of(context),
-                            style: TextStyle(
-                              color: foreground,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 2,
+                            ),
+                            child: Text(
+                              action.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                              textAlign: TextAlign.center,
+                              textDirection: Directionality.of(context),
+                              style: TextStyle(
+                                color: foreground,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
                             ),
                           ),
                         ),
