@@ -2,9 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'mumin_language_registry.dart';
 import 'mumin_localizations.dart';
 
 /// Central language controller for the entire Mumin Pro application.
+///
+/// The independent MuminLanguageRegistry is the single source of
+/// language metadata, launch approval, locale direction and preferences.
 ///
 /// Responsibilities:
 /// - Own the selected language.
@@ -24,10 +28,10 @@ final class MuminLanguageController extends ChangeNotifier {
         _languageCode = _resolveInitialLanguage(initialLanguageCode);
 
   static const String preferenceKey =
-      MuminLocalizations.languagePreferenceKey;
+      MuminLanguageRegistry.languagePreferenceKey;
 
   static const String legacyPreferenceKey =
-      MuminLocalizations.legacyLanguagePreferenceKey;
+      MuminLanguageRegistry.legacyLanguagePreferenceKey;
 
   final SharedPreferences? _preferences;
 
@@ -44,20 +48,19 @@ final class MuminLanguageController extends ChangeNotifier {
   String get languageCode => _languageCode;
 
   MuminLanguage get language =>
-      MuminLocalizations.languageFor(_languageCode) ??
-      MuminLocalizations.languageRegistry[
-          MuminLocalizations.defaultLanguageCode]!;
+      MuminLanguageRegistry.launchLanguageFor(_languageCode) ??
+      MuminLanguageRegistry.languages[
+          MuminLanguageRegistry.defaultLanguageCode]!;
 
   MuminLocalizations get localizations =>
       MuminLocalizations.fromCode(_languageCode);
 
   Locale get locale => Locale(languageCode);
 
-  TextDirection get textDirection {
-    return language.direction == MuminTextDirection.rtl
-        ? TextDirection.rtl
-        : TextDirection.ltr;
-  }
+  TextDirection get textDirection =>
+      language.isRightToLeft
+          ? TextDirection.rtl
+          : TextDirection.ltr;
 
   bool get isArabic => languageCode == 'ar';
 
@@ -65,38 +68,27 @@ final class MuminLanguageController extends ChangeNotifier {
 
   bool get isFrench => languageCode == 'fr';
 
-  bool get isRightToLeft =>
-      language.direction == MuminTextDirection.rtl;
+  bool get isRightToLeft => language.isRightToLeft;
 
-  bool get isLeftToRight =>
-      language.direction == MuminTextDirection.ltr;
+  bool get isLeftToRight => language.isLeftToRight;
 
   bool get canPersist => _preferences != null;
 
-  /// Locales approved for the current release.
-  ///
-  /// The language registry is the single source of language metadata.
-  List<Locale> get supportedLocales {
-    return availableLanguages
-        .map((language) => Locale(language.code))
-        .toList(growable: false);
-  }
+  /// Locales approved for the current application release.
+  List<Locale> get supportedLocales =>
+      MuminLanguageRegistry.availableLanguages
+          .map((language) => Locale(language.code))
+          .toList(growable: false);
 
-  /// Languages approved for the current release.
+  /// Languages approved for the current application release.
   ///
   /// Registered future languages remain unavailable until explicitly
-  /// approved for launch.
-  List<MuminLanguage> get availableLanguages {
-    return MuminLocalizations.languageRegistry.values
-        .where((language) => language.isLaunchLanguage)
-        .toList(growable: false);
-  }
+  /// approved in the central registry.
+  List<MuminLanguage> get availableLanguages =>
+      MuminLanguageRegistry.availableLanguages;
 
-  bool _isApprovedLaunchLanguage(String? code) {
-    final language = MuminLocalizations.languageFor(code);
-
-    return language != null && language.isLaunchLanguage;
-  }
+  bool _isApprovedLaunchLanguage(String? code) =>
+      MuminLanguageRegistry.isSupported(code);
 
   // ---------------------------------------------------------------------------
   // LANGUAGE SELECTION
@@ -104,8 +96,11 @@ final class MuminLanguageController extends ChangeNotifier {
 
   /// Changes the selected language immediately.
   ///
-  /// Returns false when the requested language is not approved for launch.
-  /// The UI updates before the asynchronous preference write completes.
+  /// Returns false when the requested language is not approved
+  /// for the current release.
+  ///
+  /// The interface updates before the asynchronous preference
+  /// write completes.
   bool setLanguage(String languageCode) {
     if (_isDisposed ||
         !_isApprovedLaunchLanguage(languageCode)) {
@@ -116,7 +111,7 @@ final class MuminLanguageController extends ChangeNotifier {
     }
 
     final normalized =
-        MuminLocalizations.normalizeLanguageCode(languageCode);
+        MuminLanguageRegistry.normalizeLanguageCode(languageCode);
 
     if (!_isApprovedLaunchLanguage(normalized)) {
       return false;
@@ -158,7 +153,11 @@ final class MuminLanguageController extends ChangeNotifier {
     return true;
   }
 
-  /// Restores the language from persistent storage.
+  // ---------------------------------------------------------------------------
+  // LANGUAGE RESTORATION AND MIGRATION
+  // ---------------------------------------------------------------------------
+
+  /// Restores the language from persistent local storage.
   ///
   /// The modern language-code preference has priority.
   /// The legacy boolean preference is used only for migration.
@@ -180,7 +179,7 @@ final class MuminLanguageController extends ChangeNotifier {
 
     if (_isApprovedLaunchLanguage(savedCode)) {
       final restored =
-          MuminLocalizations.normalizeLanguageCode(savedCode);
+          MuminLanguageRegistry.normalizeLanguageCode(savedCode);
 
       if (_languageCode != restored) {
         _languageCode = restored;
@@ -237,8 +236,8 @@ final class MuminLanguageController extends ChangeNotifier {
 
   /// Resolves a central translation with an explicit fallback.
   ///
-  /// The fallback is used only when neither the selected language nor
-  /// the central fallback catalog contains the requested key.
+  /// The fallback is used only when neither the selected language
+  /// nor the central fallback catalog contains the requested key.
   String textOr(
     String key,
     String fallback, {
@@ -268,14 +267,15 @@ final class MuminLanguageController extends ChangeNotifier {
     return result;
   }
 
-  String prayerName(String prayerKey) {
-    return localizations.prayerName(prayerKey);
-  }
+  /// Resolves a prayer name through the central translation engine.
+  String prayerName(String prayerKey) =>
+      localizations.prayerName(prayerKey);
 
   // ---------------------------------------------------------------------------
   // PERSISTENCE
   // ---------------------------------------------------------------------------
 
+  /// Serializes preference writes to preserve their order.
   void _enqueueWrite(
     Future<void> Function() operation,
   ) {
@@ -296,22 +296,14 @@ final class MuminLanguageController extends ChangeNotifier {
   }
 
   /// Waits until all queued language writes have finished.
-  Future<void> waitForPendingWrites() {
-    return _pendingWrites;
-  }
+  Future<void> waitForPendingWrites() => _pendingWrites;
 
   // ---------------------------------------------------------------------------
   // INITIALIZATION
   // ---------------------------------------------------------------------------
 
   static String _resolveInitialLanguage(String? code) {
-    final language = MuminLocalizations.languageFor(code);
-
-    if (language != null && language.isLaunchLanguage) {
-      return language.code;
-    }
-
-    return MuminLocalizations.defaultLanguageCode;
+    return MuminLanguageRegistry.normalizeLanguageCode(code);
   }
 
   @override
