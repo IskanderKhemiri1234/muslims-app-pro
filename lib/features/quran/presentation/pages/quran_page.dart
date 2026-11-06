@@ -938,13 +938,22 @@ class _QuranPageState extends State<QuranPage>
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return _BottomSheetShell(
-          title: 'علاماتي المرجعية',
+          title: QuranPageLocalization.text(
+            context,
+            'quran_bookmarks_title',
+          ),
           isDark: isDark,
           child: pages.isEmpty
-              ? const _EmptyState(
+              ? _EmptyState(
                   icon: Icons.bookmark_border_rounded,
-                  title: 'لا توجد علامات مرجعية',
-                  subtitle: 'احفظ الصفحات المهمة للعودة إليها لاحقاً',
+                  title: QuranPageLocalization.text(
+                    context,
+                    'quran_bookmarks_empty_title',
+                  ),
+                  subtitle: QuranPageLocalization.text(
+                    context,
+                    'quran_bookmarks_empty_hint',
+                  ),
                 )
               : ListView.separated(
                   itemCount: pages.length,
@@ -952,6 +961,7 @@ class _QuranPageState extends State<QuranPage>
                       const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final page = pages[index];
+                    final isCurrentPage = page == _currentPage;
 
                     return ListTile(
                       leading: const CircleAvatar(
@@ -961,15 +971,23 @@ class _QuranPageState extends State<QuranPage>
                           color: _gold,
                         ),
                       ),
-                      title: Text('صفحة $page'),
+                      title: Text(
+                        '${QuranPageLocalization.text(context, 'quran_page_number')} $page',
+                      ),
                       subtitle: Text(
-                        page == _currentPage
-                            ? 'الصفحة الحالية'
-                            : 'الانتقال إلى الصفحة',
+                        QuranPageLocalization.text(
+                          context,
+                          isCurrentPage
+                              ? 'quran_current_page'
+                              : 'quran_open_page',
+                        ),
                       ),
                       onTap: () => Navigator.pop(sheetContext, page),
                       trailing: IconButton(
-                        tooltip: 'حذف العلامة',
+                        tooltip: QuranPageLocalization.text(
+                          context,
+                          'quran_delete_bookmark',
+                        ),
                         icon: const Icon(
                           Icons.delete_outline_rounded,
                           color: Colors.redAccent,
