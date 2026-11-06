@@ -1,42 +1,41 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../controllers/prayer_controller.dart';
 
-/// Localized, accessible and animated prayer countdown.
+/// Centralized, accessible and animated prayer countdown.
 ///
-/// Keeps the existing public API compatible with current callers.
+/// Language identity and text direction are resolved through
+/// MuminLanguageRegistry and MuminLocalizations.
 class CountdownWidget extends StatelessWidget {
   const CountdownWidget({
     super.key,
     required this.controller,
-    this.isArabic = false,
   });
 
   final PrayerController controller;
-
-  /// Backward-compatible fallback for callers that do not provide
-  /// an application locale.
-  final bool isArabic;
 
   static const Duration _animationDuration =
       Duration(milliseconds: 220);
 
   static const double _timeUnitWidth = 68;
 
-  
-  MuminLocalizations _resolveLocalizations(BuildContext context) {
-    final localeCode = Localizations.localeOf(context).languageCode;
-    return MuminLocalizations.fromCode(localeCode);
+  MuminLocalizations _resolveLocalizations(
+    BuildContext context,
+  ) {
+    final languageCode =
+        Localizations.localeOf(context).languageCode;
+
+    return MuminLocalizations.fromCode(languageCode);
   }
 
   String _twoDigits(int value) {
     return value.toString().padLeft(2, '0');
   }
 
- 
   String _localizedUnit(
     int value,
     String unit,
@@ -92,17 +91,23 @@ class CountdownWidget extends StatelessWidget {
     );
   }
 
-  String _hourLabel(MuminLocalizations localizations) {
+  String _hourLabel(
+    MuminLocalizations localizations,
+  ) {
     return localizations.text('countdown_hours_label');
   }
 
-  String _minuteLabel(MuminLocalizations localizations) {
+  String _minuteLabel(
+    MuminLocalizations localizations,
+  ) {
     return localizations.text('countdown_minutes_label');
   }
 
-  String _secondLabel(MuminLocalizations localizations) {
+  String _secondLabel(
+    MuminLocalizations localizations,
+  ) {
     return localizations.text('countdown_seconds_label');
-  } 
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,8 +208,11 @@ class _TimeUnit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isArabic =
-        Localizations.localeOf(context).languageCode == 'ar';
+    final languageCode =
+        Localizations.localeOf(context).languageCode;
+
+    final isRightToLeft =
+        MuminLanguageRegistry.isRightToLeft(languageCode);
 
     return SizedBox(
       width: CountdownWidget._timeUnitWidth,
@@ -251,13 +259,13 @@ class _TimeUnit extends StatelessWidget {
               label,
               maxLines: 1,
               textAlign: TextAlign.center,
-              textDirection: isArabic
+              textDirection: isRightToLeft
                   ? TextDirection.rtl
                   : TextDirection.ltr,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 9,
-                letterSpacing: isArabic ? 0 : 0.7,
+                letterSpacing: isRightToLeft ? 0 : 0.7,
                 fontWeight: FontWeight.w700,
               ),
             ),
