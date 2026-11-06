@@ -1,10 +1,18 @@
 
+import 'dart:ui' show FontFeature;
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'glass_container.dart';
 
+/// Displays the daily prayer schedule.
+///
+/// The public constructor is intentionally kept compatible with existing
+/// callers. Language is resolved from the active Flutter locale, with
+/// [isArabic] retained as a fallback for older integrations.
 class PrayerScheduleSection extends StatelessWidget {
   const PrayerScheduleSection({
     super.key,
@@ -21,7 +29,7 @@ class PrayerScheduleSection extends StatelessWidget {
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
 
-  static const List<Prayer> prayers = [
+  static const List<Prayer> prayers = <Prayer>[
     Prayer.fajr,
     Prayer.sunrise,
     Prayer.dhuhr,
@@ -29,6 +37,8 @@ class PrayerScheduleSection extends StatelessWidget {
     Prayer.maghrib,
     Prayer.isha,
   ];
+
+  static const Duration _animationDuration = Duration(milliseconds: 250);
 
   IconData _iconFor(Prayer prayer) {
     switch (prayer) {
@@ -52,28 +62,30 @@ class PrayerScheduleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
+    final isDark = theme.brightness == Brightness.dark;
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    final isDark = theme.brightness == Brightness.dark;
-    final currentNextPrayer = nextPrayer;
+    final locale = Localizations.localeOf(context);
+    final localeCode = locale.languageCode.toLowerCase();
+    final localizations = MuminLocalizations.fromCode(
+      localeCode.isEmpty ? (isArabic ? 'ar' : 'en') : localeCode,
+    );
 
-    final entries = prayers
-        .map((prayer) {
-          final time = prayerTimes.timeForPrayer(prayer);
+    final entries = <_PrayerEntry>[];
 
-          if (time == null) {
-            return null;
-          }
+    for (final prayer in prayers) {
+      final time = prayerTimes.timeForPrayer(prayer);
 
-          return _PrayerEntry(
+      if (time != null) {
+        entries.add(
+          _PrayerEntry(
             prayer: prayer,
             time: time,
-          );
-        })
-        .whereType<_PrayerEntry>()
-        .toList(growable: false);
+          ),
+        );
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,7 +94,8 @@ class PrayerScheduleSection extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                isArabic ? 'مواقيت الصلاة' : 'Prayer times',
+                localizations.prayerTimes,
+                textAlign: TextAlign.start,
                 style: TextStyle(
                   color: theme.colorScheme.onSurface,
                   fontSize: 20,
@@ -99,23 +112,31 @@ class PrayerScheduleSection extends StatelessWidget {
         ),
         const SizedBox(height: 15),
         if (entries.isEmpty)
-          _EmptyScheduleState(isArabic: isArabic)
+          _EmptyScheduleState(
+            message: localizations.prayerTimesUnavailable,
+          )
         else
           ...entries.map((entry) {
-            final isNext = currentNextPrayer != null &&
-                entry.prayer == currentNextPrayer &&
+            // Sunrise is displayed in the schedule but is not treated as
+            // the next obligatory prayer.
+            final isNext = nextPrayer != null &&
+                entry.prayer == nextPrayer &&
                 entry.prayer != Prayer.none &&
                 entry.prayer != Prayer.sunrise;
 
-            return _PrayerScheduleTile(
+            return Padding(
               key: ValueKey<Prayer>(entry.prayer),
-              name: prayerName(entry.prayer),
-              formattedTime: formatTime(entry.time),
-              isNext: isNext,
-              isDark: isDark,
-              isArabic: isArabic,
-              icon: _iconFor(entry.prayer),
-              reduceMotion: reduceMotion,
+              padding: const EdgeInsets.only(bottom: 9),
+              child: _PrayerScheduleTile(
+                name: prayerName(entry.prayer),
+                formattedTime: formatTime(entry.time),
+                isNext: isNext,
+                isDark: isDark,
+                icon: _iconFor(entry.prayer),
+                reduceMotion: reduceMotion,
+                nextPrayerLabel: localizations.nextPrayer,
+                languageCode: localizations.languageCode,
+              ),
             );
           }),
       ],
@@ -135,37 +156,43 @@ class _PrayerEntry {
 
 class _EmptyScheduleState extends StatelessWidget {
   const _EmptyScheduleState({
-    required this.isArabic,
+    required this.message,
   });
 
-  final bool isArabic;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return GlassContainer(
-      radius: 19,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Icon(
-            Icons.schedule_rounded,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              isArabic
-                  ? 'تعذر تحميل مواقيت الصلاة.'
-                  : 'Prayer times are unavailable.',
-              style: TextStyle(
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: message,
+      child: ExcludeSemantics(
+        child: GlassContainer(
+          radius: 19,
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Icon(
+                Icons.schedule_rounded,
                 color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -173,26 +200,46 @@ class _EmptyScheduleState extends StatelessWidget {
 
 class _PrayerScheduleTile extends StatelessWidget {
   const _PrayerScheduleTile({
-    super.key,
     required this.name,
     required this.formattedTime,
     required this.isNext,
     required this.isDark,
-    required this.isArabic,
     required this.icon,
     required this.reduceMotion,
+    required this.nextPrayerLabel,
+    required this.languageCode,
   });
-
-  static const Duration _animationDuration =
-      Duration(milliseconds: 250);
 
   final String name;
   final String formattedTime;
   final bool isNext;
   final bool isDark;
-  final bool isArabic;
   final IconData icon;
   final bool reduceMotion;
+  final String nextPrayerLabel;
+  final String languageCode;
+
+  static const Duration _animationDuration = Duration(milliseconds: 250);
+
+  String get _semanticLabel {
+    if (isNext) {
+      switch (languageCode) {
+        case 'ar':
+          return '$name، $nextPrayerLabel، $formattedTime';
+        case 'fr':
+          return '$name, $nextPrayerLabel, $formattedTime';
+        default:
+          return '$name, $nextPrayerLabel, $formattedTime';
+      }
+    }
+
+    switch (languageCode) {
+      case 'ar':
+        return '$name، $formattedTime';
+      default:
+        return '$name, $formattedTime';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,21 +257,12 @@ class _PrayerScheduleTile extends StatelessWidget {
         ? AppColors.gold.withValues(alpha: 0.42)
         : null;
 
-    final duration = reduceMotion
-        ? Duration.zero
-        : _animationDuration;
-
-    final semanticLabel = isNext
-        ? (isArabic
-            ? '$name، الصلاة القادمة، $formattedTime'
-            : '$name, next prayer, $formattedTime')
-        : (isArabic
-            ? '$name، $formattedTime'
-            : '$name, $formattedTime');
+    final animationDuration =
+        reduceMotion ? Duration.zero : _animationDuration;
 
     return Semantics(
       container: true,
-      label: semanticLabel,
+      label: _semanticLabel,
       child: ExcludeSemantics(
         child: GlassContainer(
           radius: 19,
@@ -237,7 +275,7 @@ class _PrayerScheduleTile extends StatelessWidget {
           child: Row(
             children: [
               AnimatedContainer(
-                duration: duration,
+                duration: animationDuration,
                 curve: Curves.easeInOut,
                 width: 43,
                 height: 43,
@@ -264,20 +302,19 @@ class _PrayerScheduleTile extends StatelessWidget {
                   children: [
                     Text(
                       name,
+                      textAlign: TextAlign.start,
                       style: TextStyle(
                         color: surfaceText,
                         fontSize: 15,
-                        fontWeight: isNext
-                            ? FontWeight.w800
-                            : FontWeight.w600,
+                        fontWeight:
+                            isNext ? FontWeight.w800 : FontWeight.w600,
                       ),
                     ),
                     if (isNext) ...[
                       const SizedBox(height: 3),
                       Text(
-                        isArabic
-                            ? 'الصلاة القادمة'
-                            : 'Next prayer',
+                        nextPrayerLabel,
+                        textAlign: TextAlign.start,
                         style: TextStyle(
                           color: primaryColor,
                           fontSize: 10,
@@ -300,6 +337,7 @@ class _PrayerScheduleTile extends StatelessWidget {
               Text(
                 formattedTime,
                 textDirection: TextDirection.ltr,
+                textAlign: TextAlign.end,
                 style: TextStyle(
                   color: isNext ? AppColors.gold : surfaceText,
                   fontSize: 15,
