@@ -3,12 +3,16 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design_system/mumin_design_tokens.dart';
 
-/// A reusable, theme-aware glass surface.
+/// Reusable premium glass surface for Mumin Pro.
 ///
-/// Designed for bounded UI regions such as cards and panels.
-/// Blur can be disabled independently for performance and accessibility.
+/// Features:
+/// - Automatically adapts to light and dark themes.
+/// - Uses the central Mumin design palette.
+/// - Supports optional backdrop blur.
+/// - Provides a predictable solid fallback for low-performance devices.
+/// - Preserves the existing public constructor API.
 class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
@@ -30,52 +34,53 @@ class GlassContainer extends StatelessWidget {
   final double radius;
   final Color? borderColor;
   final Color? color;
-
-  /// Blur intensity applied to content behind this surface.
   final double blurSigma;
-
-  /// Whether backdrop blur is enabled.
   final bool enableBlur;
-
-  /// Border thickness.
   final double borderWidth;
-
-  /// Controls clipping around the rounded surface.
   final Clip clipBehavior;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mediaQuery = MediaQuery.maybeOf(context);
-
     final isDark = theme.brightness == Brightness.dark;
-
-    // Reduced transparency and reduced motion are separate
-    // accessibility preferences.
-    final reduceTransparency =
-        mediaQuery?.disableAnimations == true
-            ? false
-            : false;
+    final colorScheme = theme.colorScheme;
 
     final effectiveColor = color ??
         (isDark
-            ? Colors.white.withValues(alpha: 0.055)
-            : Colors.white.withValues(alpha: 0.82));
+            ? colorScheme.surface.withValues(alpha: 0.76)
+            : colorScheme.surface.withValues(alpha: 0.88));
 
     final effectiveBorderColor = borderColor ??
         (isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : AppColors.emerald.withValues(alpha: 0.12));
+            ? MuminColors.glassBorder.withValues(alpha: 0.72)
+            : MuminColors.emerald.withValues(alpha: 0.14));
 
     final effectiveRadius = BorderRadius.circular(radius);
 
     final decoration = BoxDecoration(
       color: effectiveColor,
       borderRadius: effectiveRadius,
-      border: Border.all(
-        color: effectiveBorderColor,
-        width: borderWidth,
-      ),
+      border: borderWidth == 0
+          ? null
+          : Border.all(
+              color: effectiveBorderColor,
+              width: borderWidth,
+            ),
+      boxShadow: isDark
+          ? const [
+              BoxShadow(
+                color: Color(0x18000000),
+                blurRadius: 18,
+                offset: Offset(0, 7),
+              ),
+            ]
+          : const [
+              BoxShadow(
+                color: Color(0x10071C17),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
     );
 
     final surface = DecoratedBox(
@@ -86,9 +91,9 @@ class GlassContainer extends StatelessWidget {
       ),
     );
 
-    // A solid surface is cheaper and more predictable than
-    // BackdropFilter when blur is disabled.
-    if (!enableBlur || blurSigma == 0 || reduceTransparency) {
+    final shouldBlur = enableBlur && blurSigma > 0;
+
+    if (!shouldBlur) {
       return ClipRRect(
         borderRadius: effectiveRadius,
         clipBehavior: clipBehavior,
