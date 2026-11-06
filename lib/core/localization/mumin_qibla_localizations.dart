@@ -1,14 +1,25 @@
 
 import 'catalogs/mumin_qibla_catalog.dart';
+import 'mumin_domain_localizations.dart';
 import 'mumin_localizations.dart';
 
-/// Provides the Qibla Atlas catalog through the active central locale.
+/// Backward-compatible Qibla localization bridge.
 ///
-/// Feature widgets should use this extension instead of maintaining
-/// their own Arabic/English/French translation maps.
+/// All text resolution is delegated to the unified domain registry.
 extension MuminQiblaLocalizations on MuminLocalizations {
   String qiblaText(String key) {
-    return MuminQiblaCatalog.text(languageCode, key);
+    return domainText(key);
+  }
+
+  String qiblaTextWith(
+    String key,
+    Map<String, Object?> parameters,
+  ) {
+    return domainTextWith(key, parameters);
+  }
+
+  bool hasQiblaTranslation(String key) {
+    return hasExplicitDomainTranslation(key);
   }
 
   bool get isQiblaCatalogComplete {
