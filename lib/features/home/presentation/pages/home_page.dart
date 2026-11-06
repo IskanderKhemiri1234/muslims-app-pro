@@ -53,7 +53,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   MuminLocalizations get _localizations {
     final locale = Localizations.localeOf(context);
-
     final languageCode =
         MuminLanguageRegistry.normalizeLanguageCode(
       locale.languageCode,
@@ -65,9 +64,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   @override
   void initState() {
     super.initState();
-
     _currentDate = DateTime.now();
-
     WidgetsBinding.instance.addObserver(this);
     _scheduleMidnightRefresh();
   }
@@ -79,7 +76,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
         _refreshDate();
         _scheduleMidnightRefresh();
         break;
-
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
@@ -97,9 +93,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   void _refreshDate() {
     if (!mounted) return;
-
     final now = DateTime.now();
-
     if (_isSameDate(_currentDate, now)) return;
 
     setState(() {
@@ -114,29 +108,23 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   void _scheduleMidnightRefresh() {
     _cancelMidnightRefresh();
-
     if (!mounted) return;
 
     final now = DateTime.now();
-
     final nextMidnight = DateTime(
       now.year,
       now.month,
       now.day + 1,
     );
 
-    final delay = nextMidnight.difference(now) +
-        const Duration(seconds: 1);
+    final delay =
+        nextMidnight.difference(now) + const Duration(seconds: 1);
 
-    _midnightTimer = Timer(
-      delay,
-      _handleMidnightRefresh,
-    );
+    _midnightTimer = Timer(delay, _handleMidnightRefresh);
   }
 
   void _handleMidnightRefresh() {
     if (!mounted) return;
-
     _refreshDate();
     _scheduleMidnightRefresh();
   }
@@ -145,22 +133,16 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     switch (prayer) {
       case Prayer.fajr:
         return _localizations.prayerName('fajr');
-
       case Prayer.sunrise:
         return _localizations.prayerName('sunrise');
-
       case Prayer.dhuhr:
         return _localizations.prayerName('dhuhr');
-
       case Prayer.asr:
         return _localizations.prayerName('asr');
-
       case Prayer.maghrib:
         return _localizations.prayerName('maghrib');
-
       case Prayer.isha:
         return _localizations.prayerName('isha');
-
       default:
         return _localizations.text('unavailable');
     }
@@ -191,9 +173,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
-        _showMessage(
-          _localizations.prayerTimesUnavailable,
-        );
+        _showMessage(_localizations.prayerTimesUnavailable);
       }
     } finally {
       if (mounted) {
@@ -214,18 +194,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       debugPrintStack(stackTrace: stackTrace);
 
       if (mounted) {
-        _showMessage(
-          _localizations.locationPermissionRequired,
-        );
+        _showMessage(_localizations.locationPermissionRequired);
       }
     }
   }
 
   void _openPage(Widget page) {
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => page,
-      ),
+      MaterialPageRoute<void>(builder: (_) => page),
     );
   }
 
@@ -234,23 +210,15 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       case 'qibla':
         _openPage(const QiblaPage());
         return;
-
       case 'quran':
         _openPage(const QuranPage());
         return;
-
       case 'adhan':
-        _showMessage(
-          _localizations.text('adhan_in_development'),
-        );
+        _showMessage(_localizations.text('adhan_in_development'));
         return;
-
       case 'adhkar':
-        _showMessage(
-          _localizations.text('adhkar_in_development'),
-        );
+        _showMessage(_localizations.text('adhkar_in_development'));
         return;
-
       default:
         _showMessage(_localizations.comingSoon);
     }
@@ -258,7 +226,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   void _showMessage(String message) {
     final messenger = ScaffoldMessenger.maybeOf(context);
-
     if (messenger == null) return;
 
     messenger
@@ -337,13 +304,11 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final width = constraints.maxWidth;
-
                 final horizontalPadding = width >= 900
                     ? 36.0
                     : width >= 600
                         ? 26.0
                         : 18.0;
-
                 final maximumContentWidth =
                     width >= 900 ? 820.0 : 680.0;
 
@@ -394,7 +359,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           const SizedBox(height: 14),
                           RepaintBoundary(
                             child: QuickActions(
-                              isArabic: localizations.isArabic,
                               onAction: _handleQuickAction,
                             ),
                           ),
@@ -403,7 +367,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             child: PrayerScheduleSection(
                               prayerTimes: snapshot.prayerTimes!,
                               nextPrayer: snapshot.nextPrayer,
-                              isArabic: localizations.isArabic,
                               prayerName: _prayerName,
                               formatTime: _formatTime,
                             ),
@@ -422,9 +385,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             ),
                           ],
                           const SizedBox(height: 28),
-                          _HomeFooter(
-                            localizations: localizations,
-                          ),
+                          _HomeFooter(localizations: localizations),
                         ],
                       ),
                     ),
@@ -1026,9 +987,7 @@ class _HomeLoadingView extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(25),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 420,
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 420),
                   child: GlassContainer(
                     radius: 28,
                     padding: const EdgeInsets.all(27),
@@ -1045,8 +1004,7 @@ class _HomeLoadingView extends StatelessWidget {
                                 AppColors.deepGreen,
                               ],
                             ),
-                            borderRadius:
-                                BorderRadius.circular(21),
+                            borderRadius: BorderRadius.circular(21),
                             border: Border.all(
                               color: AppColors.gold
                                   .withValues(alpha: 0.5),
@@ -1080,8 +1038,7 @@ class _HomeLoadingView extends StatelessWidget {
                               ? localizations.prayerTimesUnavailable
                               : localizations.loadingPrayerTimes,
                           textAlign: TextAlign.center,
-                          style:
-                              theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -1090,10 +1047,9 @@ class _HomeLoadingView extends StatelessWidget {
                           Text(
                             message!,
                             textAlign: TextAlign.center,
-                            style:
-                                theme.textTheme.bodyMedium?.copyWith(
-                              color: theme
-                                  .colorScheme.onSurfaceVariant,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color:
+                                  theme.colorScheme.onSurfaceVariant,
                               height: 1.5,
                             ),
                           ),
