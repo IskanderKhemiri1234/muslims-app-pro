@@ -1015,7 +1015,7 @@ class _QuranPageState extends State<QuranPage>
       _selectPage(selectedPage, saveImmediately: true);
     }
   }
-
+  
   Future<void> _goToPage() async {
     if (_isLoading || !mounted) return;
 
@@ -1030,32 +1030,52 @@ class _QuranPageState extends State<QuranPage>
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
-            title: const Text('الانتقال إلى صفحة'),
+            title: Text(
+              QuranPageLocalization.text(
+                context,
+                'quran_go_to_page_title',
+              ),
+            ),
             content: TextField(
               controller: controller,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                hintText: 'من 1 إلى 604',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                hintText: QuranPageLocalization.text(
+                  context,
+                  'quran_enter_page_number',
+                ),
+                border: const OutlineInputBorder(),
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('إلغاء'),
+                child: Text(
+                  QuranPageLocalization.text(
+                    context,
+                    'quran_close',
+                  ),
+                ),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: _green,
                 ),
                 onPressed: () {
-                  final page = int.tryParse(controller.text.trim());
+                  final page = int.tryParse(
+                    controller.text.trim(),
+                  );
 
                   if (page == null || !_isValidPage(page)) {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('رقم الصفحة غير صحيح'),
+                      SnackBar(
+                        content: Text(
+                          QuranPageLocalization.text(
+                            context,
+                            'quran_invalid_page',
+                          ),
+                        ),
                       ),
                     );
                     return;
@@ -1063,7 +1083,12 @@ class _QuranPageState extends State<QuranPage>
 
                   Navigator.pop(dialogContext, page);
                 },
-                child: const Text('انتقال'),
+                child: Text(
+                  QuranPageLocalization.text(
+                    context,
+                    'quran_go_to_page',
+                  ),
+                ),
               ),
             ],
           );
