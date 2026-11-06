@@ -2,28 +2,26 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'glass_container.dart';
 
-/// Displays the daily prayer schedule.
+/// Daily prayer schedule.
 ///
-/// The public constructor is intentionally kept compatible with existing
-/// callers. Language is resolved from the active Flutter locale, with
-/// [isArabic] retained as a fallback for older integrations.
+/// Language selection and direction are resolved centrally.
+/// Prayer names and time formatting are supplied by the home page.
 class PrayerScheduleSection extends StatelessWidget {
   const PrayerScheduleSection({
     super.key,
     required this.prayerTimes,
     required this.nextPrayer,
-    required this.isArabic,
     required this.prayerName,
     required this.formatTime,
   });
 
   final PrayerTimes prayerTimes;
   final Prayer? nextPrayer;
-  final bool isArabic;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
 
@@ -35,7 +33,6 @@ class PrayerScheduleSection extends StatelessWidget {
     Prayer.maghrib,
     Prayer.isha,
   ];
-
 
   IconData _iconFor(Prayer prayer) {
     switch (prayer) {
@@ -60,14 +57,17 @@ class PrayerScheduleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    final locale = Localizations.localeOf(context);
-    final localeCode = locale.languageCode.toLowerCase();
-    final localizations = MuminLocalizations.fromCode(
-      localeCode.isEmpty ? (isArabic ? 'ar' : 'en') : localeCode,
+    final languageCode =
+        MuminLanguageRegistry.normalizeLanguageCode(
+      Localizations.localeOf(context).languageCode,
     );
+
+    final localizations =
+        MuminLocalizations.fromCode(languageCode);
 
     final entries = <_PrayerEntry>[];
 
@@ -114,11 +114,8 @@ class PrayerScheduleSection extends StatelessWidget {
           )
         else
           ...entries.map((entry) {
-            // Sunrise is displayed in the schedule but is not treated as
-            // the next obligatory prayer.
             final isNext = nextPrayer != null &&
                 entry.prayer == nextPrayer &&
-                entry.prayer != Prayer.none &&
                 entry.prayer != Prayer.sunrise;
 
             return Padding(
@@ -132,7 +129,6 @@ class PrayerScheduleSection extends StatelessWidget {
                 icon: _iconFor(entry.prayer),
                 reduceMotion: reduceMotion,
                 nextPrayerLabel: localizations.nextPrayer,
-                languageCode: localizations.languageCode,
               ),
             );
           }),
@@ -204,7 +200,6 @@ class _PrayerScheduleTile extends StatelessWidget {
     required this.icon,
     required this.reduceMotion,
     required this.nextPrayerLabel,
-    required this.languageCode,
   });
 
   final String name;
@@ -214,28 +209,16 @@ class _PrayerScheduleTile extends StatelessWidget {
   final IconData icon;
   final bool reduceMotion;
   final String nextPrayerLabel;
-  final String languageCode;
 
-  static const Duration _animationDuration = Duration(milliseconds: 250);
+  static const Duration _animationDuration =
+      Duration(milliseconds: 250);
 
   String get _semanticLabel {
     if (isNext) {
-      switch (languageCode) {
-        case 'ar':
-          return '$name، $nextPrayerLabel، $formattedTime';
-        case 'fr':
-          return '$name, $nextPrayerLabel, $formattedTime';
-        default:
-          return '$name, $nextPrayerLabel, $formattedTime';
-      }
+      return '$name, $nextPrayerLabel, $formattedTime';
     }
 
-    switch (languageCode) {
-      case 'ar':
-        return '$name، $formattedTime';
-      default:
-        return '$name, $formattedTime';
-    }
+    return '$name, $formattedTime';
   }
 
   @override
