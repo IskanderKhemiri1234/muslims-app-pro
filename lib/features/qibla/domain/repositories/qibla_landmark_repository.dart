@@ -26,12 +26,18 @@ abstract interface class QiblaLandmarkRepository {
     QiblaLandmarkCategory category,
   );
 
-  /// Searches landmark names in the requested language.
+  /// Searches landmark information in the requested language.
   ///
-  /// Implementations should normalize whitespace and
-  /// perform case-insensitive matching where applicable.
+  /// The language code is expected to be one of the application's
+  /// registered launch languages: ar, en, or fr.
+  ///
+  /// Implementations must use the model's language-aware fallback
+  /// rules when a translated field is unavailable.
+  ///
+  /// Search normalization should trim whitespace, collapse repeated
+  /// spaces, and compare case-insensitively where applicable.
   Future<List<QiblaLandmark>> search({
     required String query,
-    required bool isArabic,
+    required String languageCode,
   });
 }
