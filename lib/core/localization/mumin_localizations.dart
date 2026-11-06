@@ -249,6 +249,10 @@ final class MuminLocalizations {
       'let_prayer_illuminate_your_day': 'صلاتك نور يومك',
       'translation_unavailable': 'النص غير متاح حالياً',
       'unavailable': 'غير متاح',
+            'today_label': 'اليوم',
+      'next_prayer_eyebrow': 'الصلاة القادمة',
+      'time_remaining': 'الوقت المتبقي للصلاة',
+      'countdown_auto_update': 'يتم تحديث العداد تلقائيًا',
 
       'prayer_fajr': 'الفجر',
       'prayer_sunrise': 'الشروق',
@@ -466,6 +470,10 @@ final class MuminLocalizations {
       'tasbih': 'Tasbih',
       'calendar': 'Hijri calendar',
       'settings': 'Settings',
+      'today_label': 'Today',
+      'next_prayer_eyebrow': 'Up next',
+      'time_remaining': 'Time remaining',
+      'countdown_auto_update': 'Countdown updates automatically',
 
       'coming_soon': 'This feature will be available soon',
       'let_prayer_illuminate_your_day': 'Let prayer illuminate your day',
@@ -691,6 +699,11 @@ final class MuminLocalizations {
       'adhkar': 'Invocations',
       'tasbih': 'Tasbih',
       'calendar': 'Calendrier hégirien',
+      'today_label': 'Aujourd’hui',
+      'next_prayer_eyebrow': 'Prochaine prière',
+      'time_remaining': 'Temps restant avant la prière',
+      'countdown_auto_update':
+          'Le compte à rebours se met à jour automatiquement',
       'settings': 'Paramètres',
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
