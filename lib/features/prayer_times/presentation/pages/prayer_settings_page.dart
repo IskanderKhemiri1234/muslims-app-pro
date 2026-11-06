@@ -3,92 +3,69 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/localization/mumin_localizations.dart';
+import '../../../../core/localization/mumin_prayer_settings_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../controllers/prayer_controller.dart';
 
 class PrayerSettingsPage extends StatelessWidget {
-  const PrayerSettingsPage({
-    super.key,
-    required this.isArabic,
-  });
+  const PrayerSettingsPage({super.key});
 
-  final bool isArabic;
-
-  String t(String ar, String en) => isArabic ? ar : en;
-
-  String methodName(CalculationMethod method) {
-    const names = <CalculationMethod, List<String>>{
-      CalculationMethod.muslim_world_league: [
-        'رابطة العالم الإسلامي',
-        'Muslim World League',
-      ],
-      CalculationMethod.egyptian: [
-        'الهيئة المصرية العامة للمساحة',
-        'Egyptian General Authority',
-      ],
-      CalculationMethod.karachi: [
-        'جامعة العلوم الإسلامية - كراتشي',
-        'University of Islamic Sciences, Karachi',
-      ],
-      CalculationMethod.umm_al_qura: [
-        'أم القرى - مكة المكرمة',
-        'Umm Al-Qura University',
-      ],
-      CalculationMethod.dubai: [
-        'دبي',
-        'Dubai',
-      ],
-      CalculationMethod.qatar: [
-        'قطر',
-        'Qatar',
-      ],
-      CalculationMethod.kuwait: [
-        'الكويت',
-        'Kuwait',
-      ],
-      CalculationMethod.singapore: [
-        'سنغافورة',
-        'Singapore',
-      ],
-      CalculationMethod.north_america: [
-        'أمريكا الشمالية',
-        'North America',
-      ],
-      CalculationMethod.turkey: [
-        'تركيا',
-        'Turkey',
-      ],
-      CalculationMethod.tehran: [
-        'طهران',
-        'Tehran',
-      ],
-      CalculationMethod.other: [
-        'إعدادات مخصصة',
-        'Other',
-      ],
+  String _methodName(
+    MuminLocalizations localizations,
+    CalculationMethod method,
+  ) {
+    final key = switch (method) {
+      CalculationMethod.muslim_world_league =>
+        'calculation_muslim_world_league',
+      CalculationMethod.egyptian =>
+        'calculation_egyptian',
+      CalculationMethod.karachi =>
+        'calculation_karachi',
+      CalculationMethod.umm_al_qura =>
+        'calculation_umm_al_qura',
+      CalculationMethod.dubai =>
+        'calculation_dubai',
+      CalculationMethod.qatar =>
+        'calculation_qatar',
+      CalculationMethod.kuwait =>
+        'calculation_kuwait',
+      CalculationMethod.singapore =>
+        'calculation_singapore',
+      CalculationMethod.north_america =>
+        'calculation_north_america',
+      CalculationMethod.turkey =>
+        'calculation_turkey',
+      CalculationMethod.tehran =>
+        'calculation_tehran',
+      CalculationMethod.other =>
+        'calculation_other',
     };
 
-    final labels = names[method];
-
-    if (labels != null) {
-      return labels[isArabic ? 0 : 1];
-    }
-
-    return method.name;
+    return localizations.prayerSettingsText(key);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textColor = theme.colorScheme.onSurface;
+    final localizations = MuminLocalizations.fromCode(
+      Localizations.localeOf(context).languageCode,
+    );
+
+    final direction = localizations.isRightToLeft
+        ? TextDirection.rtl
+        : TextDirection.ltr;
+
+    String t(String key) =>
+        localizations.prayerSettingsText(key);
 
     return Directionality(
-      textDirection:
-          isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: direction,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            t('إعدادات الصلاة', 'Prayer Settings'),
+            t('prayer_settings_title'),
             style: const TextStyle(
               fontWeight: FontWeight.w800,
             ),
@@ -105,24 +82,22 @@ class PrayerSettingsPage extends StatelessWidget {
                 35,
               ),
               children: [
-                _SettingsIntro(isArabic: isArabic),
-
+                _SettingsIntro(
+                  title: t('prayer_settings_intro_title'),
+                  description:
+                      t('prayer_settings_intro_description'),
+                ),
                 const SizedBox(height: 28),
-
                 _SettingsHeader(
                   icon: Icons.calculate_rounded,
                   title: t(
-                    'طريقة حساب المواقيت',
-                    'Prayer Calculation Method',
+                    'prayer_settings_calculation_section',
                   ),
                   subtitle: t(
-                    'اختر طريقة الحساب المعتمدة في منطقتك.',
-                    'Choose the calculation method used in your region.',
+                    'prayer_settings_calculation_description',
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 DropdownButtonFormField<CalculationMethod>(
                   key: ValueKey(
                     'method_${controller.method.name}',
@@ -131,19 +106,18 @@ class PrayerSettingsPage extends StatelessWidget {
                   isExpanded: true,
                   decoration: _inputDecoration(
                     label: t(
-                      'طريقة الحساب',
-                      'Calculation method',
+                      'prayer_settings_calculation_label',
                     ),
                   ),
                   items: CalculationMethod.values.map((method) {
                     return DropdownMenuItem<CalculationMethod>(
                       value: method,
                       child: Text(
-                        methodName(method),
+                        _methodName(localizations, method),
                         overflow: TextOverflow.ellipsis,
                       ),
                     );
-                  }).toList(),
+                  }).toList(growable: false),
                   onChanged: controller.isLoadingLocation
                       ? null
                       : (value) {
@@ -152,23 +126,14 @@ class PrayerSettingsPage extends StatelessWidget {
                           }
                         },
                 ),
-
                 const SizedBox(height: 30),
-
                 _SettingsHeader(
                   icon: Icons.balance_rounded,
-                  title: t(
-                    'طريقة حساب صلاة العصر',
-                    'Asr Calculation',
-                  ),
-                  subtitle: t(
-                    'يحدد هذا الاختيار وقت صلاة العصر.',
-                    'This setting determines the Asr prayer time.',
-                  ),
+                  title: t('prayer_settings_asr_section'),
+                  subtitle:
+                      t('prayer_settings_asr_description'),
                 ),
-
                 const SizedBox(height: 16),
-
                 DropdownButtonFormField<Madhab>(
                   key: ValueKey(
                     'madhab_${controller.madhab.name}',
@@ -176,23 +141,20 @@ class PrayerSettingsPage extends StatelessWidget {
                   initialValue: controller.madhab,
                   isExpanded: true,
                   decoration: _inputDecoration(
-                    label: t('المذهب', 'Madhab'),
+                    label: t('prayer_settings_madhab_label'),
                   ),
                   items: [
                     DropdownMenuItem<Madhab>(
                       value: Madhab.shafi,
                       child: Text(
-                        t(
-                          'الشافعي والمالكي والحنبلي',
-                          'Shafi, Maliki and Hanbali',
-                        ),
+                        t('prayer_settings_madhab_shafi_group'),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     DropdownMenuItem<Madhab>(
                       value: Madhab.hanafi,
                       child: Text(
-                        t('الحنفي', 'Hanafi'),
+                        t('prayer_settings_madhab_hanafi'),
                       ),
                     ),
                   ],
@@ -204,40 +166,29 @@ class PrayerSettingsPage extends StatelessWidget {
                           }
                         },
                 ),
-
                 const SizedBox(height: 28),
-
                 _InformationCard(
                   textColor: textColor,
-                  message: t(
-                    'تختلف مواقيت الصلاة حسب الموقع الجغرافي وطريقة الحساب. للحصول على نتائج أدق، اختر الطريقة التي تعتمدها الجهة الإسلامية الموثوقة في منطقتك.',
-                    'Prayer times vary according to geographical location and calculation method. For accurate results, choose the method recommended by a trusted Islamic authority in your region.',
-                  ),
+                  message: t('prayer_settings_information'),
                 ),
-
                 if (controller.timezoneId != null) ...[
                   const SizedBox(height: 18),
                   _TimezoneCard(
                     timezoneId: controller.timezoneId!,
-                    isArabic: isArabic,
+                    title: t('prayer_settings_timezone_title'),
                   ),
                 ],
-
                 if (controller.message != null) ...[
                   const SizedBox(height: 18),
                   _MessageCard(
                     message: controller.message!,
                   ),
                 ],
-
                 const SizedBox(height: 24),
-
                 Center(
                   child: Text(
-                    t(
-                      'الإعدادات تحفظ تلقائيًا',
-                      'Settings are saved automatically',
-                    ),
+                    t('prayer_settings_auto_save'),
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: textColor.withValues(alpha: 0.48),
                       fontSize: 11,
@@ -286,10 +237,12 @@ class PrayerSettingsPage extends StatelessWidget {
 
 class _SettingsIntro extends StatelessWidget {
   const _SettingsIntro({
-    required this.isArabic,
+    required this.title,
+    required this.description,
   });
 
-  final bool isArabic;
+  final String title;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
@@ -329,9 +282,7 @@ class _SettingsIntro extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isArabic
-                      ? 'صلاتك في وقتها'
-                      : 'Prayer, on time',
+                  title,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 19,
@@ -340,9 +291,7 @@ class _SettingsIntro extends StatelessWidget {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  isArabic
-                      ? 'خصص مواقيت الصلاة لتناسب موقعك وطريقة الحساب التي تتبعها.'
-                      : 'Customize prayer times for your location and preferred calculation method.',
+                  description,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.78),
                     fontSize: 12,
@@ -470,11 +419,11 @@ class _InformationCard extends StatelessWidget {
 class _TimezoneCard extends StatelessWidget {
   const _TimezoneCard({
     required this.timezoneId,
-    required this.isArabic,
+    required this.title,
   });
 
   final String timezoneId;
-  final bool isArabic;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -501,9 +450,7 @@ class _TimezoneCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isArabic
-                      ? 'المنطقة الزمنية المكتشفة'
-                      : 'Detected timezone',
+                  title,
                   style: TextStyle(
                     color: textColor.withValues(alpha: 0.65),
                     fontSize: 11,
