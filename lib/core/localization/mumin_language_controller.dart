@@ -8,8 +8,9 @@ import 'mumin_localizations.dart';
 ///
 /// Responsibilities:
 /// - Own the selected language.
-/// - Enforce the official launch language registry.
-/// - Resolve locale and text direction.
+/// - Enforce the official language registry.
+/// - Expose only approved launch languages to Flutter.
+/// - Resolve locale and text direction from central metadata.
 /// - Provide the central translation engine.
 /// - Persist language changes locally.
 /// - Serialize writes to avoid out-of-order preferences.
@@ -50,18 +51,19 @@ final class MuminLanguageController extends ChangeNotifier {
   MuminLocalizations get localizations =>
       MuminLocalizations.fromCode(_languageCode);
 
-  Locale get locale => Locale(_languageCode);
+  Locale get locale => Locale(languageCode);
 
-  TextDirection get textDirection =>
-      language.isRightToLeft
-          ? TextDirection.rtl
-          : TextDirection.ltr;
+  TextDirection get textDirection {
+    return language.direction == MuminTextDirection.rtl
+        ? TextDirection.rtl
+        : TextDirection.ltr;
+  }
 
-  bool get isArabic => _languageCode == 'ar';
+  bool get isArabic => languageCode == 'ar';
 
-  bool get isEnglish => _languageCode == 'en';
+  bool get isEnglish => languageCode == 'en';
 
-  bool get isFrench => _languageCode == 'fr';
+  bool get isFrench => languageCode == 'fr';
 
   bool get isRightToLeft =>
       language.direction == MuminTextDirection.rtl;
@@ -69,13 +71,26 @@ final class MuminLanguageController extends ChangeNotifier {
   bool get isLeftToRight =>
       language.direction == MuminTextDirection.ltr;
 
-  bool get canPersist =>
-      _preferences != null;
+  bool get canPersist => _preferences != null;
 
-  List<Locale> get supportedLocales =>
-      MuminLocalizations.supportedLanguageCodes
-          .map((code) => Locale(code))
-          .toList(growable: false);
+  /// Languages exposed to Flutter in the current release.
+  ///
+  /// The registry is the source of truth. A language can be registered
+  /// for future development without becoming available to users until
+  /// it is explicitly marked as a launch language.
+  List<Locale> get supportedLocales {
+    return MuminLocalizations.languageRegistry.values
+        .where((language) => language.isLaunchLanguage)
+        .map((language) => Locale(language.code))
+        .toList(growable: false);
+  }
+
+  /// Registered languages approved for the current release.
+  List<MuminLanguage> get availableLanguages {
+    return MuminLocalizations.languageRegistry.values
+        .where((language) => language.isLaunchLanguage)
+        .toList(growable: false);
+  }
 
   // ---------------------------------------------------------------------------
   // LANGUAGE SELECTION
@@ -172,8 +187,7 @@ final class MuminLanguageController extends ChangeNotifier {
     bool? legacyArabic;
 
     try {
-      legacyArabic =
-          _preferences!.getBool(legacyPreferenceKey);
+      legacyArabic = _preferences!.getBool(legacyPreferenceKey);
     } catch (error, stackTrace) {
       debugPrint(
         'Mumin Pro: legacy language preference is invalid: $error',
