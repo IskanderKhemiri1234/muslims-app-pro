@@ -36,7 +36,6 @@ class PrayerScheduleSection extends StatelessWidget {
     Prayer.isha,
   ];
 
-  static const Duration _animationDuration = Duration(milliseconds: 250);
 
   IconData _iconFor(Prayer prayer) {
     switch (prayer) {
