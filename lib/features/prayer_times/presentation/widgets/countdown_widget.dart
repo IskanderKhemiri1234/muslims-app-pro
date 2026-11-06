@@ -26,90 +26,26 @@ class CountdownWidget extends StatelessWidget {
 
   static const double _timeUnitWidth = 68;
 
+  
   MuminLocalizations _resolveLocalizations(BuildContext context) {
     final localeCode = Localizations.localeOf(context).languageCode;
-
-    return MuminLocalizations.fromCode(
-      localeCode.isEmpty ? (isArabic ? 'ar' : 'en') : localeCode,
-    );
+    return MuminLocalizations.fromCode(localeCode);
   }
 
   String _twoDigits(int value) {
     return value.toString().padLeft(2, '0');
   }
 
-  String _arabicUnit(int value, String unit) {
-    if (value == 2) {
-      switch (unit) {
-        case 'hour':
-          return 'ساعتان';
-        case 'minute':
-          return 'دقيقتان';
-        default:
-          return 'ثانيتان';
-      }
-    }
-
-    if (value >= 3 && value <= 10) {
-      switch (unit) {
-        case 'hour':
-          return 'ساعات';
-        case 'minute':
-          return 'دقائق';
-        default:
-          return 'ثوانٍ';
-      }
-    }
-
-    switch (unit) {
-      case 'hour':
-        return 'ساعة';
-      case 'minute':
-        return 'دقيقة';
-      default:
-        return 'ثانية';
-    }
-  }
-
-  String _englishUnit(int value, String unit) {
-    final suffix = value == 1 ? '' : 's';
-
-    switch (unit) {
-      case 'hour':
-        return 'hour$suffix';
-      case 'minute':
-        return 'minute$suffix';
-      default:
-        return 'second$suffix';
-    }
-  }
-
-  String _frenchUnit(int value, String unit) {
-    final suffix = value == 1 ? '' : 's';
-
-    switch (unit) {
-      case 'hour':
-        return 'heure$suffix';
-      case 'minute':
-        return 'minute$suffix';
-      default:
-        return 'seconde$suffix';
-    }
-  }
-
+ 
   String _localizedUnit(
     int value,
     String unit,
     MuminLocalizations localizations,
   ) {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return _arabicUnit(value, unit);
-      case 'fr':
-        return _frenchUnit(value, unit);
-      default:
-        return _englishUnit(value, unit);
-    }
+    return localizations.plural(
+      'countdown_$unit',
+      value,
+    );
   }
 
   String _semanticLabel(
@@ -138,72 +74,35 @@ class CountdownWidget extends StatelessWidget {
       localizations,
     );
 
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'الوقت المتبقي: '
-            '$hours $hourText و'
-            '$minutes $minuteText و'
-            '$seconds $secondText';
-
-      case 'fr':
-        return 'Temps restant : '
-            '$hours $hourText, '
-            '$minutes $minuteText et '
-            '$seconds $secondText';
-
-      default:
-        return 'Time remaining: '
-            '$hours $hourText, '
-            '$minutes $minuteText and '
-            '$seconds $secondText';
-    }
+    return localizations.textWith(
+      'countdown_semantic_label',
+      {
+        'hours': '$hours $hourText',
+        'minutes': '$minutes $minuteText',
+        'seconds': '$seconds $secondText',
+      },
+    );
   }
 
   String _noUpcomingPrayerLabel(
     MuminLocalizations localizations,
   ) {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'لا يوجد موعد صلاة قادم متاح';
-      case 'fr':
-        return 'Aucun horaire de prière à venir disponible';
-      default:
-        return 'No upcoming prayer time available';
-    }
+    return localizations.text(
+      'countdown_no_upcoming_prayer',
+    );
   }
 
   String _hourLabel(MuminLocalizations localizations) {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'ساعات';
-      case 'fr':
-        return 'HEURES';
-      default:
-        return 'HOURS';
-    }
+    return localizations.text('countdown_hours_label');
   }
 
   String _minuteLabel(MuminLocalizations localizations) {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'دقائق';
-      case 'fr':
-        return 'MINUTES';
-      default:
-        return 'MINUTES';
-    }
+    return localizations.text('countdown_minutes_label');
   }
 
   String _secondLabel(MuminLocalizations localizations) {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'ثوانٍ';
-      case 'fr':
-        return 'SECONDES';
-      default:
-        return 'SECONDS';
-    }
-  }
+    return localizations.text('countdown_seconds_label');
+  } 
 
   @override
   Widget build(BuildContext context) {
