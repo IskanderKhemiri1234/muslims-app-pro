@@ -9,10 +9,9 @@ import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/presentation/widgets/countdown_widget.dart';
 import 'glass_container.dart';
 
-/// Signature next-prayer experience for Mumin Pro.
+/// Premium next-prayer experience for Mumin Pro.
 ///
-/// The public constructor is intentionally preserved so existing
-/// home-page integrations remain compatible.
+/// The public constructor remains compatible with existing integrations.
 class PrayerHeroCard extends StatelessWidget {
   const PrayerHeroCard({
     super.key,
@@ -24,19 +23,21 @@ class PrayerHeroCard extends StatelessWidget {
 
   final PrayerController controller;
 
-  /// Backward-compatible fallback.
-  ///
-  /// The active MaterialApp locale takes precedence.
+  /// Backward-compatible language fallback.
+  /// The active application locale takes precedence.
   final bool isArabic;
 
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
 
   MuminLocalizations _resolveLocalizations(BuildContext context) {
-    final localeCode = Localizations.localeOf(context).languageCode;
+    final localeCode =
+        Localizations.maybeLocaleOf(context)?.languageCode;
 
     return MuminLocalizations.fromCode(
-      localeCode.isEmpty ? (isArabic ? 'ar' : 'en') : localeCode,
+      localeCode == null || localeCode.isEmpty
+          ? (isArabic ? 'ar' : 'en')
+          : localeCode,
     );
   }
 
@@ -52,9 +53,8 @@ class PrayerHeroCard extends StatelessWidget {
           begin: reduceMotion ? 1 : 0.985,
           end: 1,
         ),
-        duration: reduceMotion
-            ? Duration.zero
-            : MuminMotion.smooth,
+        duration:
+            reduceMotion ? Duration.zero : MuminMotion.smooth,
         curve: MuminMotion.enter,
         builder: (context, scale, child) {
           return Transform.scale(
@@ -100,9 +100,8 @@ class _HeroSurface extends StatelessWidget {
   final String Function(DateTime) formatTime;
   final bool reduceMotion;
 
-  String get _unavailableLabel {
-    return localizations.text('unavailable');
-  }
+  String get _unavailableLabel =>
+      localizations.text('unavailable');
 
   @override
   Widget build(BuildContext context) {
@@ -124,103 +123,98 @@ class _HeroSurface extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 350;
 
-        final horizontalPadding = compact ? 18.0 : 23.0;
-        final verticalPadding = compact ? 20.0 : 24.0;
+        final horizontalPadding = compact ? 16.0 : 23.0;
+        final verticalPadding = compact ? 19.0 : 24.0;
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF126C55),
-                  Color(0xFF084B3B),
-                  Color(0xFF06372E),
-                  Color(0xFF041F1B),
+        return Semantics(
+          container: true,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF126C55),
+                    Color(0xFF084B3B),
+                    Color(0xFF06372E),
+                    Color(0xFF041F1B),
+                  ],
+                  stops: [0, 0.32, 0.72, 1],
+                ),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.42),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF075B46)
+                        .withValues(alpha: 0.24),
+                    blurRadius: 30,
+                    spreadRadius: -5,
+                    offset: const Offset(0, 15),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
+                  ),
                 ],
-                stops: [0, 0.32, 0.72, 1],
               ),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.42),
-                width: 1,
+              child: Stack(
+                children: [
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: _HeroAtmosphere(),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _HeroHeader(
+                          localizations: localizations,
+                        ),
+                        SizedBox(height: compact ? 23 : 31),
+                        _PrayerIdentity(
+                          prayerLabel: prayerLabel,
+                          animationKey: animationKey,
+                          hasNextPrayer: hasNextPrayer,
+                          currentTime: currentTime,
+                          formatTime: formatTime,
+                          localizations: localizations,
+                          reduceMotion: reduceMotion,
+                          compact: compact,
+                        ),
+                        SizedBox(height: compact ? 21 : 28),
+                        _CountdownPanel(
+                          controller: controller,
+                          localizations: localizations,
+                          compact: compact,
+                        ),
+                        SizedBox(height: compact ? 15 : 19),
+                        _HeroFooter(
+                          localizations: localizations,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PositionedDirectional(
+                    top: 0,
+                    start: 0,
+                    end: 0,
+                    child: IgnorePointer(
+                      child: _HeroTopHighlight(),
+                    ),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF075B46)
-                      .withValues(alpha: 0.24),
-                  blurRadius: 30,
-                  spreadRadius: -5,
-                  offset: const Offset(0, 15),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 18,
-                  offset: const Offset(0, 9),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: _HeroAtmosphere(),
-                  ),
-                ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: verticalPadding,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HeroHeader(
-                        localizations: localizations,
-                      ),
-
-                      SizedBox(height: compact ? 25 : 31),
-
-                      _PrayerIdentity(
-                        prayerLabel: prayerLabel,
-                        animationKey: animationKey,
-                        hasNextPrayer: hasNextPrayer,
-                        currentTime: currentTime,
-                        formatTime: formatTime,
-                        reduceMotion: reduceMotion,
-                        compact: compact,
-                      ),
-
-                      SizedBox(height: compact ? 23 : 28),
-
-                      _CountdownPanel(
-                        controller: controller,
-                        localizations: localizations,
-                        reduceMotion: reduceMotion,
-                        compact: compact,
-                      ),
-
-                      SizedBox(height: compact ? 16 : 19),
-
-                      _HeroFooter(
-                        localizations: localizations,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const PositionedDirectional(
-                  top: 0,
-                  start: 0,
-                  end: 0,
-                  child: IgnorePointer(
-                    child: _HeroTopHighlight(),
-                  ),
-                ),
-              ],
             ),
           ),
         );
@@ -229,9 +223,7 @@ class _HeroSurface extends StatelessWidget {
   }
 }
 
-/// Atmospheric decoration drawn without image assets or continuous animation.
-///
-/// Custom painting keeps the geometry lightweight and resolution-independent.
+/// Lightweight decorative background, painted without image assets.
 class _HeroAtmosphere extends StatelessWidget {
   const _HeroAtmosphere();
 
@@ -267,15 +259,15 @@ class _HeroAtmospherePainter extends CustomPainter {
         ],
       ).createShader(
         Rect.fromCircle(
-          center: Offset(size.width * 0.9, size.height * 0.08),
+          center: Offset(
+            size.width * 0.9,
+            size.height * 0.08,
+          ),
           radius: size.width * 0.65,
         ),
       );
 
-    canvas.drawRect(
-      Offset.zero & size,
-      glowPaint,
-    );
+    canvas.drawRect(Offset.zero & size, glowPaint);
 
     final center = Offset(
       size.width * 0.88,
@@ -293,7 +285,6 @@ class _HeroAtmospherePainter extends CustomPainter {
     }
 
     final geometryPath = Path();
-
     final startX = size.width * 0.08;
     final startY = size.height * 0.76;
 
@@ -301,18 +292,21 @@ class _HeroAtmospherePainter extends CustomPainter {
       final x = startX + index * 24.0;
       final y = startY + (index.isEven ? 0 : 12);
 
-      geometryPath.moveTo(x, y - 7);
-      geometryPath.lineTo(x + 7, y);
-      geometryPath.lineTo(x, y + 7);
-      geometryPath.lineTo(x - 7, y);
-      geometryPath.close();
+      geometryPath
+        ..moveTo(x, y - 7)
+        ..lineTo(x + 7, y)
+        ..lineTo(x, y + 7)
+        ..lineTo(x - 7, y)
+        ..close();
     }
 
     canvas.drawPath(geometryPath, lightPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _HeroAtmospherePainter oldDelegate) {
+  bool shouldRepaint(
+    covariant _HeroAtmospherePainter oldDelegate,
+  ) {
     return false;
   }
 }
@@ -378,9 +372,7 @@ class _HeroHeader extends StatelessWidget {
             size: 19,
           ),
         ),
-
         const SizedBox(width: 11),
-
         Expanded(
           child: Text(
             localizations.nextPrayer,
@@ -394,9 +386,7 @@ class _HeroHeader extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(width: 8),
-
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: 11,
@@ -447,6 +437,7 @@ class _PrayerIdentity extends StatelessWidget {
     required this.hasNextPrayer,
     required this.currentTime,
     required this.formatTime,
+    required this.localizations,
     required this.reduceMotion,
     required this.compact,
   });
@@ -456,8 +447,20 @@ class _PrayerIdentity extends StatelessWidget {
   final bool hasNextPrayer;
   final DateTime? currentTime;
   final String Function(DateTime) formatTime;
+  final MuminLocalizations localizations;
   final bool reduceMotion;
   final bool compact;
+
+  String get _eyebrow {
+    switch (localizations.languageCode) {
+      case 'ar':
+        return 'الصلاة القادمة';
+      case 'fr':
+        return 'PROCHAINE PRIÈRE';
+      default:
+        return 'UP NEXT';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -472,12 +475,10 @@ class _PrayerIdentity extends StatelessWidget {
             color: AppColors.goldLight.withValues(alpha: 0.85),
             fontSize: 10,
             fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
+            letterSpacing: localizations.isArabic ? 0 : 1.2,
           ),
         ),
-
         const SizedBox(height: 9),
-
         AnimatedSwitcher(
           duration: reduceMotion
               ? Duration.zero
@@ -509,15 +510,13 @@ class _PrayerIdentity extends StatelessWidget {
                 fontSize: compact ? 34 : 40,
                 height: 1.13,
                 fontWeight: FontWeight.w900,
-                letterSpacing: -0.7,
+                letterSpacing: localizations.isArabic ? 0 : -0.7,
               ),
             ),
           ),
         ),
-
         if (hasNextPrayer && time != null) ...[
           const SizedBox(height: 13),
-
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -537,9 +536,7 @@ class _PrayerIdentity extends StatelessWidget {
                   color: AppColors.goldLight,
                 ),
               ),
-
               const SizedBox(width: 9),
-
               Text(
                 formatTime(time),
                 textDirection: TextDirection.ltr,
@@ -558,34 +555,17 @@ class _PrayerIdentity extends StatelessWidget {
       ],
     );
   }
-
-  String get _eyebrow {
-    switch (Localizations.localeOf(_HeroBuildContext.current!).languageCode) {
-      case 'ar':
-        return 'الصلاة القادمة';
-      case 'fr':
-        return 'PROCHAINE PRIÈRE';
-      default:
-        return 'UP NEXT';
-    }
-  }
 }
 
-/// Compact countdown surface.
-///
-/// Blur is intentionally disabled here. The layered translucent surface
-/// provides depth without continuously sampling the background.
 class _CountdownPanel extends StatelessWidget {
   const _CountdownPanel({
     required this.controller,
     required this.localizations,
-    required this.reduceMotion,
     required this.compact,
   });
 
   final PrayerController controller;
   final MuminLocalizations localizations;
-  final bool reduceMotion;
   final bool compact;
 
   String get _remainingTimeLabel {
@@ -607,7 +587,7 @@ class _CountdownPanel extends StatelessWidget {
       radius: 23,
       enableBlur: false,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 17,
+        horizontal: compact ? 10 : 17,
         vertical: compact ? 14 : 17,
       ),
       child: Column(
@@ -645,9 +625,7 @@ class _CountdownPanel extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 14),
-
           CountdownWidget(
             controller: controller,
             isArabic: localizations.isArabic,
@@ -685,9 +663,7 @@ class _HeroFooter extends StatelessWidget {
           color: AppColors.goldLight,
           size: 15,
         ),
-
         const SizedBox(width: 8),
-
         Expanded(
           child: Text(
             _footerMessage,
@@ -701,9 +677,7 @@ class _HeroFooter extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(width: 8),
-
         Container(
           width: 5,
           height: 5,
