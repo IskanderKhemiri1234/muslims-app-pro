@@ -1,12 +1,15 @@
 
 import 'package:flutter/material.dart';
 
+import 'mumin_localizations.dart';
+
 /// Central locale-aware formatting service for Mumin Pro.
 ///
 /// Responsibilities:
 /// - Format dates using the active Flutter locale.
 /// - Format prayer times consistently.
 /// - Format integer values using localized digits.
+/// - Resolve text direction through the central language registry.
 /// - Keep formatting independent from individual feature screens.
 ///
 /// This service does not calculate prayer times, modify DateTime values,
@@ -32,23 +35,30 @@ final class MuminLocaleFormatters {
     );
   }
 
+  /// Central localization model for the active locale.
+  MuminLocalizations get localizations =>
+      MuminLocalizations.fromCode(locale.languageCode);
+
   /// Active language code, such as ar, en, or fr.
-  String get languageCode => locale.languageCode;
+  String get languageCode => localizations.languageCode;
 
-  bool get isArabic => languageCode == 'ar';
+  /// Compatibility properties for existing feature consumers.
+  bool get isArabic => localizations.isArabic;
 
-  bool get isEnglish => languageCode == 'en';
+  bool get isEnglish => localizations.isEnglish;
 
-  bool get isFrench => languageCode == 'fr';
+  bool get isFrench => localizations.isFrench;
 
-  bool get isRightToLeft => isArabic;
+  /// Direction comes from the central language registry.
+  bool get isRightToLeft => localizations.isRightToLeft;
 
-  /// Formats an integer using the active locale.
+  TextDirection get textDirection =>
+      isRightToLeft ? TextDirection.rtl : TextDirection.ltr;
+
+  /// Formats an integer using the active Flutter locale.
   ///
-  /// Examples:
-  /// - Arabic: locale-appropriate Arabic number presentation.
-  /// - English: locale-appropriate English number presentation.
-  /// - French: locale-appropriate French number presentation.
+  /// The actual digit presentation is determined by the installed
+  /// MaterialLocalizations implementation for this locale.
   String formatNumber(int value) {
     return materialLocalizations.formatDecimal(value);
   }
