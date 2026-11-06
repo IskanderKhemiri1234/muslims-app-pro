@@ -3,6 +3,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/mumin_design_tokens.dart';
+import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
@@ -11,22 +12,19 @@ import 'glass_container.dart';
 
 /// Premium next-prayer experience for Mumin Pro.
 ///
-/// The public constructor remains compatible with existing integrations.
+/// All language metadata and direction decisions are resolved
+/// through the centralized localization architecture.
 class PrayerHeroCard extends StatelessWidget {
   const PrayerHeroCard({
     super.key,
     required this.controller,
-    required this.isArabic,
+    @Deprecated('Language is resolved by MuminLanguageRegistry.')
+    bool? isArabic,
     required this.prayerName,
     required this.formatTime,
   });
 
   final PrayerController controller;
-
-  /// Backward-compatible language fallback.
-  /// The active application locale takes precedence.
-  final bool isArabic;
-
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
 
@@ -35,9 +33,9 @@ class PrayerHeroCard extends StatelessWidget {
         Localizations.maybeLocaleOf(context)?.languageCode;
 
     return MuminLocalizations.fromCode(
-      localeCode == null || localeCode.isEmpty
-          ? (isArabic ? 'ar' : 'en')
-          : localeCode,
+      MuminLanguageRegistry.normalizeLanguageCode(
+        localeCode ?? MuminLanguageRegistry.defaultLanguageCode,
+      ),
     );
   }
 
@@ -53,8 +51,7 @@ class PrayerHeroCard extends StatelessWidget {
           begin: reduceMotion ? 1 : 0.985,
           end: 1,
         ),
-        duration:
-            reduceMotion ? Duration.zero : MuminMotion.smooth,
+        duration: reduceMotion ? Duration.zero : MuminMotion.smooth,
         curve: MuminMotion.enter,
         builder: (context, scale, child) {
           return Transform.scale(
@@ -122,7 +119,6 @@ class _HeroSurface extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 350;
-
         final horizontalPadding = compact ? 16.0 : 23.0;
         final verticalPadding = compact ? 19.0 : 24.0;
 
@@ -223,7 +219,7 @@ class _HeroSurface extends StatelessWidget {
   }
 }
 
-/// Lightweight decorative background, painted without image assets.
+/// Lightweight decorative background painted without image assets.
 class _HeroAtmosphere extends StatelessWidget {
   const _HeroAtmosphere();
 
@@ -276,7 +272,6 @@ class _HeroAtmospherePainter extends CustomPainter {
 
     for (var index = 0; index < 4; index++) {
       final radius = size.width * (0.19 + index * 0.105);
-
       canvas.drawCircle(
         center,
         radius,
@@ -339,12 +334,12 @@ class _HeroHeader extends StatelessWidget {
 
   final MuminLocalizations localizations;
 
-    String get _todayLabel =>
+  String get _todayLabel =>
       localizations.text('today_label');
-}
+
   @override
   Widget build(BuildContext context) {
-    final isArabic = localizations.isArabic;
+    final isRightToLeft = localizations.isRightToLeft;
 
     return Row(
       children: [
@@ -374,7 +369,7 @@ class _HeroHeader extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.82),
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              letterSpacing: isArabic ? 0 : 1.1,
+              letterSpacing: isRightToLeft ? 0 : 1.1,
             ),
           ),
         ),
@@ -444,12 +439,12 @@ class _PrayerIdentity extends StatelessWidget {
   final bool compact;
 
   String get _eyebrow =>
-      localizations.text('next_prayer_eyebrow');  
-  }
+      localizations.text('next_prayer_eyebrow');
 
   @override
   Widget build(BuildContext context) {
     final time = currentTime;
+    final isRightToLeft = localizations.isRightToLeft;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,7 +455,7 @@ class _PrayerIdentity extends StatelessWidget {
             color: AppColors.goldLight.withValues(alpha: 0.85),
             fontSize: 10,
             fontWeight: FontWeight.w800,
-            letterSpacing: localizations.isArabic ? 0 : 1.2,
+            letterSpacing: isRightToLeft ? 0 : 1.2,
           ),
         ),
         const SizedBox(height: 9),
@@ -495,7 +490,7 @@ class _PrayerIdentity extends StatelessWidget {
                 fontSize: compact ? 34 : 40,
                 height: 1.13,
                 fontWeight: FontWeight.w900,
-                letterSpacing: localizations.isArabic ? 0 : -0.7,
+                letterSpacing: isRightToLeft ? 0 : -0.7,
               ),
             ),
           ),
@@ -553,12 +548,13 @@ class _CountdownPanel extends StatelessWidget {
   final MuminLocalizations localizations;
   final bool compact;
 
-   String get _remainingTimeLabel =>
-      localizations.text('time_remaining'); 
-  }
+  String get _remainingTimeLabel =>
+      localizations.text('time_remaining');
 
   @override
   Widget build(BuildContext context) {
+    final isRightToLeft = localizations.isRightToLeft;
+
     return GlassContainer(
       color: Colors.white.withValues(alpha: 0.085),
       borderColor: Colors.white.withValues(alpha: 0.16),
@@ -591,8 +587,7 @@ class _CountdownPanel extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.73),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    letterSpacing:
-                        localizations.isArabic ? 0 : 0.75,
+                    letterSpacing: isRightToLeft ? 0 : 0.75,
                   ),
                 ),
               ),
@@ -606,7 +601,6 @@ class _CountdownPanel extends StatelessWidget {
           const SizedBox(height: 14),
           CountdownWidget(
             controller: controller,
-            isArabic: localizations.isArabic,
           ),
         ],
       ),
@@ -621,9 +615,8 @@ class _HeroFooter extends StatelessWidget {
 
   final MuminLocalizations localizations;
 
-    String get _footerMessage =>
+  String get _footerMessage =>
       localizations.text('countdown_auto_update');
-  }
 
   @override
   Widget build(BuildContext context) {
