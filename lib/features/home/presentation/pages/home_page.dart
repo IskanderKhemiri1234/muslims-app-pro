@@ -15,11 +15,13 @@ import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
 
-/// Main Mumin Pro dashboard.
+/// Main dashboard of Mumin Pro.
 ///
-/// The page observes only the prayer data required by its layout.
-/// The one-second countdown remains isolated in PrayerHeroCard through
-/// PrayerController.clockListenable.
+/// The dashboard listens only to the prayer state it actually displays.
+/// The live countdown remains inside PrayerHeroCard and is not included
+/// in the home-page selector.
+///
+/// Public constructor parameters are preserved for compatibility.
 class PrayerHomePage extends StatefulWidget {
   const PrayerHomePage({
     super.key,
@@ -29,14 +31,8 @@ class PrayerHomePage extends StatefulWidget {
     required this.onThemeToggle,
   });
 
-  /// Retained for compatibility with existing application callers.
-  ///
-  /// The active language is resolved from the Flutter application locale.
   final bool isArabic;
-
-  /// Opens the language selector owned by the application root.
   final VoidCallback onLanguageToggle;
-
   final bool isDark;
   final VoidCallback onThemeToggle;
 
@@ -54,10 +50,13 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   MuminLocalizations get _localizations {
     final locale = Localizations.localeOf(context);
-    return MuminLocalizations.fromCode(locale.languageCode);
-  }
 
-  String _t(String key) => _localizations.text(key);
+    return MuminLocalizations.fromCode(
+      locale.languageCode.isEmpty
+          ? (widget.isArabic ? 'ar' : 'en')
+          : locale.languageCode,
+    );
+  }
 
   @override
   void initState() {
@@ -70,6 +69,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // The selected locale may change while the page remains mounted.
+    // The framework rebuilds the page; no separate language state is needed.
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
@@ -79,16 +86,11 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
         _cancelMidnightRefresh();
         break;
     }
-  }
-
-  void _cancelMidnightRefresh() {
-    _midnightTimer?.cancel();
-    _midnightTimer = null;
   }
 
   bool _isSameDate(DateTime first, DateTime second) {
@@ -109,6 +111,11 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     });
   }
 
+  void _cancelMidnightRefresh() {
+    _midnightTimer?.cancel();
+    _midnightTimer = null;
+  }
+
   void _scheduleMidnightRefresh() {
     _cancelMidnightRefresh();
 
@@ -125,7 +132,10 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     final delay = nextMidnight.difference(now) +
         const Duration(seconds: 1);
 
-    _midnightTimer = Timer(delay, _handleMidnightRefresh);
+    _midnightTimer = Timer(
+      delay,
+      _handleMidnightRefresh,
+    );
   }
 
   void _handleMidnightRefresh() {
@@ -156,7 +166,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
         return _localizations.prayerName('isha');
 
       default:
-        return _t('unavailable');
+        return _localizations.text('unavailable');
     }
   }
 
@@ -164,7 +174,22 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
 
-    return '$hour:$minute';
+    final formatted = '$hour:$minute';
+
+    if (!_localizations.isArabic) {
+      return formatted;
+    }
+
+    const westernDigits = '0123456789';
+    const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+
+    return formatted.split('').map((character) {
+      final index = westernDigits.indexOf(character);
+
+      return index < 0
+          ? character
+          : arabicDigits[index];
+    }).join();
   }
 
   String _formatDate(BuildContext context, DateTime date) {
@@ -181,10 +206,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     try {
       await context.read<PrayerController>().retryInitialization();
     } catch (error, stackTrace) {
-      debugPrint(
-        'Mumin Pro: prayer initialization retry failed: $error',
-      );
+      debugPrint('Mumin Pro: initialization retry failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+
+      if (mounted) {
+        _showMessage(
+          _localizations.prayerTimesUnavailable,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -205,14 +234,13 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
       if (mounted) {
         _showMessage(
-          context,
-          _t('location_permission_required'),
+          _localizations.locationPermissionRequired,
         );
       }
     }
   }
 
-  void _openPage(BuildContext context, Widget page) {
+  void _openPage(Widget page) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => page,
@@ -220,39 +248,34 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     );
   }
 
-  void _handleQuickAction(BuildContext context, String action) {
+  void _handleQuickAction(String action) {
     switch (action) {
       case 'qibla':
-        _openPage(context, const QiblaPage());
+        _openPage(const QiblaPage());
         return;
 
       case 'quran':
-        _openPage(context, const QuranPage());
+        _openPage(const QuranPage());
         return;
 
       case 'adhan':
         _showMessage(
-          context,
-          _t('adhan_in_development'),
+          _localizations.text('adhan_in_development'),
         );
         return;
 
       case 'adhkar':
         _showMessage(
-          context,
-          _t('adhkar_in_development'),
+          _localizations.text('adhkar_in_development'),
         );
         return;
 
       default:
-        _showMessage(
-          context,
-          _t('coming_soon'),
-        );
+        _showMessage(_localizations.comingSoon);
     }
   }
 
-  void _showMessage(BuildContext context, String message) {
+  void _showMessage(String message) {
     final messenger = ScaffoldMessenger.maybeOf(context);
 
     if (messenger == null) return;
@@ -264,6 +287,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
           content: Text(message),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       );
   }
@@ -284,7 +310,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
           ? TextDirection.rtl
           : TextDirection.ltr,
       child: Selector<PrayerController, _HomeSnapshot>(
-        selector: (_, controller) {
+        selector: (context, controller) {
           return _HomeSnapshot(
             prayerTimes: controller.prayerTimes,
             nextPrayer: controller.nextPrayer,
@@ -293,11 +319,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             message: controller.message,
           );
         },
-        builder: (context, snapshot, _) {
-          final prayerTimes = snapshot.prayerTimes;
-
-          if (prayerTimes == null) {
-            return _LoadingView(
+        builder: (context, snapshot, child) {
+          if (snapshot.prayerTimes == null) {
+            return _HomeLoadingView(
               localizations: localizations,
               message: snapshot.message,
               isRetrying: _isRetrying,
@@ -305,118 +329,157 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             );
           }
 
-          return Scaffold(
-            body: Stack(
-              children: [
-                const _BackgroundDecorations(),
-                SafeArea(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width = constraints.maxWidth;
-
-                      final horizontalPadding = width >= 900
-                          ? 40.0
-                          : width >= 600
-                              ? 28.0
-                              : 19.0;
-
-                      final contentWidth =
-                          width >= 900 ? 820.0 : double.infinity;
-
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: contentWidth,
-                          ),
-                          child: ListView(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: EdgeInsets.fromLTRB(
-                              horizontalPadding,
-                              10,
-                              horizontalPadding,
-                              30,
-                            ),
-                            children: [
-                              _TopBar(
-                                localizations: localizations,
-                                isDark: widget.isDark,
-                                city: snapshot.city,
-                                date: _formatDate(
-                                  context,
-                                  _currentDate,
-                                ),
-                                onLanguageToggle:
-                                    widget.onLanguageToggle,
-                                onThemeToggle: widget.onThemeToggle,
-                              ),
-                              const SizedBox(height: 23),
-                              PrayerHeroCard(
-                                controller:
-                                    context.read<PrayerController>(),
-                                isArabic: localizations.isArabic,
-                                prayerName: _prayerName,
-                                formatTime: _formatTime,
-                              ),
-                              const SizedBox(height: 30),
-                              _SectionTitle(
-                                title: _t('quick_access'),
-                                subtitle: _t('daily_essentials'),
-                              ),
-                              const SizedBox(height: 14),
-                              QuickActions(
-                                isArabic: localizations.isArabic,
-                                onAction: (action) {
-                                  _handleQuickAction(
-                                    context,
-                                    action,
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 30),
-                              PrayerScheduleSection(
-                                prayerTimes: prayerTimes,
-                                nextPrayer: snapshot.nextPrayer,
-                                isArabic: localizations.isArabic,
-                                prayerName: _prayerName,
-                                formatTime: _formatTime,
-                              ),
-                              const SizedBox(height: 18),
-                              _LocationButton(
-                                localizations: localizations,
-                                isLoading: snapshot.isLoadingLocation,
-                                onPressed: _updateLocation,
-                              ),
-                              if (snapshot.message != null) ...[
-                                const SizedBox(height: 12),
-                                _MessageCard(
-                                  message: snapshot.message!,
-                                ),
-                              ],
-                              const SizedBox(height: 24),
-                              _Footer(
-                                localizations: localizations,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          return _buildDashboard(
+            context,
+            snapshot,
+            localizations,
           );
         },
       ),
     );
   }
+
+  Widget _buildDashboard(
+    BuildContext context,
+    _HomeSnapshot snapshot,
+    MuminLocalizations localizations,
+  ) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _HomeBackground(),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+
+                final horizontalPadding = width >= 900
+                    ? 36.0
+                    : width >= 600
+                        ? 26.0
+                        : 18.0;
+
+                final maximumContentWidth =
+                    width >= 900 ? 820.0 : 680.0;
+
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: maximumContentWidth,
+                    ),
+                    child: RefreshIndicator(
+                      onRefresh: _retryInitialization,
+                      color: AppColors.gold,
+                      backgroundColor: theme.colorScheme.surface,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          12,
+                          horizontalPadding,
+                          34,
+                        ),
+                        children: [
+                          _HomeHeader(
+                            localizations: localizations,
+                            city: snapshot.city,
+                            date: _formatDate(
+                              context,
+                              _currentDate,
+                            ),
+                            isDark: widget.isDark,
+                            onLanguageToggle:
+                                widget.onLanguageToggle,
+                            onThemeToggle:
+                                widget.onThemeToggle,
+                          ),
+                          const SizedBox(height: 25),
+
+                          RepaintBoundary(
+                            child: PrayerHeroCard(
+                              controller:
+                                  context.read<PrayerController>(),
+                              isArabic: localizations.isArabic,
+                              prayerName: _prayerName,
+                              formatTime: _formatTime,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          _HomeSectionHeading(
+                            title: localizations.quickAccess,
+                            subtitle: localizations.dailyEssentials,
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          RepaintBoundary(
+                            child: QuickActions(
+                              isArabic: localizations.isArabic,
+                              onAction: _handleQuickAction,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          RepaintBoundary(
+                            child: PrayerScheduleSection(
+                              prayerTimes: snapshot.prayerTimes!,
+                              nextPrayer: snapshot.nextPrayer,
+                              isArabic: localizations.isArabic,
+                              prayerName: _prayerName,
+                              formatTime: _formatTime,
+                            ),
+                          ),
+
+                          const SizedBox(height: 19),
+
+                          _LocationAction(
+                            localizations: localizations,
+                            isLoading: snapshot.isLoadingLocation,
+                            onPressed: _updateLocation,
+                          ),
+
+                          if (snapshot.message != null &&
+                              snapshot.message!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 13),
+                            _HomeStatusMessage(
+                              message: snapshot.message!,
+                            ),
+                          ],
+
+                          const SizedBox(height: 28),
+
+                          _HomeFooter(
+                            localizations: localizations,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Immutable projection of the controller state used by the home page.
+/// Small immutable projection of the prayer controller state.
 ///
-/// Countdown clock ticks are deliberately excluded. They are consumed
-/// directly by the hero card and must not rebuild the complete dashboard.
+/// Clock ticks are intentionally excluded so they cannot trigger
+/// a rebuild of the complete home dashboard.
 class _HomeSnapshot {
   const _HomeSnapshot({
     required this.prayerTimes,
@@ -454,46 +517,78 @@ class _HomeSnapshot {
   }
 }
 
-class _BackgroundDecorations extends StatelessWidget {
-  const _BackgroundDecorations();
+/// Static decorative background.
+///
+/// It is intentionally non-interactive and contains no repeating animation.
+class _HomeBackground extends StatelessWidget {
+  const _HomeBackground();
 
   @override
   Widget build(BuildContext context) {
-    return const Positioned.fill(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return RepaintBoundary(
       child: IgnorePointer(
-        child: Stack(
-          children: [
-            Positioned(
-              top: -150,
-              right: -110,
-              child: _GlowCircle(
-                color: Color(0x1F00A878),
-                size: 310,
-              ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: isDark
+                  ? const [
+                      Color(0xFF071C17),
+                      Color(0xFF09271F),
+                      Color(0xFF071C17),
+                    ]
+                  : const [
+                      Color(0xFFF4F2E9),
+                      Color(0xFFEAF1EB),
+                      Color(0xFFF7F4EC),
+                    ],
             ),
-            Positioned(
-              top: 420,
-              left: -160,
-              child: _GlowCircle(
-                color: Color(0x0CDBAD50),
-                size: 300,
+          ),
+          child: const Stack(
+            children: [
+              PositionedDirectional(
+                top: -150,
+                end: -120,
+                child: _AmbientGlow(
+                  size: 330,
+                  color: Color(0x2600A878),
+                ),
               ),
-            ),
-          ],
+              PositionedDirectional(
+                top: 390,
+                start: -180,
+                child: _AmbientGlow(
+                  size: 310,
+                  color: Color(0x16D8B66A),
+                ),
+              ),
+              PositionedDirectional(
+                bottom: -210,
+                end: -150,
+                child: _AmbientGlow(
+                  size: 360,
+                  color: Color(0x12007555),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _GlowCircle extends StatelessWidget {
-  const _GlowCircle({
-    required this.color,
+class _AmbientGlow extends StatelessWidget {
+  const _AmbientGlow({
     required this.size,
+    required this.color,
   });
 
-  final Color color;
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -515,25 +610,22 @@ class _GlowCircle extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
     required this.localizations,
-    required this.isDark,
     required this.city,
     required this.date,
+    required this.isDark,
     required this.onLanguageToggle,
     required this.onThemeToggle,
   });
 
   final MuminLocalizations localizations;
-  final bool isDark;
   final String city;
   final String date;
+  final bool isDark;
   final VoidCallback onLanguageToggle;
   final VoidCallback onThemeToggle;
-
-  String get _languageCode =>
-      localizations.languageCode.toUpperCase();
 
   String get _languageTooltip {
     switch (localizations.languageCode) {
@@ -549,36 +641,43 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textColor = colorScheme.onSurface;
 
     return Row(
       children: [
-        Semantics(
-          image: true,
-          label: localizations.appName,
+        RepaintBoundary(
           child: Container(
-            width: 46,
-            height: 46,
+            width: 49,
+            height: 49,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
                 colors: [
-                  AppColors.emerald,
-                  AppColors.deepGreen,
+                  Color(0xFF0B7053),
+                  Color(0xFF063E31),
+                  Color(0xFF05271F),
                 ],
               ),
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(17),
               border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.35),
+                color: AppColors.gold.withValues(alpha: 0.48),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.emerald.withValues(alpha: 0.16),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: const Icon(
               Icons.mosque_rounded,
               color: AppColors.goldLight,
-              size: 25,
+              size: 27,
             ),
           ),
         ),
-        const SizedBox(width: 11),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,28 +687,30 @@ class _TopBar extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: textColor,
-                  fontSize: 18,
+                  color: colorScheme.onSurface,
+                  fontSize: 19,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: 0.1,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 5),
               Row(
                 children: [
                   const Icon(
                     Icons.location_on_rounded,
-                    size: 12,
+                    size: 13,
                     color: AppColors.gold,
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      '$city • $date',
+                      '$city · $date',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: textColor.withValues(alpha: 0.65),
+                        color: colorScheme.onSurfaceVariant,
                         fontSize: 10,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -618,18 +719,17 @@ class _TopBar extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
+        const SizedBox(width: 4),
+        _HeaderIconButton(
           tooltip: isDark
               ? localizations.lightMode
               : localizations.darkMode,
+          icon: isDark
+              ? Icons.light_mode_rounded
+              : Icons.dark_mode_rounded,
           onPressed: onThemeToggle,
-          icon: Icon(
-            isDark
-                ? Icons.light_mode_rounded
-                : Icons.dark_mode_rounded,
-            color: AppColors.gold,
-          ),
         ),
+        const SizedBox(width: 5),
         Semantics(
           button: true,
           label: _languageTooltip,
@@ -642,28 +742,28 @@ class _TopBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 constraints: const BoxConstraints(
-                  minWidth: 54,
-                  minHeight: 42,
+                  minWidth: 53,
+                  minHeight: 43,
                 ),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 9,
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.emerald.withValues(alpha: 0.10),
+                  color: colorScheme.surface.withValues(alpha: 0.72),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.35),
+                    color: AppColors.gold.withValues(alpha: 0.42),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _languageCode,
+                      localizations.languageCode.toUpperCase(),
                       style: const TextStyle(
                         color: AppColors.emeraldLight,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -684,8 +784,47 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Theme.of(context)
+            .colorScheme
+            .surface
+            .withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 43,
+            height: 43,
+            child: Icon(
+              icon,
+              color: AppColors.gold,
+              size: 21,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeSectionHeading extends StatelessWidget {
+  const _HomeSectionHeading({
     required this.title,
     required this.subtitle,
   });
@@ -695,25 +834,30 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
+          textAlign: TextAlign.start,
           style: TextStyle(
-            color: color,
+            color: colorScheme.onSurface,
             fontSize: 19,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
+            height: 1.25,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         Text(
           subtitle,
+          textAlign: TextAlign.start,
           style: TextStyle(
-            color: color.withValues(alpha: 0.65),
+            color: colorScheme.onSurfaceVariant,
             fontSize: 11,
+            fontWeight: FontWeight.w500,
+            height: 1.4,
           ),
         ),
       ],
@@ -721,8 +865,8 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _LocationButton extends StatelessWidget {
-  const _LocationButton({
+class _LocationAction extends StatelessWidget {
+  const _LocationAction({
     required this.localizations,
     required this.isLoading,
     required this.onPressed,
@@ -734,8 +878,14 @@ class _LocationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      enabled: !isLoading,
+      label: isLoading
+          ? localizations.updatingLocation
+          : localizations.updateLocation,
       child: OutlinedButton.icon(
         onPressed: isLoading ? null : onPressed,
         icon: isLoading
@@ -744,9 +894,13 @@ class _LocationButton extends StatelessWidget {
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
+                  color: AppColors.gold,
                 ),
               )
-            : const Icon(Icons.my_location_rounded),
+            : const Icon(
+                Icons.my_location_rounded,
+                size: 19,
+              ),
         label: Text(
           isLoading
               ? localizations.updatingLocation
@@ -754,13 +908,19 @@ class _LocationButton extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(55),
-          foregroundColor: AppColors.emeraldLight,
+          minimumSize: const Size.fromHeight(54),
+          foregroundColor: colorScheme.primary,
           side: BorderSide(
-            color: AppColors.emerald.withValues(alpha: 0.45),
+            color: AppColors.gold.withValues(alpha: 0.48),
+            width: 1.1,
           ),
+          backgroundColor: colorScheme.surface.withValues(alpha: 0.52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(17),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -768,8 +928,8 @@ class _LocationButton extends StatelessWidget {
   }
 }
 
-class _MessageCard extends StatelessWidget {
-  const _MessageCard({
+class _HomeStatusMessage extends StatelessWidget {
+  const _HomeStatusMessage({
     required this.message,
   });
 
@@ -777,24 +937,47 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return GlassContainer(
-      radius: 15,
+      radius: 16,
+      enableBlur: false,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 13,
+      ),
       child: Semantics(
         liveRegion: true,
-        child: Text(
-          message,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 12,
-          ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: colorScheme.secondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                textAlign: TextAlign.start,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 12,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _Footer extends StatelessWidget {
-  const _Footer({
+class _HomeFooter extends StatelessWidget {
+  const _HomeFooter({
     required this.localizations,
   });
 
@@ -802,26 +985,52 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface;
-    final tagline = localizations.letPrayerIlluminateYourDay;
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Semantics(
-      label: '${localizations.appName}, $tagline',
+      label: '${localizations.appName}, '
+          '${localizations.letPrayerIlluminateYourDay}',
       child: Column(
         children: [
+          Container(
+            width: 38,
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  AppColors.gold.withValues(alpha: 0.75),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
           const Icon(
             Icons.mosque_rounded,
             color: AppColors.gold,
-            size: 23,
+            size: 22,
           ),
           const SizedBox(height: 8),
           Text(
-            tagline,
+            localizations.letPrayerIlluminateYourDay,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: color.withValues(alpha: 0.65),
+              color: color,
               fontSize: 12,
               fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            localizations.appName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.gold,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
             ),
           ),
         ],
@@ -830,8 +1039,8 @@ class _Footer extends StatelessWidget {
   }
 }
 
-class _LoadingView extends StatelessWidget {
-  const _LoadingView({
+class _HomeLoadingView extends StatelessWidget {
+  const _HomeLoadingView({
     required this.localizations,
     required this.message,
     required this.isRetrying,
@@ -845,83 +1054,132 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final errorMessage = message?.trim() ?? '';
-    final hasError = errorMessage.isNotEmpty;
+    final theme = Theme.of(context);
+    final hasError = message != null && message!.trim().isNotEmpty;
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(25),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 420,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.mosque_rounded,
-                    color: AppColors.gold,
-                    size: 42,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _HomeBackground(),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(25),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 420,
                   ),
-                  const SizedBox(height: 22),
-                  if (!hasError)
-                    const CircularProgressIndicator(
-                      color: AppColors.emeraldLight,
-                    )
-                  else
-                    const Icon(
-                      Icons.cloud_off_rounded,
-                      size: 38,
-                      color: AppColors.gold,
-                    ),
-                  const SizedBox(height: 20),
-                  Text(
-                    hasError
-                        ? localizations.prayerTimesUnavailable
-                        : localizations.loadingPrayerTimes,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (hasError) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      errorMessage,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: isRetrying
-                            ? null
-                            : () {
-                                onRetry();
-                              },
-                        icon: isRetrying
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.refresh_rounded),
-                        label: Text(
-                          isRetrying
-                              ? localizations.retrying
-                              : localizations.retry,
+                  child: GlassContainer(
+                    radius: 28,
+                    padding: const EdgeInsets.all(27),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 65,
+                          height: 65,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.emerald,
+                                AppColors.deepGreen,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(21),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.mosque_rounded,
+                            color: AppColors.goldLight,
+                            size: 34,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 22),
+                        if (!hasError)
+                          SizedBox(
+                            width: 27,
+                            height: 27,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        else
+                          const Icon(
+                            Icons.cloud_off_rounded,
+                            size: 34,
+                            color: AppColors.gold,
+                          ),
+                        const SizedBox(height: 20),
+                        Text(
+                          hasError
+                              ? localizations.prayerTimesUnavailable
+                              : localizations.loadingPrayerTimes,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (hasError) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            message!,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: isRetrying
+                                  ? null
+                                  : onRetry,
+                              icon: isRetrying
+                                  ? const SizedBox(
+                                      width: 17,
+                                      height: 17,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh_rounded),
+                              label: Text(
+                                isRetrying
+                                    ? localizations.retrying
+                                    : localizations.retry,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!hasError && !reduceMotion) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            localizations.appName,
+                            style: const TextStyle(
+                              color: AppColors.gold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
