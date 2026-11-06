@@ -1,19 +1,20 @@
 
 import 'catalogs/mumin_quran_catalog.dart';
-import 'mumin_domain_localizations.dart';
+import 'catalogs/mumin_quran_reader_catalog.dart';
+import 'mumin_domain_catalog_registry.dart';
 import 'mumin_localizations.dart';
 
 /// Central Quran interface localization bridge.
 ///
-/// Quranic Arabic text is never translated or modified by this bridge.
-/// Only reader interface labels and messages are localized.
+/// Only interface labels are localized.
+/// Quranic Arabic text is never translated or modified.
 extension MuminQuranLocalizations on MuminLocalizations {
-  /// Resolves a Quran interface string through the unified domain engine.
+  /// Resolves any registered Quran interface key centrally.
   String quranText(String key) {
     return domainText(key);
   }
 
-  /// Resolves a Quran interface string with interpolation parameters.
+  /// Resolves a Quran interface key with interpolation.
   String quranTextWith(
     String key,
     Map<String, Object?> parameters,
@@ -21,46 +22,65 @@ extension MuminQuranLocalizations on MuminLocalizations {
     return domainTextWith(key, parameters);
   }
 
-  /// Checks whether a key belongs to the Quran interface catalog.
+  /// Checks whether a key belongs to either Quran interface catalog.
   bool hasQuranTranslation(String key) {
-    return MuminQuranCatalog.requiredKeys.contains(key.trim());
+    final normalizedKey = key.trim();
+
+    return MuminQuranCatalog.requiredKeys.contains(normalizedKey) ||
+        MuminQuranReaderCatalog.requiredKeys.contains(normalizedKey);
   }
 
-  /// Checks whether the key is explicitly translated in all launch languages.
+  /// Checks explicit translation coverage in all launch languages.
   bool isQuranTranslationComplete(String key) {
     final normalizedKey = key.trim();
 
-    if (!MuminQuranCatalog.requiredKeys.contains(normalizedKey)) {
+    if (!hasQuranTranslation(normalizedKey)) {
       return false;
     }
 
     return MuminQuranCatalog.launchLanguageCodes.every(
-      (code) => MuminQuranCatalog
-          .forLanguage(code)[normalizedKey]
-          ?.trim()
-          .isNotEmpty == true,
+      (code) => MuminDomainCatalogRegistry.hasTranslation(
+        code,
+        normalizedKey,
+      ),
     );
   }
 
-  /// Reports whether the active Quran catalog is complete.
+  /// Checks the combined Quran catalogs for the active language.
   bool get isQuranCatalogComplete {
-    return MuminQuranCatalog.isCompleteFor(languageCode);
+    return quranTranslationKeys.every(
+      (key) => MuminDomainCatalogRegistry.hasTranslation(
+        languageCode,
+        key,
+      ),
+    );
   }
 
-  /// Exposes Quran catalog integrity for all launch languages.
+  /// Combined integrity report for Arabic, English and French.
   Map<String, bool> get quranCatalogIntegrity {
-    return MuminQuranCatalog.launchCatalogIntegrity;
+    return Map<String, bool>.unmodifiable({
+      for (final code in MuminQuranCatalog.launchLanguageCodes)
+        code: quranTranslationKeys.every(
+          (key) => MuminDomainCatalogRegistry.hasTranslation(
+            code,
+            key,
+          ),
+        ),
+    });
   }
 
-  /// Exposes the supported Quran catalog language codes.
+  /// Supported Quran catalog language codes.
   List<String> get quranCatalogLanguageCodes {
     return List<String>.unmodifiable(
       MuminQuranCatalog.launchLanguageCodes,
     );
   }
 
-  /// Exposes the Quran interface translation keys.
+  /// Combined keys from the main Quran and reader catalogs.
   Set<String> get quranTranslationKeys {
-    return MuminQuranCatalog.requiredKeys;
+    return Set<String>.unmodifiable({
+      ...MuminQuranCatalog.requiredKeys,
+      ...MuminQuranReaderCatalog.requiredKeys,
+    });
   }
 }
