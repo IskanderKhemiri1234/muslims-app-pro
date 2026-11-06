@@ -3,6 +3,18 @@ import '../../domain/models/qibla_landmark.dart';
 import '../../domain/repositories/qibla_landmark_repository.dart';
 import '../datasources/qibla_landmark_local_data_source.dart';
 
+/// Local repository for Qibla landmarks.
+///
+/// Search is language-aware and uses the selected language code:
+/// ar, en, or fr.
+///
+/// The repository searches the localized:
+/// - Name
+/// - Description
+/// - City
+/// - Region
+///
+/// Country code is also included as a language-independent identifier.
 class QiblaLandmarkRepositoryImpl
     implements QiblaLandmarkRepository {
   QiblaLandmarkRepositoryImpl({
@@ -13,8 +25,11 @@ class QiblaLandmarkRepositoryImpl
 
   Future<List<QiblaLandmark>>? _cachedFuture;
 
-  /// Loads landmarks once and shares the same pending operation
+  /// Loads landmarks once and shares the pending operation
   /// between simultaneous callers.
+  ///
+  /// If loading fails, the cache is cleared so a later request
+  /// can retry.
   Future<List<QiblaLandmark>> _getCachedLandmarks() async {
     final existingFuture = _cachedFuture;
 
@@ -28,7 +43,6 @@ class QiblaLandmarkRepositoryImpl
     try {
       return await pendingFuture;
     } catch (_) {
-      // Allow a later request to retry after a failed load.
       if (identical(_cachedFuture, pendingFuture)) {
         _cachedFuture = null;
       }
@@ -39,7 +53,9 @@ class QiblaLandmarkRepositoryImpl
 
   @override
   Future<List<QiblaLandmark>> getAll() async {
-    return _getCachedLandmarks();
+    final landmarks = await _getCachedLandmarks();
+
+    return List.unmodifiable(landmarks);
   }
 
   @override
@@ -77,10 +93,19 @@ class QiblaLandmarkRepositoryImpl
     );
   }
 
+  /// Searches landmark information in the selected language.
+  ///
+  /// Supported launch languages:
+  /// - ar: Arabic
+  /// - en: English
+  /// - fr: French
+  ///
+  /// The model's language fallback rules are used whenever
+  /// a localized field is unavailable.
   @override
   Future<List<QiblaLandmark>> search({
     required String query,
-    required bool isArabic,
+    required String languageCode,
   }) async {
     final normalizedQuery = _normalize(query);
 
@@ -89,31 +114,26 @@ class QiblaLandmarkRepositoryImpl
     }
 
     final landmarks = await _getCachedLandmarks();
+    final normalizedLanguageCode =
+        languageCode.trim().toLowerCase().split('-').first;
 
     final results = landmarks.where((landmark) {
-      final name = landmark.nameForLocale(
-        isArabic: isArabic,
-      );
-
-      final description = landmark.descriptionForLocale(
-        isArabic: isArabic,
-      );
-
-      final city = isArabic
-          ? landmark.cityAr
-          : landmark.cityEn;
-
-      final region = isArabic
-          ? landmark.regionAr
-          : landmark.regionEn;
-
-      final searchableText = _normalize([
-        name,
-        description ?? '',
-        city ?? '',
-        region ?? '',
+      final searchableFields = <String>[
+        landmark.nameForLanguage(normalizedLanguageCode),
+        landmark.descriptionForLanguage(
+              normalizedLanguageCode,
+            ) ??
+            '',
+        landmark.cityForLanguage(normalizedLanguageCode) ??
+            '',
+        landmark.regionForLanguage(normalizedLanguageCode) ??
+            '',
         landmark.countryCode,
-      ].join(' '));
+      ];
+
+      final searchableText = _normalize(
+        searchableFields.join(' '),
+      );
 
       return searchableText.contains(normalizedQuery);
     });
@@ -123,11 +143,12 @@ class QiblaLandmarkRepositoryImpl
 
   /// Clears the in-memory cache.
   ///
-  /// The next repository request will reload the local JSON asset.
+  /// The next repository request reloads the local JSON asset.
   void clearCache() {
     _cachedFuture = null;
   }
 
+  /// Normalizes whitespace and letter casing for search.
   String _normalize(String value) {
     return value
         .trim()
