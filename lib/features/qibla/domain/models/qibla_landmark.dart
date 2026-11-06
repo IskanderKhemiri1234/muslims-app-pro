@@ -8,6 +8,36 @@ enum QiblaLandmarkCategory {
   landmark,
 }
 
+/// Resolves a localized value without depending on Flutter or UI code.
+///
+/// Fallback order:
+/// - Arabic: Arabic, English, French.
+/// - English: English, Arabic, French.
+/// - French: French, English, Arabic.
+String _resolveLandmarkLanguage({
+  required String languageCode,
+  required String? arabic,
+  required String? english,
+  required String? french,
+}) {
+  final code = languageCode.trim().toLowerCase().split('-').first;
+
+  final candidates = switch (code) {
+    'ar' => [arabic, english, french],
+    'fr' => [french, english, arabic],
+    _ => [english, arabic, french],
+  };
+
+  for (final candidate in candidates) {
+    final value = candidate?.trim();
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
 /// A locally bundled photograph associated with a landmark.
 class QiblaLandmarkImage {
   const QiblaLandmarkImage({
@@ -19,6 +49,7 @@ class QiblaLandmarkImage {
     required this.sourceName,
     required this.sourceUrl,
     required this.license,
+    this.captionFr,
     this.isPrimary = false,
     this.width,
     this.height,
@@ -32,6 +63,7 @@ class QiblaLandmarkImage {
 
   final String captionAr;
   final String captionEn;
+  final String? captionFr;
 
   /// Photographer, creator, or copyright holder.
   final String creator;
@@ -52,8 +84,19 @@ class QiblaLandmarkImage {
   final int? width;
   final int? height;
 
-  String captionForLocale({required bool isArabic}) =>
-      isArabic ? captionAr : captionEn;
+  String captionForLanguage(String languageCode) {
+    return _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: captionAr,
+      english: captionEn,
+      french: captionFr,
+    );
+  }
+
+  @Deprecated('Use captionForLanguage(languageCode).')
+  String captionForLocale({required bool isArabic}) {
+    return captionForLanguage(isArabic ? 'ar' : 'en');
+  }
 
   bool get hasValidDimensions =>
       (width == null || width! > 0) &&
@@ -71,6 +114,9 @@ class QiblaLandmarkHistoricalEvent {
     required this.dateLabelAr,
     required this.dateLabelEn,
     required this.sortOrder,
+    this.titleFr,
+    this.descriptionFr,
+    this.dateLabelFr,
     this.startYear,
     this.endYear,
     this.calendar,
@@ -82,13 +128,16 @@ class QiblaLandmarkHistoricalEvent {
 
   final String titleAr;
   final String titleEn;
+  final String? titleFr;
 
   final String descriptionAr;
   final String descriptionEn;
+  final String? descriptionFr;
 
   /// Human-readable date, for example: القرن الثاني عشر الميلادي.
   final String dateLabelAr;
   final String dateLabelEn;
+  final String? dateLabelFr;
 
   /// Numeric ordering for chronological presentation.
   final int sortOrder;
@@ -107,14 +156,47 @@ class QiblaLandmarkHistoricalEvent {
   /// IDs of sources supporting this historical event.
   final List<String> sourceIds;
 
-  String titleForLocale({required bool isArabic}) =>
-      isArabic ? titleAr : titleEn;
+  String titleForLanguage(String languageCode) {
+    return _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: titleAr,
+      english: titleEn,
+      french: titleFr,
+    );
+  }
 
-  String descriptionForLocale({required bool isArabic}) =>
-      isArabic ? descriptionAr : descriptionEn;
+  String descriptionForLanguage(String languageCode) {
+    return _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: descriptionAr,
+      english: descriptionEn,
+      french: descriptionFr,
+    );
+  }
 
-  String dateForLocale({required bool isArabic}) =>
-      isArabic ? dateLabelAr : dateLabelEn;
+  String dateForLanguage(String languageCode) {
+    return _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: dateLabelAr,
+      english: dateLabelEn,
+      french: dateLabelFr,
+    );
+  }
+
+  @Deprecated('Use titleForLanguage(languageCode).')
+  String titleForLocale({required bool isArabic}) {
+    return titleForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use descriptionForLanguage(languageCode).')
+  String descriptionForLocale({required bool isArabic}) {
+    return descriptionForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use dateForLanguage(languageCode).')
+  String dateForLocale({required bool isArabic}) {
+    return dateForLanguage(isArabic ? 'ar' : 'en');
+  }
 
   bool get hasValidYearRange =>
       startYear == null ||
@@ -160,8 +242,10 @@ class QiblaLandmark {
     required this.latitude,
     required this.longitude,
     required this.countryCode,
+    this.nameFr,
     this.descriptionAr,
     this.descriptionEn,
+    this.descriptionFr,
     this.imageAsset,
     this.sourceName,
     this.sourceUrl,
@@ -170,10 +254,13 @@ class QiblaLandmark {
     this.isFeatured = false,
     this.cityAr,
     this.cityEn,
+    this.cityFr,
     this.regionAr,
     this.regionEn,
+    this.regionFr,
     this.historicalPeriodAr,
     this.historicalPeriodEn,
+    this.historicalPeriodFr,
     this.establishedYear,
     this.images = const [],
     this.historicalEvents = const [],
@@ -187,11 +274,10 @@ class QiblaLandmark {
   /// Stable identifier. Never use the displayed name as an ID.
   final String id;
 
-  /// Arabic display name.
+  /// Localized display names.
   final String nameAr;
-
-  /// English display name.
   final String nameEn;
+  final String? nameFr;
 
   /// Landmark classification.
   final QiblaLandmarkCategory category;
@@ -208,6 +294,7 @@ class QiblaLandmark {
   /// General descriptions.
   final String? descriptionAr;
   final String? descriptionEn;
+  final String? descriptionFr;
 
   /// Optional primary local image for backward compatibility.
   final String? imageAsset;
@@ -226,12 +313,16 @@ class QiblaLandmark {
   /// Geographic administrative information.
   final String? cityAr;
   final String? cityEn;
+  final String? cityFr;
+
   final String? regionAr;
   final String? regionEn;
+  final String? regionFr;
 
   /// Historical period, when reliably documented.
   final String? historicalPeriodAr;
   final String? historicalPeriodEn;
+  final String? historicalPeriodFr;
 
   /// Approximate or documented establishment year.
   ///
@@ -261,25 +352,90 @@ class QiblaLandmark {
   bool get hasHistoricalInformation =>
       historicalPeriodAr != null ||
       historicalPeriodEn != null ||
+      historicalPeriodFr != null ||
       establishedYear != null ||
       historicalEvents.isNotEmpty;
 
-  String nameForLocale({required bool isArabic}) =>
-      isArabic ? nameAr : nameEn;
+  String nameForLanguage(String languageCode) {
+    return _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: nameAr,
+      english: nameEn,
+      french: nameFr,
+    );
+  }
 
-  String? descriptionForLocale({required bool isArabic}) =>
-      isArabic ? descriptionAr : descriptionEn;
+  String? descriptionForLanguage(String languageCode) {
+    final value = _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: descriptionAr,
+      english: descriptionEn,
+      french: descriptionFr,
+    );
+    return value.isEmpty ? null : value;
+  }
 
-  String? cityForLocale({required bool isArabic}) =>
-      isArabic ? cityAr : cityEn;
+  String? cityForLanguage(String languageCode) {
+    final value = _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: cityAr,
+      english: cityEn,
+      french: cityFr,
+    );
+    return value.isEmpty ? null : value;
+  }
 
-  String? regionForLocale({required bool isArabic}) =>
-      isArabic ? regionAr : regionEn;
+  String? regionForLanguage(String languageCode) {
+    final value = _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: regionAr,
+      english: regionEn,
+      french: regionFr,
+    );
+    return value.isEmpty ? null : value;
+  }
 
+  String? historicalPeriodForLanguage(String languageCode) {
+    final value = _resolveLandmarkLanguage(
+      languageCode: languageCode,
+      arabic: historicalPeriodAr,
+      english: historicalPeriodEn,
+      french: historicalPeriodFr,
+    );
+    return value.isEmpty ? null : value;
+  }
+
+  // Temporary compatibility methods.
+  // Remove these after all Qibla Atlas consumers use languageCode.
+
+  @Deprecated('Use nameForLanguage(languageCode).')
+  String nameForLocale({required bool isArabic}) {
+    return nameForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use descriptionForLanguage(languageCode).')
+  String? descriptionForLocale({required bool isArabic}) {
+    return descriptionForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use cityForLanguage(languageCode).')
+  String? cityForLocale({required bool isArabic}) {
+    return cityForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use regionForLanguage(languageCode).')
+  String? regionForLocale({required bool isArabic}) {
+    return regionForLanguage(isArabic ? 'ar' : 'en');
+  }
+
+  @Deprecated('Use historicalPeriodForLanguage(languageCode).')
   String? historicalPeriodForLocale({
     required bool isArabic,
-  }) =>
-      isArabic ? historicalPeriodAr : historicalPeriodEn;
+  }) {
+    return historicalPeriodForLanguage(
+      isArabic ? 'ar' : 'en',
+    );
+  }
 
   /// Returns the explicitly marked primary image, if available.
   QiblaLandmarkImage? get primaryImage {
