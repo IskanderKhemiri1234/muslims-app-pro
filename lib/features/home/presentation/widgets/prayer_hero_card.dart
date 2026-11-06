@@ -1,11 +1,17 @@
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/presentation/widgets/countdown_widget.dart';
 import 'glass_container.dart';
 
+/// Premium next-prayer hero card.
+///
+/// The public constructor remains backward compatible with existing
+/// PrayerHomePage integrations.
 class PrayerHeroCard extends StatelessWidget {
   const PrayerHeroCard({
     super.key,
@@ -16,17 +22,34 @@ class PrayerHeroCard extends StatelessWidget {
   });
 
   final PrayerController controller;
+
+  /// Retained for compatibility with existing callers.
+  ///
+  /// The active application locale takes precedence.
   final bool isArabic;
+
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
 
+  MuminLocalizations _resolveLocalizations(BuildContext context) {
+    final localeCode = Localizations.localeOf(context).languageCode;
+
+    return MuminLocalizations.fromCode(
+      localeCode.isEmpty ? (isArabic ? 'ar' : 'en') : localeCode,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final localizations = _resolveLocalizations(context);
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.97, end: 1),
+      tween: Tween<double>(
+        begin: reduceMotion ? 1 : 0.97,
+        end: 1,
+      ),
       duration: reduceMotion
           ? Duration.zero
           : const Duration(milliseconds: 550),
@@ -43,7 +66,7 @@ class PrayerHeroCard extends StatelessWidget {
           return _HeroSurface(
             nextPrayer: controller.nextPrayer,
             nextTime: controller.nextPrayerTime,
-            isArabic: isArabic,
+            localizations: localizations,
             prayerName: prayerName,
             formatTime: formatTime,
             controller: controller,
@@ -59,7 +82,7 @@ class _HeroSurface extends StatelessWidget {
   const _HeroSurface({
     required this.nextPrayer,
     required this.nextTime,
-    required this.isArabic,
+    required this.localizations,
     required this.prayerName,
     required this.formatTime,
     required this.controller,
@@ -68,27 +91,32 @@ class _HeroSurface extends StatelessWidget {
 
   final Prayer? nextPrayer;
   final DateTime? nextTime;
-  final bool isArabic;
+  final MuminLocalizations localizations;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
   final PrayerController controller;
   final bool reduceMotion;
+
+  String get _unavailableLabel {
+    return localizations.text('unavailable');
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentPrayer = nextPrayer;
     final currentTime = nextTime;
 
-    final prayerLabel =
-        currentPrayer != null && currentTime != null
-            ? prayerName(currentPrayer)
-            : (isArabic ? 'غير متاح' : 'Unavailable');
+    final hasNextPrayer = currentPrayer != null && currentTime != null;
 
-    final animationKey =
-        '${currentPrayer?.name ?? 'unavailable'}_'
+    final prayerLabel = hasNextPrayer
+        ? prayerName(currentPrayer)
+        : _unavailableLabel;
+
+    final animationKey = '${currentPrayer?.name ?? 'unavailable'}_'
         '${currentTime?.millisecondsSinceEpoch ?? 'none'}';
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(23),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -119,7 +147,7 @@ class _HeroSurface extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HeroHeader(isArabic: isArabic),
+              _HeroHeader(localizations: localizations),
               const SizedBox(height: 23),
               AnimatedSwitcher(
                 duration: reduceMotion
@@ -146,6 +174,7 @@ class _HeroSurface extends StatelessWidget {
                     prayerLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.start,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 37,
@@ -155,8 +184,8 @@ class _HeroSurface extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 7),
-              if (currentPrayer != null && currentTime != null)
+              if (hasNextPrayer) ...[
+                const SizedBox(height: 7),
                 Row(
                   children: [
                     const Icon(
@@ -172,17 +201,21 @@ class _HeroSurface extends StatelessWidget {
                         color: AppColors.goldLight,
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
+                        fontFeatures: [
+                          FontFeature.tabularFigures(),
+                        ],
                       ),
                     ),
                   ],
                 ),
+              ],
               const SizedBox(height: 24),
               _CountdownPanel(
                 controller: controller,
-                isArabic: isArabic,
+                localizations: localizations,
               ),
               const SizedBox(height: 16),
-              _HeroFooter(isArabic: isArabic),
+              _HeroFooter(localizations: localizations),
             ],
           ),
         ],
@@ -192,12 +225,27 @@ class _HeroSurface extends StatelessWidget {
 }
 
 class _HeroHeader extends StatelessWidget {
-  const _HeroHeader({required this.isArabic});
+  const _HeroHeader({
+    required this.localizations,
+  });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
+
+  String get _todayLabel {
+    switch (localizations.languageCode) {
+      case 'ar':
+        return 'اليوم';
+      case 'fr':
+        return 'AUJOURD’HUI';
+      default:
+        return 'TODAY';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isArabic = localizations.isArabic;
+
     return Row(
       children: [
         const Icon(
@@ -208,17 +256,18 @@ class _HeroHeader extends StatelessWidget {
         const SizedBox(width: 9),
         Expanded(
           child: Text(
-            isArabic ? 'الصلاة القادمة' : 'NEXT PRAYER',
+            localizations.nextPrayer,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.72),
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: isArabic ? 0 : 2,
+              letterSpacing: isArabic ? 0 : 1.2,
             ),
           ),
         ),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: 11,
@@ -241,7 +290,7 @@ class _HeroHeader extends StatelessWidget {
               ),
               const SizedBox(width: 5),
               Text(
-                isArabic ? 'مواقيت اليوم' : 'TODAY',
+                _todayLabel,
                 style: const TextStyle(
                   color: AppColors.goldLight,
                   fontSize: 10,
@@ -259,14 +308,27 @@ class _HeroHeader extends StatelessWidget {
 class _CountdownPanel extends StatelessWidget {
   const _CountdownPanel({
     required this.controller,
-    required this.isArabic,
+    required this.localizations,
   });
 
   final PrayerController controller;
-  final bool isArabic;
+  final MuminLocalizations localizations;
+
+  String get _remainingTimeLabel {
+    switch (localizations.languageCode) {
+      case 'ar':
+        return 'الوقت المتبقي للصلاة';
+      case 'fr':
+        return 'TEMPS RESTANT AVANT LA PRIÈRE';
+      default:
+        return 'TIME REMAINING';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isArabic = localizations.isArabic;
+
     return GlassContainer(
       color: Colors.white.withValues(alpha: 0.09),
       borderColor: Colors.white.withValues(alpha: 0.13),
@@ -279,12 +341,14 @@ class _CountdownPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isArabic ? 'الوقت المتبقي للصلاة' : 'TIME REMAINING',
+            _remainingTimeLabel,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.68),
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              letterSpacing: isArabic ? 0 : 1.4,
+              letterSpacing: isArabic ? 0 : 0.8,
             ),
           ),
           const SizedBox(height: 13),
@@ -299,9 +363,22 @@ class _CountdownPanel extends StatelessWidget {
 }
 
 class _HeroFooter extends StatelessWidget {
-  const _HeroFooter({required this.isArabic});
+  const _HeroFooter({
+    required this.localizations,
+  });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
+
+  String get _footerMessage {
+    switch (localizations.languageCode) {
+      case 'ar':
+        return 'يتم تحديث العداد تلقائيًا';
+      case 'fr':
+        return 'Le compte à rebours se met à jour automatiquement';
+      default:
+        return 'Countdown updates automatically';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -315,14 +392,13 @@ class _HeroFooter extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            isArabic
-                ? 'يتم تحديث العداد تلقائيًا'
-                : 'Countdown updates automatically',
-            maxLines: 1,
+            _footerMessage,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.55),
               fontSize: 10,
+              height: 1.35,
             ),
           ),
         ),
