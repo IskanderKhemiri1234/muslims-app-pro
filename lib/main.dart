@@ -1,9 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'core/theme/app_theme.dart';
+import 'core/design_system/mumin_theme.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
@@ -133,7 +134,6 @@ class SettingsController extends ChangeNotifier {
         languageCode,
       );
 
-      // Keep the legacy preference synchronized.
       await preferences.setBool(
         _legacyArabicKey,
         languageCode == 'ar',
@@ -215,24 +215,18 @@ class _MuslimsAppState extends State<MuslimsApp> {
       child: Consumer<SettingsController>(
         builder: (context, settings, child) {
           return MaterialApp(
-            title: 'Muslims Pro',
+            title: 'Mumin Pro',
             debugShowCheckedModeBanner: false,
-
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
+            theme: MuminTheme.light,
+            darkTheme: MuminTheme.dark,
             themeMode: settings.themeMode,
-
             locale: settings.locale,
-
             supportedLocales: const [
               Locale('ar'),
               Locale('en'),
               Locale('fr'),
             ],
-
-            localizationsDelegates:
-                GlobalMaterialLocalizations.delegates,
-
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
             home: PrayerHomePage(
               isArabic: settings.isArabic,
               onLanguageToggle: settings.toggleLanguage,
