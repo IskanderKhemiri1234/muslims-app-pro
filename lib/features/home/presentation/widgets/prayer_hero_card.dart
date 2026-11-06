@@ -339,17 +339,9 @@ class _HeroHeader extends StatelessWidget {
 
   final MuminLocalizations localizations;
 
-  String get _todayLabel {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'اليوم';
-      case 'fr':
-        return 'AUJOURD’HUI';
-      default:
-        return 'TODAY';
-    }
-  }
-
+    String get _todayLabel =>
+      localizations.text('today_label');
+}
   @override
   Widget build(BuildContext context) {
     final isArabic = localizations.isArabic;
@@ -451,15 +443,8 @@ class _PrayerIdentity extends StatelessWidget {
   final bool reduceMotion;
   final bool compact;
 
-  String get _eyebrow {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'الصلاة القادمة';
-      case 'fr':
-        return 'PROCHAINE PRIÈRE';
-      default:
-        return 'UP NEXT';
-    }
+  String get _eyebrow =>
+      localizations.text('next_prayer_eyebrow');  
   }
 
   @override
@@ -568,15 +553,8 @@ class _CountdownPanel extends StatelessWidget {
   final MuminLocalizations localizations;
   final bool compact;
 
-  String get _remainingTimeLabel {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'الوقت المتبقي للصلاة';
-      case 'fr':
-        return 'TEMPS RESTANT AVANT LA PRIÈRE';
-      default:
-        return 'TIME REMAINING';
-    }
+   String get _remainingTimeLabel =>
+      localizations.text('time_remaining'); 
   }
 
   @override
@@ -643,15 +621,8 @@ class _HeroFooter extends StatelessWidget {
 
   final MuminLocalizations localizations;
 
-  String get _footerMessage {
-    switch (localizations.languageCode) {
-      case 'ar':
-        return 'يتم تحديث العداد تلقائيًا';
-      case 'fr':
-        return 'Le compte à rebours se met à jour automatiquement';
-      default:
-        return 'Countdown updates automatically';
-    }
+    String get _footerMessage =>
+      localizations.text('countdown_auto_update');
   }
 
   @override
