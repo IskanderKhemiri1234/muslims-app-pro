@@ -2,6 +2,7 @@
 import 'catalogs/mumin_quran_catalog.dart';
 import 'catalogs/mumin_quran_reader_catalog.dart';
 import 'mumin_domain_catalog_registry.dart';
+import 'mumin_domain_localizations.dart';
 import 'mumin_localizations.dart';
 
 /// Central Quran interface localization bridge.
