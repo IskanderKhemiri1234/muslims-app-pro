@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,7 +12,7 @@ void main() {
   });
 
   testWidgets(
-    'Muslims app opens successfully',
+    'Mumin Pro opens successfully with saved settings',
     (WidgetTester tester) async {
       final preferences = await SharedPreferences.getInstance();
 
@@ -22,24 +23,21 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MuslimsApp(
+        MuminApp(
           settingsController: settingsController,
         ),
       );
 
       await tester.pump();
 
-      expect(find.byType(MuslimsApp), findsOneWidget);
-
+      expect(find.byType(MuminApp), findsOneWidget);
       expect(find.byType(MaterialApp), findsOneWidget);
 
       expect(settingsController.languageCode, 'ar');
       expect(settingsController.isDark, isTrue);
 
       await tester.pumpWidget(const SizedBox.shrink());
-
       await tester.pump();
-
     },
   );
 }
