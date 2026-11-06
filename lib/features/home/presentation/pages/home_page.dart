@@ -1,9 +1,11 @@
+
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../qibla/presentation/pages/qibla_page.dart';
@@ -22,8 +24,14 @@ class PrayerHomePage extends StatefulWidget {
     required this.onThemeToggle,
   });
 
+  /// Kept for backward compatibility with existing callers.
+  ///
+  /// The active language is resolved from the application's Locale.
   final bool isArabic;
+
+  /// Opens the language selector owned by the application root.
   final VoidCallback onLanguageToggle;
+
   final bool isDark;
   final VoidCallback onThemeToggle;
 
@@ -39,11 +47,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   bool _isRetrying = false;
 
-  bool get _isArabic => widget.isArabic;
-
-  String _t(String arabic, String english) {
-    return _isArabic ? arabic : english;
+  MuminLocalizations get _localizations {
+    final locale = Localizations.localeOf(context);
+    return MuminLocalizations.fromCode(locale.languageCode);
   }
+
+  bool get _isArabic => _localizations.isArabic;
+
+  String _t(String key) => _localizations.text(key);
 
   @override
   void initState() {
@@ -66,15 +77,15 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
-        _midnightTimer?.cancel();
-        _midnightTimer = null;
-        break;
-
       case AppLifecycleState.hidden:
-        _midnightTimer?.cancel();
-        _midnightTimer = null;
+        _cancelMidnightRefresh();
         break;
     }
+  }
+
+  void _cancelMidnightRefresh() {
+    _midnightTimer?.cancel();
+    _midnightTimer = null;
   }
 
   void _refreshDate() {
@@ -96,7 +107,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 
   void _scheduleMidnightRefresh() {
-    _midnightTimer?.cancel();
+    _cancelMidnightRefresh();
 
     final now = DateTime.now();
 
@@ -120,19 +131,19 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   String _prayerName(Prayer prayer) {
     switch (prayer) {
       case Prayer.fajr:
-        return _t('الفجر', 'Fajr');
+        return _localizations.prayerName('fajr');
       case Prayer.sunrise:
-        return _t('الشروق', 'Sunrise');
+        return _localizations.prayerName('sunrise');
       case Prayer.dhuhr:
-        return _t('الظهر', 'Dhuhr');
+        return _localizations.prayerName('dhuhr');
       case Prayer.asr:
-        return _t('العصر', 'Asr');
+        return _localizations.prayerName('asr');
       case Prayer.maghrib:
-        return _t('المغرب', 'Maghrib');
+        return _localizations.prayerName('maghrib');
       case Prayer.isha:
-        return _t('العشاء', 'Isha');
+        return _localizations.prayerName('isha');
       default:
-        return _t('غير متاح', 'Unavailable');
+        return _t('unavailable');
     }
   }
 
@@ -143,11 +154,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     return '$hour:$minute';
   }
 
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-
-    return '$day/$month/${date.year}';
+  String _formatDate(BuildContext context, DateTime date) {
+    return MaterialLocalizations.of(context).formatMediumDate(date);
   }
 
   Future<void> _retryInitialization() async {
@@ -160,13 +168,31 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     try {
       await context.read<PrayerController>().retryInitialization();
     } catch (error, stackTrace) {
-      debugPrint('Prayer initialization retry failed: $error');
+      debugPrint('Mumin Pro: prayer initialization retry failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       if (mounted) {
         setState(() {
           _isRetrying = false;
         });
+      }
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    if (!mounted) return;
+
+    try {
+      await context.read<PrayerController>().updateLocation();
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: location update failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (mounted) {
+        _showMessage(
+          context,
+          _t('location_permission_required'),
+        );
       }
     }
   }
@@ -192,30 +218,21 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       case 'adhan':
         _showMessage(
           context,
-          _t(
-            'خدمة الأذان قيد التطوير',
-            'Adhan service is under development',
-          ),
+          _t('adhan_in_development'),
         );
         return;
 
       case 'adhkar':
         _showMessage(
           context,
-          _t(
-            'قسم الأذكار قيد التطوير',
-            'Adhkar section is under development',
-          ),
+          _t('adhkar_in_development'),
         );
         return;
 
       default:
         _showMessage(
           context,
-          _t(
-            'هذه الميزة ستتوفر قريباً',
-            'This feature will be available soon',
-          ),
+          _t('coming_soon'),
         );
     }
   }
@@ -238,18 +255,17 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   @override
   void dispose() {
-    _midnightTimer?.cancel();
-    _midnightTimer = null;
-
+    _cancelMidnightRefresh();
     WidgetsBinding.instance.removeObserver(this);
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final localizations = _localizations;
+
     return Directionality(
-      textDirection: _isArabic
+      textDirection: localizations.isRightToLeft
           ? TextDirection.rtl
           : TextDirection.ltr,
       child: Selector<PrayerController, _HomeSnapshot>(
@@ -268,14 +284,12 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
           if (prayerTimes == null) {
             return _LoadingView(
-              isArabic: _isArabic,
+              localizations: localizations,
               message: snapshot.message,
               isRetrying: _isRetrying,
               onRetry: _retryInitialization,
             );
           }
-
-          final message = snapshot.message;
 
           return Scaffold(
             body: Stack(
@@ -303,8 +317,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           ),
                           child: ListView(
                             keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior
-                                    .onDrag,
+                                ScrollViewKeyboardDismissBehavior.onDrag,
                             padding: EdgeInsets.fromLTRB(
                               horizontalPadding,
                               10,
@@ -313,43 +326,34 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             ),
                             children: [
                               _TopBar(
-                                isArabic: _isArabic,
+                                localizations: localizations,
                                 isDark: widget.isDark,
                                 city: snapshot.city,
-                                date: _formatDate(_currentDate),
+                                date: _formatDate(
+                                  context,
+                                  _currentDate,
+                                ),
                                 onLanguageToggle:
                                     widget.onLanguageToggle,
                                 onThemeToggle:
                                     widget.onThemeToggle,
                               ),
-
                               const SizedBox(height: 23),
-
                               PrayerHeroCard(
                                 controller:
                                     context.read<PrayerController>(),
-                                isArabic: _isArabic,
+                                isArabic: localizations.isArabic,
                                 prayerName: _prayerName,
                                 formatTime: _formatTime,
                               ),
-
                               const SizedBox(height: 30),
-
                               _SectionTitle(
-                                title: _t(
-                                  'الوصول السريع',
-                                  'Quick access',
-                                ),
-                                subtitle: _t(
-                                  'كل ما تحتاجه في مكان واحد',
-                                  'Your daily essentials',
-                                ),
+                                title: _t('quick_access'),
+                                subtitle: _t('daily_essentials'),
                               ),
-
                               const SizedBox(height: 14),
-
                               QuickActions(
-                                isArabic: _isArabic,
+                                isArabic: localizations.isArabic,
                                 onAction: (action) {
                                   _handleQuickAction(
                                     context,
@@ -357,40 +361,30 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                                   );
                                 },
                               ),
-
                               const SizedBox(height: 30),
-
                               PrayerScheduleSection(
                                 prayerTimes: prayerTimes,
                                 nextPrayer: snapshot.nextPrayer,
-                                isArabic: _isArabic,
+                                isArabic: localizations.isArabic,
                                 prayerName: _prayerName,
                                 formatTime: _formatTime,
                               ),
-
                               const SizedBox(height: 18),
-
                               _LocationButton(
-                                isArabic: _isArabic,
-                                isLoading:
-                                    snapshot.isLoadingLocation,
-                                onPressed: () {
-                                  context
-                                      .read<PrayerController>()
-                                      .updateLocation();
-                                },
+                                localizations: localizations,
+                                isLoading: snapshot.isLoadingLocation,
+                                onPressed: _updateLocation,
                               ),
-
-                              if (message != null) ...[
+                              if (snapshot.message != null) ...[
                                 const SizedBox(height: 12),
                                 _MessageCard(
-                                  message: message,
+                                  message: snapshot.message!,
                                 ),
                               ],
-
                               const SizedBox(height: 24),
-
-                              _Footer(isArabic: _isArabic),
+                              _Footer(
+                                localizations: localizations,
+                              ),
                             ],
                           ),
                         ),
@@ -511,7 +505,7 @@ class _GlowCircle extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.isArabic,
+    required this.localizations,
     required this.isDark,
     required this.city,
     required this.date,
@@ -519,12 +513,26 @@ class _TopBar extends StatelessWidget {
     required this.onThemeToggle,
   });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
   final bool isDark;
   final String city;
   final String date;
   final VoidCallback onLanguageToggle;
   final VoidCallback onThemeToggle;
+
+  String get _languageCode =>
+      localizations.languageCode.toUpperCase();
+
+  String get _languageTooltip {
+    switch (localizations.languageCode) {
+      case 'ar':
+        return 'تغيير اللغة';
+      case 'fr':
+        return 'Changer de langue';
+      default:
+        return 'Change language';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -535,9 +543,7 @@ class _TopBar extends StatelessWidget {
       children: [
         Semantics(
           image: true,
-          label: isArabic
-              ? 'شعار مسجد مسلمز برو'
-              : 'Muslims Pro mosque logo',
+          label: localizations.text('app_name'),
           child: Container(
             width: 46,
             height: 46,
@@ -560,15 +566,13 @@ class _TopBar extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(width: 11),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Muslims Pro',
+                localizations.appName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -577,9 +581,7 @@ class _TopBar extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-
               const SizedBox(height: 4),
-
               Row(
                 children: [
                   const Icon(
@@ -587,9 +589,7 @@ class _TopBar extends StatelessWidget {
                     size: 12,
                     color: AppColors.gold,
                   ),
-
                   const SizedBox(width: 3),
-
                   Expanded(
                     child: Text(
                       '$city • $date',
@@ -606,11 +606,10 @@ class _TopBar extends StatelessWidget {
             ],
           ),
         ),
-
         IconButton(
           tooltip: isDark
-              ? (isArabic ? 'الوضع الفاتح' : 'Light mode')
-              : (isArabic ? 'الوضع الداكن' : 'Dark mode'),
+              ? localizations.lightMode
+              : localizations.darkMode,
           onPressed: onThemeToggle,
           icon: Icon(
             isDark
@@ -619,14 +618,52 @@ class _TopBar extends StatelessWidget {
             color: AppColors.gold,
           ),
         ),
-
-        TextButton(
-          onPressed: onLanguageToggle,
-          child: Text(
-            isArabic ? 'EN' : 'عربي',
-            style: const TextStyle(
-              color: AppColors.emeraldLight,
-              fontWeight: FontWeight.w800,
+        Semantics(
+          button: true,
+          label: _languageTooltip,
+          value: localizations.languageNativeName,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: onLanguageToggle,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                constraints: const BoxConstraints(
+                  minWidth: 54,
+                  minHeight: 42,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.emerald.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _languageCode,
+                      style: const TextStyle(
+                        color: AppColors.emeraldLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    const Icon(
+                      Icons.expand_more_rounded,
+                      size: 17,
+                      color: AppColors.gold,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -659,9 +696,7 @@ class _SectionTitle extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-
         const SizedBox(height: 4),
-
         Text(
           subtitle,
           style: TextStyle(
@@ -676,12 +711,12 @@ class _SectionTitle extends StatelessWidget {
 
 class _LocationButton extends StatelessWidget {
   const _LocationButton({
-    required this.isArabic,
+    required this.localizations,
     required this.isLoading,
     required this.onPressed,
   });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
   final bool isLoading;
   final VoidCallback onPressed;
 
@@ -702,12 +737,8 @@ class _LocationButton extends StatelessWidget {
             : const Icon(Icons.my_location_rounded),
         label: Text(
           isLoading
-              ? (isArabic
-                  ? 'جارٍ تحديد الموقع...'
-                  : 'Getting location...')
-              : (isArabic
-                  ? 'تحديث موقعي الحالي'
-                  : 'Update my location'),
+              ? localizations.updatingLocation
+              : localizations.updateLocation,
           textAlign: TextAlign.center,
         ),
         style: OutlinedButton.styleFrom(
@@ -752,19 +783,18 @@ class _MessageCard extends StatelessWidget {
 
 class _Footer extends StatelessWidget {
   const _Footer({
-    required this.isArabic,
+    required this.localizations,
   });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
 
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.onSurface;
+    final tagline = localizations.letPrayerIlluminateYourDay;
 
     return Semantics(
-      label: isArabic
-          ? 'مسلمز برو، صلاتك نور يومك'
-          : 'Muslims Pro, let prayer illuminate your day',
+      label: '${localizations.appName}, $tagline',
       child: Column(
         children: [
           const Icon(
@@ -772,13 +802,9 @@ class _Footer extends StatelessWidget {
             color: AppColors.gold,
             size: 23,
           ),
-
           const SizedBox(height: 8),
-
           Text(
-            isArabic
-                ? 'صلاتك نور يومك'
-                : 'Let prayer illuminate your day',
+            tagline,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: color.withValues(alpha: 0.65),
@@ -794,13 +820,13 @@ class _Footer extends StatelessWidget {
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView({
-    required this.isArabic,
+    required this.localizations,
     required this.message,
     required this.isRetrying,
     required this.onRetry,
   });
 
-  final bool isArabic;
+  final MuminLocalizations localizations;
   final String? message;
   final bool isRetrying;
   final Future<void> Function() onRetry;
@@ -827,9 +853,7 @@ class _LoadingView extends StatelessWidget {
                     color: AppColors.gold,
                     size: 42,
                   ),
-
                   const SizedBox(height: 22),
-
                   if (!hasError)
                     const CircularProgressIndicator(
                       color: AppColors.emeraldLight,
@@ -840,32 +864,22 @@ class _LoadingView extends StatelessWidget {
                       size: 38,
                       color: AppColors.gold,
                     ),
-
                   const SizedBox(height: 20),
-
                   Text(
                     hasError
-                        ? (isArabic
-                            ? 'تعذر تجهيز مواقيت الصلاة'
-                            : 'Unable to prepare prayer times')
-                        : (isArabic
-                            ? 'جارٍ تجهيز مواقيت الصلاة...'
-                            : 'Preparing prayer times...'),
+                        ? localizations.prayerTimesUnavailable
+                        : localizations.loadingPrayerTimes,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-
                   if (hasError) ...[
                     const SizedBox(height: 12),
-
                     Text(
                       errorMessage,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
-
                     const SizedBox(height: 20),
-
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
@@ -885,12 +899,8 @@ class _LoadingView extends StatelessWidget {
                             : const Icon(Icons.refresh_rounded),
                         label: Text(
                           isRetrying
-                              ? (isArabic
-                                  ? 'جارٍ إعادة المحاولة...'
-                                  : 'Retrying...')
-                              : (isArabic
-                                  ? 'إعادة المحاولة'
-                                  : 'Try again'),
+                              ? localizations.retrying
+                              : localizations.retry,
                         ),
                       ),
                     ),
