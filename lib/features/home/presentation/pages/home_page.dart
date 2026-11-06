@@ -10,7 +10,7 @@ import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/localization/mumin_locale_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
-import '../../../qibla/presentation/pages/qibla_page.dart';
+import '../../../qibla/presentation/pages/qibla_page_entry.dart';
 import '../../../quran/presentation/pages/quran_page.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/prayer_hero_card.dart';
@@ -201,8 +201,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   void _handleQuickAction(String action) {
     switch (action) {
       case 'qibla':
-        _openPage(const QiblaPage());
-        return;
+  _openPage(const QiblaPageEntry());
+  return;
       case 'quran':
         _openPage(const QuranPage());
         return;
