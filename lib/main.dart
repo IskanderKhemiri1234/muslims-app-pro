@@ -15,10 +15,7 @@ Future<void> main() async {
   runApp(const MuminBootstrap());
 }
 
-/// Loads persistent settings before creating the application providers.
-///
-/// If local storage is unavailable, the application still starts with safe
-/// defaults. A storage failure must never prevent access to prayer features.
+/// Restores persistent settings before starting the application.
 class MuminBootstrap extends StatefulWidget {
   const MuminBootstrap({super.key});
 
@@ -49,8 +46,6 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
     bool? legacyArabicSetting;
     bool? savedDarkMode;
 
-    // Read each value independently. A malformed preference should not
-    // prevent the other settings from being restored.
     if (preferences != null) {
       try {
         savedLanguageCode =
@@ -79,17 +74,13 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
 
     final String initialLanguage;
 
-    if (savedLanguageCode != null &&
-        MuminLocalizations.supportedLanguageCodes.contains(
-          savedLanguageCode.trim().toLowerCase(),
-        )) {
-      initialLanguage = savedLanguageCode.trim().toLowerCase();
+    if (MuminLocalizations.isSupported(savedLanguageCode)) {
+      initialLanguage =
+          MuminLocalizations.normalizeLanguageCode(savedLanguageCode);
     } else if (legacyArabicSetting != null) {
-      // Backward compatibility with installations that stored only
-      // app_language_ar before the three-language selector was introduced.
       initialLanguage = legacyArabicSetting ? 'ar' : 'en';
     } else {
-      initialLanguage = 'ar';
+      initialLanguage = MuminLocalizations.defaultLanguageCode;
     }
 
     return SettingsController(
@@ -111,13 +102,10 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
         }
 
         if (snapshot.hasError) {
-          // Defensive fallback. _initializeSettings normally catches storage
-          // failures, but this prevents an unexpected initialization error
-          // from leaving the user on an endless loading screen.
           return MuminApp(
             settingsController: SettingsController(
               preferences: null,
-              languageCode: 'ar',
+              languageCode: MuminLocalizations.defaultLanguageCode,
               isDark: true,
             ),
           );
@@ -129,10 +117,7 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
   }
 }
 
-/// Central application settings state.
-///
-/// The controller owns the selected language and theme. Widgets observe
-/// changes through Provider, while persistence remains encapsulated here.
+/// Central application settings controller.
 class SettingsController extends ChangeNotifier {
   SettingsController({
     required SharedPreferences? preferences,
@@ -140,11 +125,14 @@ class SettingsController extends ChangeNotifier {
     required bool isDark,
   })  : _preferences = preferences,
         _languageCode =
-            MuminLocalizations.fromCode(languageCode).languageCode,
+            MuminLocalizations.normalizeLanguageCode(languageCode),
         _isDark = isDark;
 
-  static const String languageCodeKey = 'app_language_code';
+  static const String languageCodeKey =
+      MuminLocalizations.languagePreferenceKey;
+
   static const String legacyArabicKey = 'app_language_ar';
+
   static const String darkModeKey = 'app_theme_dark';
 
   final SharedPreferences? _preferences;
@@ -153,13 +141,15 @@ class SettingsController extends ChangeNotifier {
   bool _isDark;
   bool _isDisposed = false;
 
-  // Serializing writes prevents a slower previous write from overwriting
-  // a more recent language or theme selection.
   Future<void> _pendingWrites = Future<void>.value();
 
   String get languageCode => _languageCode;
 
   bool get isArabic => _languageCode == 'ar';
+
+  bool get isEnglish => _languageCode == 'en';
+
+  bool get isFrench => _languageCode == 'fr';
 
   bool get isDark => _isDark;
 
@@ -176,24 +166,21 @@ class SettingsController extends ChangeNotifier {
 
   bool get canPersistSettings => _preferences != null;
 
-  /// Selects one of the supported application languages.
+  /// Changes the language immediately and persists it asynchronously.
   ///
-  /// The visible state updates immediately. Saving happens asynchronously
-  /// and failures are logged without interrupting the current session.
+  /// Region-specific codes are accepted when their language is supported.
   void setLanguage(String languageCode) {
-    final normalized =
-        MuminLocalizations.fromCode(languageCode).languageCode;
-
-    // Reject unsupported input instead of silently switching the user
-    // to the fallback language.
-    if (!MuminLocalizations.supportedLanguageCodes.contains(
-      languageCode.trim().toLowerCase(),
-    )) {
-      debugPrint('Mumin Pro: unsupported language selection: $languageCode');
+    if (_isDisposed || !MuminLocalizations.isSupported(languageCode)) {
+      debugPrint(
+        'Mumin Pro: unsupported language selection: $languageCode',
+      );
       return;
     }
 
-    if (_languageCode == normalized || _isDisposed) {
+    final normalized =
+        MuminLocalizations.normalizeLanguageCode(languageCode);
+
+    if (_languageCode == normalized) {
       return;
     }
 
@@ -202,32 +189,37 @@ class SettingsController extends ChangeNotifier {
 
     _enqueuePreferenceWrite(() async {
       final preferences = _preferences;
-      if (preferences == null) return;
+
+      if (preferences == null) {
+        return;
+      }
 
       final languageSaved = await preferences.setString(
         languageCodeKey,
         normalized,
       );
 
-      // Keep the old boolean key synchronized for older code paths.
       final legacySaved = await preferences.setBool(
         legacyArabicKey,
         normalized == 'ar',
       );
 
       if (!languageSaved || !legacySaved) {
-        debugPrint('Mumin Pro: language preferences were not fully saved.');
+        debugPrint(
+          'Mumin Pro: language preferences were not fully saved.',
+        );
       }
     });
   }
 
-  /// Toggles between light and dark themes.
+  /// Toggles the application theme.
   void toggleTheme() {
     setDarkMode(!_isDark);
   }
 
+  /// Sets the application theme explicitly.
   void setDarkMode(bool isDark) {
-    if (_isDark == isDark || _isDisposed) {
+    if (_isDisposed || _isDark == isDark) {
       return;
     }
 
@@ -236,7 +228,10 @@ class SettingsController extends ChangeNotifier {
 
     _enqueuePreferenceWrite(() async {
       final preferences = _preferences;
-      if (preferences == null) return;
+
+      if (preferences == null) {
+        return;
+      }
 
       final saved = await preferences.setBool(
         darkModeKey,
@@ -249,6 +244,7 @@ class SettingsController extends ChangeNotifier {
     });
   }
 
+  /// Serializes preference writes to preserve their order.
   void _enqueuePreferenceWrite(
     Future<void> Function() operation,
   ) {
@@ -262,7 +258,7 @@ class SettingsController extends ChangeNotifier {
     });
   }
 
-  /// Allows tests or controlled shutdown flows to wait for queued writes.
+  /// Waits for all queued preference writes.
   Future<void> waitForPendingWrites() => _pendingWrites;
 
   @override
@@ -309,34 +305,38 @@ class _MuminAppState extends State<MuminApp> {
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (sheetContext) {
-        final current = settings.languageCode;
+        return Consumer<SettingsController>(
+          builder: (context, currentSettings, child) {
+            final localizations = currentSettings.localizations;
 
-        return Directionality(
-          textDirection: settings.textDirection,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  settings.localizations.text('select_language'),
-                  textAlign: TextAlign.start,
-                  style: Theme.of(sheetContext).textTheme.titleLarge,
+            return Directionality(
+              textDirection: currentSettings.textDirection,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      localizations.selectLanguage,
+                      textAlign: TextAlign.start,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    for (final code in _languageOrder)
+                      _LanguageOption(
+                        languageCode: code,
+                        selected: currentSettings.languageCode == code,
+                        onTap: () {
+                          currentSettings.setLanguage(code);
+                          Navigator.of(sheetContext).pop();
+                        },
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                for (final code in _languageOrder)
-                  _LanguageOption(
-                    languageCode: code,
-                    selected: current == code,
-                    onTap: () {
-                      settings.setLanguage(code);
-                      Navigator.of(sheetContext).pop();
-                    },
-                  ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -367,12 +367,12 @@ class _MuminAppState extends State<MuminApp> {
             supportedLocales: MuminLocalizations.supportedLanguageCodes
                 .map((code) => Locale(code))
                 .toList(growable: false),
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            localizationsDelegates:
+                GlobalMaterialLocalizations.delegates,
             localeResolutionCallback: (deviceLocale, supportedLocales) {
-              // The explicit user selection takes precedence over the
-              // device locale. The device locale is only a safe fallback.
               for (final supportedLocale in supportedLocales) {
-                if (supportedLocale.languageCode == settings.languageCode) {
+                if (supportedLocale.languageCode ==
+                    settings.languageCode) {
                   return supportedLocale;
                 }
               }
@@ -386,7 +386,9 @@ class _MuminAppState extends State<MuminApp> {
                 }
               }
 
-              return const Locale('en');
+              return Locale(
+                MuminLocalizations.defaultLanguageCode,
+              );
             },
             home: PrayerHomePage(
               isArabic: settings.isArabic,
@@ -403,7 +405,7 @@ class _MuminAppState extends State<MuminApp> {
   }
 }
 
-/// A language row with native and English names.
+/// Language selector row.
 class _LanguageOption extends StatelessWidget {
   const _LanguageOption({
     required this.languageCode,
@@ -417,7 +419,9 @@ class _LanguageOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MuminLocalizations.fromCode(languageCode);
+    final localizations =
+        MuminLocalizations.fromCode(languageCode);
+
     final colorScheme = Theme.of(context).colorScheme;
 
     final nativeName = localizations.languageNativeName;
@@ -449,7 +453,8 @@ class _LanguageOption extends StatelessWidget {
         title: Text(
           nativeName,
           style: TextStyle(
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            fontWeight:
+                selected ? FontWeight.w800 : FontWeight.w600,
             color: colorScheme.onSurface,
           ),
         ),
@@ -473,54 +478,73 @@ class _LanguageOption extends StatelessWidget {
   }
 }
 
-/// Minimal branded startup screen shown while preferences are restored.
+/// Branded startup screen displayed while preferences are restored.
 class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
 
   @override
   Widget build(BuildContext context) {
+    final localizations =
+        MuminLocalizations.fromCode(
+      MuminLocalizations.defaultLanguageCode,
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      locale: const Locale('ar'),
+      supportedLocales: const [
+        Locale('ar'),
+        Locale('en'),
+        Locale('fr'),
+      ],
+      localizationsDelegates:
+          GlobalMaterialLocalizations.delegates,
       theme: MuminTheme.dark,
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF075B46),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: const Color(0xFFD8B66A),
-                    width: 1.2,
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF075B46),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: const Color(0xFFD8B66A),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.mosque_rounded,
+                    color: Color(0xFFD8B66A),
+                    size: 34,
                   ),
                 ),
-                child: const Icon(
-                  Icons.mosque_rounded,
-                  color: Color(0xFFD8B66A),
-                  size: 34,
+                const SizedBox(height: 20),
+                Text(
+                  localizations.appName,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Mumin Pro',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              const SizedBox(height: 22),
-              const SizedBox(
-                width: 25,
-                height: 25,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: Color(0xFFD8B66A),
+                const SizedBox(height: 22),
+                const SizedBox(
+                  width: 25,
+                  height: 25,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: Color(0xFFD8B66A),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
