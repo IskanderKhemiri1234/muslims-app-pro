@@ -2,16 +2,17 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/mumin_design_tokens.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/presentation/widgets/countdown_widget.dart';
 import 'glass_container.dart';
 
-/// Premium next-prayer hero card.
+/// Signature next-prayer experience for Mumin Pro.
 ///
-/// The public constructor remains backward compatible with existing
-/// PrayerHomePage integrations.
+/// The public constructor is intentionally preserved so existing
+/// home-page integrations remain compatible.
 class PrayerHeroCard extends StatelessWidget {
   const PrayerHeroCard({
     super.key,
@@ -23,9 +24,9 @@ class PrayerHeroCard extends StatelessWidget {
 
   final PrayerController controller;
 
-  /// Retained for compatibility with existing callers.
+  /// Backward-compatible fallback.
   ///
-  /// The active application locale takes precedence.
+  /// The active MaterialApp locale takes precedence.
   final bool isArabic;
 
   final String Function(Prayer) prayerName;
@@ -45,34 +46,36 @@ class PrayerHeroCard extends StatelessWidget {
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(
-        begin: reduceMotion ? 1 : 0.97,
-        end: 1,
-      ),
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 550),
-      curve: Curves.easeOutCubic,
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          return _HeroSurface(
-            nextPrayer: controller.nextPrayer,
-            nextTime: controller.nextPrayerTime,
-            localizations: localizations,
-            prayerName: prayerName,
-            formatTime: formatTime,
-            controller: controller,
-            reduceMotion: reduceMotion,
+    return RepaintBoundary(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(
+          begin: reduceMotion ? 1 : 0.985,
+          end: 1,
+        ),
+        duration: reduceMotion
+            ? Duration.zero
+            : MuminMotion.smooth,
+        curve: MuminMotion.enter,
+        builder: (context, scale, child) {
+          return Transform.scale(
+            scale: scale,
+            child: child,
           );
         },
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, child) {
+            return _HeroSurface(
+              nextPrayer: controller.nextPrayer,
+              nextTime: controller.nextPrayerTime,
+              controller: controller,
+              localizations: localizations,
+              prayerName: prayerName,
+              formatTime: formatTime,
+              reduceMotion: reduceMotion,
+            );
+          },
+        ),
       ),
     );
   }
@@ -82,19 +85,19 @@ class _HeroSurface extends StatelessWidget {
   const _HeroSurface({
     required this.nextPrayer,
     required this.nextTime,
+    required this.controller,
     required this.localizations,
     required this.prayerName,
     required this.formatTime,
-    required this.controller,
     required this.reduceMotion,
   });
 
   final Prayer? nextPrayer;
   final DateTime? nextTime;
+  final PrayerController controller;
   final MuminLocalizations localizations;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
-  final PrayerController controller;
   final bool reduceMotion;
 
   String get _unavailableLabel {
@@ -106,119 +109,230 @@ class _HeroSurface extends StatelessWidget {
     final currentPrayer = nextPrayer;
     final currentTime = nextTime;
 
-    final hasNextPrayer = currentPrayer != null && currentTime != null;
+    final hasNextPrayer =
+        currentPrayer != null && currentTime != null;
 
     final prayerLabel = hasNextPrayer
         ? prayerName(currentPrayer)
         : _unavailableLabel;
 
-    final animationKey = '${currentPrayer?.name ?? 'unavailable'}_'
+    final animationKey =
+        '${currentPrayer?.name ?? 'unavailable'}_'
         '${currentTime?.millisecondsSinceEpoch ?? 'none'}';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(23),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            Color(0xFF0B6149),
-            Color(0xFF064333),
-            Color(0xFF032B25),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.28),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.emerald.withValues(alpha: 0.20),
-            blurRadius: 35,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const _HeroDecoration(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _HeroHeader(localizations: localizations),
-              const SizedBox(height: 23),
-              AnimatedSwitcher(
-                duration: reduceMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 350),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.10),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  );
-                },
-                child: SizedBox(
-                  key: ValueKey<String>(animationKey),
-                  width: double.infinity,
-                  child: Text(
-                    prayerLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.start,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 37,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 350;
+
+        final horizontalPadding = compact ? 18.0 : 23.0;
+        final verticalPadding = compact ? 20.0 : 24.0;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF126C55),
+                  Color(0xFF084B3B),
+                  Color(0xFF06372E),
+                  Color(0xFF041F1B),
+                ],
+                stops: [0, 0.32, 0.72, 1],
               ),
-              if (hasNextPrayer) ...[
-                const SizedBox(height: 7),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule_rounded,
-                      size: 17,
-                      color: AppColors.goldLight,
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      formatTime(currentTime),
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(
-                        color: AppColors.goldLight,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: [
-                          FontFeature.tabularFigures(),
-                        ],
-                      ),
-                    ),
-                  ],
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.42),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF075B46)
+                      .withValues(alpha: 0.24),
+                  blurRadius: 30,
+                  spreadRadius: -5,
+                  offset: const Offset(0, 15),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 18,
+                  offset: const Offset(0, 9),
                 ),
               ],
-              const SizedBox(height: 24),
-              _CountdownPanel(
-                controller: controller,
-                localizations: localizations,
-              ),
-              const SizedBox(height: 16),
-              _HeroFooter(localizations: localizations),
-            ],
+            ),
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: _HeroAtmosphere(),
+                  ),
+                ),
+
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: verticalPadding,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HeroHeader(
+                        localizations: localizations,
+                      ),
+
+                      SizedBox(height: compact ? 25 : 31),
+
+                      _PrayerIdentity(
+                        prayerLabel: prayerLabel,
+                        animationKey: animationKey,
+                        hasNextPrayer: hasNextPrayer,
+                        currentTime: currentTime,
+                        formatTime: formatTime,
+                        reduceMotion: reduceMotion,
+                        compact: compact,
+                      ),
+
+                      SizedBox(height: compact ? 23 : 28),
+
+                      _CountdownPanel(
+                        controller: controller,
+                        localizations: localizations,
+                        reduceMotion: reduceMotion,
+                        compact: compact,
+                      ),
+
+                      SizedBox(height: compact ? 16 : 19),
+
+                      _HeroFooter(
+                        localizations: localizations,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const PositionedDirectional(
+                  top: 0,
+                  start: 0,
+                  end: 0,
+                  child: IgnorePointer(
+                    child: _HeroTopHighlight(),
+                  ),
+                ),
+              ],
+            ),
           ),
+        );
+      },
+    );
+  }
+}
+
+/// Atmospheric decoration drawn without image assets or continuous animation.
+///
+/// Custom painting keeps the geometry lightweight and resolution-independent.
+class _HeroAtmosphere extends StatelessWidget {
+  const _HeroAtmosphere();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: const _HeroAtmospherePainter(),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _HeroAtmospherePainter extends CustomPainter {
+  const _HeroAtmospherePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final goldPaint = Paint()
+      ..color = AppColors.gold.withValues(alpha: 0.075)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final lightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.045)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF6CCFB0).withValues(alpha: 0.14),
+          const Color(0xFF6CCFB0).withValues(alpha: 0),
         ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.9, size.height * 0.08),
+          radius: size.width * 0.65,
+        ),
+      );
+
+    canvas.drawRect(
+      Offset.zero & size,
+      glowPaint,
+    );
+
+    final center = Offset(
+      size.width * 0.88,
+      size.height * 0.13,
+    );
+
+    for (var index = 0; index < 4; index++) {
+      final radius = size.width * (0.19 + index * 0.105);
+
+      canvas.drawCircle(
+        center,
+        radius,
+        index.isEven ? goldPaint : lightPaint,
+      );
+    }
+
+    final geometryPath = Path();
+
+    final startX = size.width * 0.08;
+    final startY = size.height * 0.76;
+
+    for (var index = 0; index < 5; index++) {
+      final x = startX + index * 24.0;
+      final y = startY + (index.isEven ? 0 : 12);
+
+      geometryPath.moveTo(x, y - 7);
+      geometryPath.lineTo(x + 7, y);
+      geometryPath.lineTo(x, y + 7);
+      geometryPath.lineTo(x - 7, y);
+      geometryPath.close();
+    }
+
+    canvas.drawPath(geometryPath, lightPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroAtmospherePainter oldDelegate) {
+    return false;
+  }
+}
+
+class _HeroTopHighlight extends StatelessWidget {
+  const _HeroTopHighlight();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.transparent,
+            AppColors.gold.withValues(alpha: 0.65),
+            Colors.white.withValues(alpha: 0.20),
+            Colors.transparent,
+          ],
+        ),
       ),
     );
   }
@@ -248,43 +362,63 @@ class _HeroHeader extends StatelessWidget {
 
     return Row(
       children: [
-        const Icon(
-          Icons.nights_stay_rounded,
-          color: AppColors.goldLight,
-          size: 19,
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.075),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.32),
+            ),
+          ),
+          child: const Icon(
+            Icons.nights_stay_rounded,
+            color: AppColors.goldLight,
+            size: 19,
+          ),
         ),
-        const SizedBox(width: 9),
+
+        const SizedBox(width: 11),
+
         Expanded(
           child: Text(
             localizations.nextPrayer,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: Colors.white.withValues(alpha: 0.82),
               fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: isArabic ? 0 : 1.2,
+              fontWeight: FontWeight.w800,
+              letterSpacing: isArabic ? 0 : 1.1,
             ),
           ),
         ),
+
         const SizedBox(width: 8),
+
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: 11,
-            vertical: 7,
+            vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: AppColors.gold.withValues(alpha: 0.13),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.gold.withValues(alpha: 0.18),
+                AppColors.gold.withValues(alpha: 0.07),
+              ],
+            ),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.28),
+              color: AppColors.gold.withValues(alpha: 0.38),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.auto_awesome,
+                Icons.auto_awesome_rounded,
                 color: AppColors.goldLight,
                 size: 12,
               ),
@@ -293,8 +427,9 @@ class _HeroHeader extends StatelessWidget {
                 _todayLabel,
                 style: const TextStyle(
                   color: AppColors.goldLight,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
@@ -305,14 +440,153 @@ class _HeroHeader extends StatelessWidget {
   }
 }
 
+class _PrayerIdentity extends StatelessWidget {
+  const _PrayerIdentity({
+    required this.prayerLabel,
+    required this.animationKey,
+    required this.hasNextPrayer,
+    required this.currentTime,
+    required this.formatTime,
+    required this.reduceMotion,
+    required this.compact,
+  });
+
+  final String prayerLabel;
+  final String animationKey;
+  final bool hasNextPrayer;
+  final DateTime? currentTime;
+  final String Function(DateTime) formatTime;
+  final bool reduceMotion;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final time = currentTime;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _eyebrow,
+          style: TextStyle(
+            color: AppColors.goldLight.withValues(alpha: 0.85),
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+
+        const SizedBox(height: 9),
+
+        AnimatedSwitcher(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 380),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.09),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: SizedBox(
+            key: ValueKey<String>(animationKey),
+            width: double.infinity,
+            child: Text(
+              prayerLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.start,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: compact ? 34 : 40,
+                height: 1.13,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.7,
+              ),
+            ),
+          ),
+        ),
+
+        if (hasNextPrayer && time != null) ...[
+          const SizedBox(height: 13),
+
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.26),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  size: 15,
+                  color: AppColors.goldLight,
+                ),
+              ),
+
+              const SizedBox(width: 9),
+
+              Text(
+                formatTime(time),
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  color: AppColors.goldLight,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  fontFeatures: [
+                    FontFeature.tabularFigures(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  String get _eyebrow {
+    switch (Localizations.localeOf(_HeroBuildContext.current!).languageCode) {
+      case 'ar':
+        return 'الصلاة القادمة';
+      case 'fr':
+        return 'PROCHAINE PRIÈRE';
+      default:
+        return 'UP NEXT';
+    }
+  }
+}
+
+/// Compact countdown surface.
+///
+/// Blur is intentionally disabled here. The layered translucent surface
+/// provides depth without continuously sampling the background.
 class _CountdownPanel extends StatelessWidget {
   const _CountdownPanel({
     required this.controller,
     required this.localizations,
+    required this.reduceMotion,
+    required this.compact,
   });
 
   final PrayerController controller;
   final MuminLocalizations localizations;
+  final bool reduceMotion;
+  final bool compact;
 
   String get _remainingTimeLabel {
     switch (localizations.languageCode) {
@@ -327,34 +601,56 @@ class _CountdownPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isArabic = localizations.isArabic;
-
     return GlassContainer(
-      color: Colors.white.withValues(alpha: 0.09),
-      borderColor: Colors.white.withValues(alpha: 0.13),
-      radius: 21,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 17,
-        vertical: 16,
+      color: Colors.white.withValues(alpha: 0.085),
+      borderColor: Colors.white.withValues(alpha: 0.16),
+      radius: 23,
+      enableBlur: false,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 17,
+        vertical: compact ? 14 : 17,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _remainingTimeLabel,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.68),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: isArabic ? 0 : 0.8,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.goldLight,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _remainingTimeLabel,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.73),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing:
+                        localizations.isArabic ? 0 : 0.75,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.hourglass_bottom_rounded,
+                color: AppColors.goldLight,
+                size: 17,
+              ),
+            ],
           ),
-          const SizedBox(height: 13),
+
+          const SizedBox(height: 14),
+
           CountdownWidget(
             controller: controller,
-            isArabic: isArabic,
+            isArabic: localizations.isArabic,
           ),
         ],
       ),
@@ -384,69 +680,39 @@ class _HeroFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          Icons.verified_user_outlined,
-          color: Colors.white.withValues(alpha: 0.55),
-          size: 14,
+        const Icon(
+          Icons.verified_outlined,
+          color: AppColors.goldLight,
+          size: 15,
         ),
-        const SizedBox(width: 6),
+
+        const SizedBox(width: 8),
+
         Expanded(
           child: Text(
             _footerMessage,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
+              color: Colors.white.withValues(alpha: 0.60),
               fontSize: 10,
-              height: 1.35,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
-      ],
-    );
-  }
-}
 
-class _HeroDecoration extends StatelessWidget {
-  const _HeroDecoration();
+        const SizedBox(width: 8),
 
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: -55,
-              right: -35,
-              child: Container(
-                width: 170,
-                height: 170,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.gold.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -75,
-              left: -55,
-              child: Container(
-                width: 190,
-                height: 190,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    width: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.8),
+            shape: BoxShape.circle,
+          ),
         ),
-      ),
+      ],
     );
   }
 }
