@@ -751,11 +751,11 @@ class _QuranPageState extends State<QuranPage>
     }
   }
 
+  
   Future<void> _openVerseBookmarks() async {
     if (!mounted) return;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final verses = List<Map<String, dynamic>>.from(_verseBookmarks);
 
     final selectedPage = await showModalBottomSheet<int>(
@@ -764,13 +764,22 @@ class _QuranPageState extends State<QuranPage>
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return _BottomSheetShell(
-          title: 'الآيات المحفوظة',
+          title: QuranPageLocalization.text(
+            context,
+            'quran_saved_verses_title',
+          ),
           isDark: isDark,
           child: verses.isEmpty
-              ? const _EmptyState(
+              ? _EmptyState(
                   icon: Icons.bookmark_border_rounded,
-                  title: 'لا توجد آيات محفوظة',
-                  subtitle: 'اضغط على آية داخل المصحف واختر حفظ الآية',
+                  title: QuranPageLocalization.text(
+                    context,
+                    'quran_saved_verses_empty_title',
+                  ),
+                  subtitle: QuranPageLocalization.text(
+                    context,
+                    'quran_saved_verses_empty_hint',
+                  ),
                 )
               : ListView.separated(
                   itemCount: verses.length,
@@ -780,12 +789,11 @@ class _QuranPageState extends State<QuranPage>
                     final verse = verses[index];
 
                     final suraName =
-                        verse['suraName'] as String? ?? 'سورة';
-
-                    
+                        verse['suraName'] as String? ?? '';
                     final aya = verse['aya'] as int;
                     final page = verse['page'] as int;
-                    final text = verse['text'] as String? ?? '';
+                    final verseText =
+                        verse['text'] as String? ?? '';
 
                     return ListTile(
                       leading: const Icon(
@@ -793,25 +801,34 @@ class _QuranPageState extends State<QuranPage>
                         color: _gold,
                       ),
                       title: Text(
-                        '$suraName - الآية $aya',
+                        '$suraName - '
+                        '${QuranPageLocalization.text(context, 'quran_ayah_number')} '
+                        '$aya',
                         textDirection: TextDirection.rtl,
                       ),
                       subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
-                          if (text.isNotEmpty)
+                          if (verseText.isNotEmpty)
                             Text(
-                              text,
+                              verseText,
                               textDirection: TextDirection.rtl,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          Text('صفحة $page'),
+                          Text(
+                            '${QuranPageLocalization.text(context, 'quran_page_number')} $page',
+                          ),
                         ],
                       ),
-                      onTap: () => Navigator.pop(sheetContext, page),
+                      onTap: () =>
+                          Navigator.pop(sheetContext, page),
                       trailing: IconButton(
-                        tooltip: 'حذف',
+                        tooltip: QuranPageLocalization.text(
+                          context,
+                          'quran_delete',
+                        ),
                         icon: const Icon(
                           Icons.delete_outline_rounded,
                           color: Colors.redAccent,
@@ -836,7 +853,10 @@ class _QuranPageState extends State<QuranPage>
     );
 
     if (selectedPage != null && mounted) {
-      _selectPage(selectedPage, saveImmediately: true);
+      _selectPage(
+        selectedPage,
+        saveImmediately: true,
+      );
     }
   }
 
