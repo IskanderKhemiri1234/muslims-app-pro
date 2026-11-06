@@ -309,8 +309,7 @@ class _MuminAppState extends State<MuminApp> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
-                    for (final language
-                        in MuminLocalizations.availableLanguages)
+                    for (final language in languages.availableLanguages)
                       _LanguageOption(
                         language: language,
                         selected:
