@@ -7,7 +7,7 @@ import '../controllers/qibla_landmark_search_controller.dart';
 /// Search field and localized result list for the Qibla Atlas.
 ///
 /// The page supplies translated labels so this widget remains independent
-/// from any duplicated localization system.
+/// from duplicated feature-level localization systems.
 class QiblaLandmarkSearchSection extends StatefulWidget {
   const QiblaLandmarkSearchSection({
     super.key,
@@ -58,12 +58,33 @@ class _QiblaLandmarkSearchSectionState
   void didUpdateWidget(covariant QiblaLandmarkSearchSection oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.languageCode != widget.languageCode) {
-      widget.controller.setLanguageCode(widget.languageCode);
+    final controllerChanged =
+        !identical(oldWidget.controller, widget.controller);
+    final languageChanged =
+        oldWidget.languageCode != widget.languageCode;
+
+    if (controllerChanged) {
+      _textController.value = TextEditingValue(
+        text: widget.controller.query,
+        selection: TextSelection.collapsed(
+          offset: widget.controller.query.length,
+        ),
+      );
     }
 
-    if (oldWidget.controller != widget.controller) {
-      _textController.text = widget.controller.query;
+    if (controllerChanged || languageChanged) {
+      final targetController = widget.controller;
+      final targetLanguageCode = widget.languageCode;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !identical(widget.controller, targetController) ||
+            widget.languageCode != targetLanguageCode) {
+          return;
+        }
+
+        targetController.setLanguageCode(targetLanguageCode);
+      });
     }
   }
 
