@@ -1,6 +1,4 @@
 
-import 'dart:ui' show FontFeature;
-
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
