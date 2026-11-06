@@ -14,6 +14,16 @@ import '../../domain/services/global_prayer_calculation_service.dart';
 import '../../domain/services/prayer_calculation_service.dart';
 import '../../domain/services/prayer_rules_service.dart';
 
+/// Central controller for prayer calculations, location and countdown time.
+///
+/// Responsibilities:
+/// - Maintain validated geographic coordinates.
+/// - Resolve and retain the IANA timezone.
+/// - Calculate today's and tomorrow's prayer schedules.
+/// - Preserve compatibility with legacy PrayerTimes consumers.
+/// - Expose a lightweight ValueListenable clock for countdown widgets.
+/// - Stop periodic work while the application is in the background.
+/// - Serialize preference writes and prevent overlapping initialization.
 class PrayerController extends ChangeNotifier
     with WidgetsBindingObserver {
   PrayerController({
@@ -32,7 +42,8 @@ class PrayerController extends ChangeNotifier
             calculationService ?? const PrayerCalculationService(),
         _rulesService = rulesService ??
             PrayerRulesService(
-              fallbackMethod: CalculationMethod.muslim_world_league,
+              fallbackMethod:
+                  CalculationMethod.muslim_world_league,
               fallbackMadhab: Madhab.shafi,
             ) {
     WidgetsBinding.instance.addObserver(this);
@@ -42,9 +53,9 @@ class PrayerController extends ChangeNotifier
     unawaited(retryInitialization());
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // DEPENDENCIES
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   final LocationDataSource _locationSource;
   final TimezoneDiscoveryService _timezoneService;
@@ -55,9 +66,9 @@ class PrayerController extends ChangeNotifier
   final PrayerCalculationService _calculationService;
   final PrayerRulesService _rulesService;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // PERSISTENCE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   static const String _latitudeKey = 'prayer_latitude';
   static const String _longitudeKey = 'prayer_longitude';
@@ -69,9 +80,9 @@ class PrayerController extends ChangeNotifier
   bool _hasSavedMethod = false;
   bool _hasSavedMadhab = false;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // DEFAULT SETTINGS
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   double latitude = 33.5731;
   double longitude = -7.5898;
@@ -83,9 +94,9 @@ class PrayerController extends ChangeNotifier
 
   Madhab madhab = Madhab.shafi;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // TIMEZONE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   DiscoveredTimezone? _discoveredTimezone;
 
@@ -96,9 +107,9 @@ class PrayerController extends ChangeNotifier
   tz.Location? get timezoneLocation =>
       _discoveredTimezone?.location;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // PRAYER STATE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   PrayerTimes? _prayerTimes;
   PrayerTimes? _tomorrowPrayerTimes;
@@ -127,16 +138,16 @@ class PrayerController extends ChangeNotifier
 
   DateTime? get nextPrayerTime => _nextPrayerAt;
 
-  /// Indicates whether the authoritative global schedule is available.
+  /// Whether both authoritative schedules and the next prayer are available.
   bool get hasUsableSchedule =>
       _globalSchedule != null &&
       _tomorrowGlobalSchedule != null &&
       _nextPrayerAt != null &&
       _nextPrayer != Prayer.none;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // CLOCK
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   final ValueNotifier<DateTime> clock =
       ValueNotifier<DateTime>(DateTime.now());
@@ -145,11 +156,16 @@ class PrayerController extends ChangeNotifier
 
   Timer? _timer;
 
-  static const Duration _clockInterval = Duration(seconds: 1);
+  /// The timer is one-shot and aligned to the next wall-clock second.
+  ///
+  /// Unlike an indefinitely periodic timer, this avoids accumulating
+  /// scheduling drift over long foreground sessions.
+  static const Duration _minimumClockDelay =
+      Duration(milliseconds: 1);
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // STATUS
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   bool isLoadingLocation = false;
 
@@ -168,9 +184,9 @@ class PrayerController extends ChangeNotifier
 
   bool _isAppActive = true;
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // COUNTDOWN
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Duration get remaining {
     final target = _nextPrayerAt;
@@ -184,9 +200,9 @@ class PrayerController extends ChangeNotifier
     return difference.isNegative ? Duration.zero : difference;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // INITIALIZATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Future<void> retryInitialization() {
     if (_disposed) {
@@ -238,7 +254,7 @@ class PrayerController extends ChangeNotifier
         _startClock();
       }
     } catch (error, stackTrace) {
-      debugPrint('Prayer initialization error: $error');
+      debugPrint('Prayer initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (_disposed) return;
@@ -252,9 +268,9 @@ class PrayerController extends ChangeNotifier
     _notifySafely();
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // VALIDATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   bool _isValidCoordinates(double lat, double lon) {
     return lat.isFinite &&
@@ -271,9 +287,9 @@ class PrayerController extends ChangeNotifier
         first.day == second.day;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // LOAD SETTINGS
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Future<void> _loadSettings() async {
     try {
@@ -286,7 +302,10 @@ class PrayerController extends ChangeNotifier
 
       if (savedLatitude != null &&
           savedLongitude != null &&
-          _isValidCoordinates(savedLatitude, savedLongitude)) {
+          _isValidCoordinates(
+            savedLatitude,
+            savedLongitude,
+          )) {
         latitude = savedLatitude;
         longitude = savedLongitude;
         city = 'Saved location';
@@ -318,20 +337,21 @@ class PrayerController extends ChangeNotifier
           break;
       }
     } catch (error, stackTrace) {
-      debugPrint('Prayer settings load error: $error');
+      debugPrint('Prayer settings load failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // SAVE SETTINGS
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Future<void> _saveSettings() {
     if (_disposed) {
       return Future<void>.value();
     }
 
+    // Snapshot values now, not when the queued write eventually executes.
     final savedLatitude = latitude;
     final savedLongitude = longitude;
     final savedMethod = method.name;
@@ -352,21 +372,26 @@ class PrayerController extends ChangeNotifier
       await prefs.setString(_madhabKey, savedMadhab);
     });
 
+    // Keep the queue usable even when an individual write fails.
     _settingsWriteQueue = operation.then<void>(
       (_) {},
       onError: (Object error, StackTrace stackTrace) {
-        debugPrint('Prayer settings save error: $error');
+        debugPrint('Prayer settings save failed: $error');
       },
     );
 
     return operation;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // TIMEZONE DISCOVERY
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Future<void> _discoverTimezone() async {
+    if (!_isValidCoordinates(latitude, longitude)) {
+      throw StateError('Invalid coordinates for timezone discovery.');
+    }
+
     final result = await _timezoneService.discover(
       latitude: latitude,
       longitude: longitude,
@@ -380,7 +405,7 @@ class PrayerController extends ChangeNotifier
       );
     }
 
-    if (result.timezoneId.isEmpty ||
+    if (result.timezoneId.trim().isEmpty ||
         result.timezoneId != result.location.name) {
       throw StateError('Invalid discovered timezone.');
     }
@@ -388,9 +413,9 @@ class PrayerController extends ChangeNotifier
     _discoveredTimezone = result;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // PRAYER RULES
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   void _applyRulesProfileIfNoSavedSettings() {
     if (_hasSavedMethod && _hasSavedMadhab) {
@@ -429,12 +454,16 @@ class PrayerController extends ChangeNotifier
     );
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // PRAYER CALCULATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   DateTime _dateOnly(DateTime date) {
-    return DateTime.utc(date.year, date.month, date.day);
+    return DateTime.utc(
+      date.year,
+      date.month,
+      date.day,
+    );
   }
 
   DateTime _nextCalendarDay(DateTime date) {
@@ -494,7 +523,7 @@ class PrayerController extends ChangeNotifier
     final todayDate = _dateOnly(localNow);
     final tomorrowDate = _nextCalendarDay(localNow);
 
-    // The global engine is the authoritative calculation source.
+    // Calculate both authoritative schedules before committing state.
     final todayGlobal = _createGlobalSchedule(todayDate);
     final tomorrowGlobal = _createGlobalSchedule(tomorrowDate);
 
@@ -504,7 +533,8 @@ class PrayerController extends ChangeNotifier
       now: now,
     );
 
-    // Legacy compatibility must not invalidate a valid global schedule.
+    // Legacy compatibility is optional and cannot invalidate
+    // a successfully calculated authoritative global schedule.
     PrayerTimes? todayLegacy;
     PrayerTimes? tomorrowLegacy;
 
@@ -519,11 +549,11 @@ class PrayerController extends ChangeNotifier
         ),
       );
     } catch (error, stackTrace) {
-      debugPrint('Legacy prayer calculation error: $error');
+      debugPrint('Legacy prayer calculation failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
 
-    // Commit after the authoritative calculations complete.
+    // Commit all schedule values together.
     _globalSchedule = todayGlobal;
     _tomorrowGlobalSchedule = tomorrowGlobal;
 
@@ -536,9 +566,9 @@ class PrayerController extends ChangeNotifier
     _nextPrayerAt = next.$2;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // NEXT PRAYER ENGINE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   (Prayer, tz.TZDateTime?) _findNextPrayer({
     required GlobalPrayerSchedule today,
@@ -561,9 +591,11 @@ class PrayerController extends ChangeNotifier
       }
     }
 
-    final tomorrowFajr = tomorrow.timeForPrayer(Prayer.fajr);
+    final tomorrowFajr =
+        tomorrow.timeForPrayer(Prayer.fajr);
 
-    if (tomorrowFajr != null && tomorrowFajr.isAfter(now)) {
+    if (tomorrowFajr != null &&
+        tomorrowFajr.isAfter(now)) {
       return (Prayer.fajr, tomorrowFajr);
     }
 
@@ -590,9 +622,9 @@ class PrayerController extends ChangeNotifier
     _nextPrayerAt = next.$2;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // CLOCK ENGINE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   void _startClock() {
     if (_disposed || !_isAppActive) return;
@@ -601,11 +633,40 @@ class PrayerController extends ChangeNotifier
 
     _synchronizeClock();
 
-    _timer = Timer.periodic(
-      _clockInterval,
-      (_) {
+    if (!_disposed && _isAppActive) {
+      _scheduleNextClockTick();
+    }
+  }
+
+  /// Schedules one callback at the next wall-clock second boundary.
+  ///
+  /// A one-shot timer is used so delayed callbacks do not accumulate
+  /// periodic-timer drift.
+  void _scheduleNextClockTick() {
+    if (_disposed || !_isAppActive) return;
+
+    _timer?.cancel();
+
+    final now = DateTime.now();
+
+    final millisecondsUntilNextSecond =
+        Duration.millisecondsPerSecond - now.millisecond;
+
+    final delay = Duration(
+      milliseconds: millisecondsUntilNextSecond,
+    );
+
+    _timer = Timer(
+      delay < _minimumClockDelay
+          ? _minimumClockDelay
+          : delay,
+      () {
+        if (_disposed || !_isAppActive) return;
+
+        _synchronizeClock();
+
         if (!_disposed && _isAppActive) {
-          _synchronizeClock();
+          _scheduleNextClockTick();
         }
       },
     );
@@ -617,27 +678,36 @@ class PrayerController extends ChangeNotifier
     final now = DateTime.now();
     final previous = clock.value;
 
-    clock.value = now;
+    // Avoid notifying listeners if the displayed second did not change.
+    if (now.year != previous.year ||
+        now.month != previous.month ||
+        now.day != previous.day ||
+        now.hour != previous.hour ||
+        now.minute != previous.minute ||
+        now.second != previous.second) {
+      clock.value = now;
+    }
 
     final timezone = _discoveredTimezone?.location;
 
     if (timezone == null) return;
 
     final localNow = tz.TZDateTime.from(now, timezone);
-
     final scheduleDate = _scheduleDate;
 
+    // Handles midnight, timezone date changes and date jumps.
     if (scheduleDate == null ||
         !_isSameDate(localNow, scheduleDate)) {
       _recalculateSafely();
       return;
     }
 
-    final expectedElapsed = _clockInterval.inMilliseconds;
-    final actualElapsed = now.difference(previous).inMilliseconds;
+    final actualElapsed = now.difference(previous);
 
-    if (actualElapsed < 0 ||
-        actualElapsed > expectedElapsed * 5) {
+    // A large clock jump can indicate manual time changes,
+    // device resume or delayed scheduling.
+    if (actualElapsed.isNegative ||
+        actualElapsed > const Duration(seconds: 5)) {
       _recalculateSafely();
       return;
     }
@@ -658,7 +728,7 @@ class PrayerController extends ChangeNotifier
       message = null;
       _notifySafely();
     } catch (error, stackTrace) {
-      debugPrint('Prayer schedule recalculation error: $error');
+      debugPrint('Prayer schedule recalculation failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       message = 'Unable to refresh prayer times.';
@@ -672,9 +742,9 @@ class PrayerController extends ChangeNotifier
     _timer = null;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // APPLICATION LIFECYCLE
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -683,24 +753,26 @@ class PrayerController extends ChangeNotifier
     if (state == AppLifecycleState.resumed) {
       _isAppActive = true;
 
+      // Recalculate using the current wall clock before restarting ticks.
       _recalculateSafely();
-      _startClock();
 
-      _notifySafely();
+      if (!_disposed && _isAppActive) {
+        _startClock();
+      }
     } else {
       _isAppActive = false;
       _stopClock();
     }
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // LOCATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   Future<void> updateLocation() async {
     if (_disposed || isLoadingLocation) return;
 
-    // Prevent a location update from racing initialization.
+    // Do not race the initial settings/timezone calculation.
     final initialization = _initializationTask;
 
     if (initialization != null) {
@@ -708,6 +780,8 @@ class PrayerController extends ChangeNotifier
 
       if (_disposed) return;
     }
+
+    if (_disposed || isLoadingLocation) return;
 
     isLoadingLocation = true;
     message = null;
@@ -718,6 +792,8 @@ class PrayerController extends ChangeNotifier
     final oldCity = city;
     final oldTimezone = _discoveredTimezone;
 
+    var locationChanged = false;
+
     try {
       final Position position =
           await _locationSource.getCurrentLocation();
@@ -727,7 +803,10 @@ class PrayerController extends ChangeNotifier
       final newLatitude = position.latitude;
       final newLongitude = position.longitude;
 
-      if (!_isValidCoordinates(newLatitude, newLongitude)) {
+      if (!_isValidCoordinates(
+        newLatitude,
+        newLongitude,
+      )) {
         throw StateError('Received invalid location coordinates.');
       }
 
@@ -735,42 +814,29 @@ class PrayerController extends ChangeNotifier
       longitude = newLongitude;
       city = 'Current location';
 
-      try {
-        await _discoverTimezone();
+      locationChanged = true;
 
-        if (_disposed) return;
-
-        _calculateSchedule();
-      } catch (_) {
-        if (_disposed) return;
-
-        _restoreLocationState(
-          latitude: oldLatitude,
-          longitude: oldLongitude,
-          city: oldCity,
-          timezone: oldTimezone,
-        );
-
-        _calculateSchedule();
-
-        rethrow;
-      }
+      await _discoverTimezone();
 
       if (_disposed) return;
 
-      // A valid new location remains active even if persistence fails.
+      _calculateSchedule();
+
+      if (_disposed) return;
+
+      // Keep a valid location even if persistence is unavailable.
       try {
         await _saveSettings();
       } catch (error, stackTrace) {
-        debugPrint('Location persistence error: $error');
+        debugPrint('Location persistence failed: $error');
         debugPrintStack(stackTrace: stackTrace);
 
-        message = 'Location updated, but saving settings failed.';
+        message =
+            'Location updated, but saving settings failed.';
       }
 
       if (_disposed) return;
 
-      // Restart the clock after successful location calculation.
       if (_isAppActive) {
         _startClock();
       }
@@ -779,28 +845,34 @@ class PrayerController extends ChangeNotifier
         message = 'Location updated successfully.';
       }
     } catch (error, stackTrace) {
-      debugPrint('Location update error: $error');
+      debugPrint('Location update failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (_disposed) return;
 
-      _restoreLocationState(
-        latitude: oldLatitude,
-        longitude: oldLongitude,
-        city: oldCity,
-        timezone: oldTimezone,
-      );
+      if (locationChanged) {
+        _restoreLocationState(
+          latitude: oldLatitude,
+          longitude: oldLongitude,
+          city: oldCity,
+          timezone: oldTimezone,
+        );
 
-      // Attempt to restore the previous schedule safely.
-      try {
-        _calculateSchedule();
+        // Restore the previous valid schedule.
+        try {
+          _calculateSchedule();
 
-        if (_isAppActive) {
-          _startClock();
+          if (_isAppActive) {
+            _startClock();
+          }
+        } catch (rollbackError, rollbackStackTrace) {
+          debugPrint(
+            'Location rollback failed: $rollbackError',
+          );
+          debugPrintStack(
+            stackTrace: rollbackStackTrace,
+          );
         }
-      } catch (rollbackError, rollbackStackTrace) {
-        debugPrint('Location rollback error: $rollbackError');
-        debugPrintStack(stackTrace: rollbackStackTrace);
       }
 
       message = error
@@ -827,9 +899,9 @@ class PrayerController extends ChangeNotifier
     _discoveredTimezone = timezone;
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // CALCULATION SETTINGS
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   void changeMethod(CalculationMethod value) {
     if (_disposed || method == value) return;
@@ -851,6 +923,7 @@ class PrayerController extends ChangeNotifier
 
     final previousMethod = method;
     final previousMadhab = madhab;
+
     final previousHasSavedMethod = _hasSavedMethod;
     final previousHasSavedMadhab = _hasSavedMadhab;
 
@@ -873,7 +946,7 @@ class PrayerController extends ChangeNotifier
         _saveSettings().catchError(
           (Object error, StackTrace stackTrace) {
             debugPrint(
-              'Prayer settings persistence error: $error',
+              'Prayer settings persistence failed: $error',
             );
           },
         ),
@@ -881,25 +954,27 @@ class PrayerController extends ChangeNotifier
 
       _notifySafely();
     } catch (error, stackTrace) {
-      debugPrint('Prayer settings update error: $error');
+      debugPrint('Prayer settings update failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       method = previousMethod;
       madhab = previousMadhab;
+
       _hasSavedMethod = previousHasSavedMethod;
       _hasSavedMadhab = previousHasSavedMadhab;
 
       _recalculateSafely();
 
-      message = 'Unable to update prayer calculation settings.';
+      message =
+          'Unable to update prayer calculation settings.';
 
       _notifySafely();
     }
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // SAFE NOTIFICATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   void _notifySafely() {
     if (!_disposed) {
@@ -907,9 +982,9 @@ class PrayerController extends ChangeNotifier
     }
   }
 
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
   // DISPOSAL
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   @override
   void dispose() {
