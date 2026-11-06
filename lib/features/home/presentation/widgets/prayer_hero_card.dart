@@ -18,8 +18,6 @@ class PrayerHeroCard extends StatelessWidget {
   const PrayerHeroCard({
     super.key,
     required this.controller,
-    @Deprecated('Language is resolved by MuminLanguageRegistry.')
-    bool? isArabic,
     required this.prayerName,
     required this.formatTime,
   });
