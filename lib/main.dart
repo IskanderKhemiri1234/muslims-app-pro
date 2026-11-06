@@ -384,7 +384,6 @@ class _MuminAppState extends State<MuminApp> {
               );
             },
             home: PrayerHomePage(
-              isArabic: languages.isArabic,
               onLanguageToggle: () {
                 _showLanguagePicker(context, languages);
               },
