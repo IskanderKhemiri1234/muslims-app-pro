@@ -1425,7 +1425,7 @@ Text(
       ),
     );
   }
-
+ 
   Widget _buildReaderPreview(bool isDark) {
     final pageColor = isDark
         ? const Color(0xFF202A23)
@@ -1461,7 +1461,9 @@ Text(
               vertical: 12,
             ),
             decoration: BoxDecoration(
-              color: _green.withValues(alpha: isDark ? 0.35 : 0.07),
+              color: _green.withValues(
+                alpha: isDark ? 0.35 : 0.07,
+              ),
               border: Border(
                 bottom: BorderSide(
                   color: _gold.withValues(alpha: 0.3),
@@ -1477,7 +1479,7 @@ Text(
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'الصفحة $_currentPage',
+                  '${QuranPageLocalization.text(context, 'quran_page')} $_currentPage',
                   style: TextStyle(
                     color: textColor,
                     fontWeight: FontWeight.bold,
@@ -1492,7 +1494,10 @@ Text(
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'فتح المصحف كاملاً',
+                  QuranPageLocalization.text(
+                    context,
+                    'quran_open_reader',
+                  ),
                   style: TextStyle(
                     color: textColor.withValues(alpha: 0.75),
                     fontSize: 11,
@@ -1526,10 +1531,14 @@ Text(
                                   isDark ? '#E8DFC9' : '#26382C',
                               backgroundColor:
                                   isDark ? '#202A23' : '#FFFCF3',
-                              ayaActions: const [
+                              ayaActions: [
                                 QuranAyaAction(
                                   id: 'save_ayah',
-                                  title: 'حفظ الآية',
+                                  title:
+                                      QuranPageLocalization.text(
+                                    context,
+                                    'quran_save_verse',
+                                  ),
                                 ),
                               ],
                               onAyaAction: _saveVerseBookmark,
@@ -1556,9 +1565,12 @@ Text(
                           ],
                         ),
                       ),
-                      child: const Text(
-                        'اضغط لفتح صفحة القرآن كاملة',
-                        style: TextStyle(
+                      child: Text(
+                        QuranPageLocalization.text(
+                          context,
+                          'quran_open_reader',
+                        ),
+                        style: const TextStyle(
                           color: _gold,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
@@ -1573,7 +1585,7 @@ Text(
         ],
       ),
     );
-  }
+  }  
 
   Widget _buildReaderControls(bool isDark) {
     final textColor = isDark ? Colors.white : _deepGreen;
