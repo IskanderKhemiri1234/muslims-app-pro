@@ -20,21 +20,14 @@ import '../widgets/quick_actions.dart';
 /// Main dashboard of Mumin Pro.
 ///
 /// Language metadata, locale normalization and text direction
-/// are controlled by the centralized language architecture.
+/// are controlled exclusively by the centralized language architecture.
 class PrayerHomePage extends StatefulWidget {
   const PrayerHomePage({
     super.key,
-    @Deprecated('Language is managed by MuminLanguageController.')
-    required this.isArabic,
     required this.onLanguageToggle,
     required this.isDark,
     required this.onThemeToggle,
   });
-
-  /// Temporary compatibility parameter.
-  /// It is deliberately not used to resolve the active language.
-  @Deprecated('Use MuminLanguageController.')
-  final bool isArabic;
 
   final VoidCallback onLanguageToggle;
   final bool isDark;
