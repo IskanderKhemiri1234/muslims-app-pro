@@ -260,15 +260,13 @@ abstract final class MuminTheme {
       ),
 
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: MuminColors.gold,
-        foregroundColor: MuminColors.midnightEmerald,
-        elevation: MuminElevation.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: MuminRadius.lg == 18
-              ? BorderRadius.circular(MuminRadius.lg)
-              : MuminRadius.card,
-        ),
-      ),
+  backgroundColor: MuminColors.gold,
+  foregroundColor: MuminColors.midnightEmerald,
+  elevation: MuminElevation.card,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(MuminRadius.lg),
+  ),
+),
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
