@@ -2,19 +2,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'mumin_language_registry.dart';
 import 'mumin_localizations.dart';
 
 /// Official Flutter localization delegate for Mumin Pro.
 ///
-/// The central MuminLocalizations engine remains the single
-/// source of application translations and language metadata.
+/// Language availability and metadata are owned exclusively by
+/// MuminLanguageRegistry. Translation resolution is owned by
+/// MuminLocalizations.
 final class MuminLocalizationsDelegate
     extends LocalizationsDelegate<MuminLocalizations> {
   const MuminLocalizationsDelegate();
 
   @override
   bool isSupported(Locale locale) {
-    return MuminLocalizations.isSupported(
+    return MuminLanguageRegistry.isSupported(
       locale.languageCode,
     );
   }
@@ -22,7 +24,7 @@ final class MuminLocalizationsDelegate
   @override
   Future<MuminLocalizations> load(Locale locale) {
     final languageCode =
-        MuminLocalizations.normalizeLanguageCode(
+        MuminLanguageRegistry.normalizeLanguageCode(
       locale.languageCode,
     );
 
