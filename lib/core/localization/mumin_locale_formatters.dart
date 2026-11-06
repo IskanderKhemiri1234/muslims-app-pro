@@ -1,19 +1,14 @@
 
 import 'package:flutter/material.dart';
 
+import 'mumin_language_registry.dart';
 import 'mumin_localizations.dart';
 
 /// Central locale-aware formatting service for Mumin Pro.
 ///
-/// Responsibilities:
-/// - Format dates using the active Flutter locale.
-/// - Format prayer times consistently.
-/// - Format integer values using localized digits.
-/// - Resolve text direction through the central language registry.
-/// - Keep formatting independent from individual feature screens.
-///
-/// This service does not calculate prayer times, modify DateTime values,
-/// or perform timezone conversion. It only formats values supplied to it.
+/// Formatting is based on Flutter's active MaterialLocalizations,
+/// while language identity and text direction come from the
+/// independent MuminLanguageRegistry.
 @immutable
 final class MuminLocaleFormatters {
   const MuminLocaleFormatters({
@@ -21,13 +16,9 @@ final class MuminLocaleFormatters {
     required this.materialLocalizations,
   });
 
-  /// Active application locale.
   final Locale locale;
-
-  /// Flutter's locale-aware Material formatting implementation.
   final MaterialLocalizations materialLocalizations;
 
-  /// Creates a formatter using the locale active in the current widget tree.
   factory MuminLocaleFormatters.of(BuildContext context) {
     return MuminLocaleFormatters(
       locale: Localizations.localeOf(context),
@@ -35,39 +26,40 @@ final class MuminLocaleFormatters {
     );
   }
 
-  /// Central localization model for the active locale.
+  /// The approved launch language code.
+  String get languageCode =>
+      MuminLanguageRegistry.normalizeLanguageCode(
+        locale.languageCode,
+      );
+
+  /// Translation engine remains responsible for translated text.
   MuminLocalizations get localizations =>
-      MuminLocalizations.fromCode(locale.languageCode);
+      MuminLocalizations.fromCode(languageCode);
 
-  /// Active language code, such as ar, en, or fr.
-  String get languageCode => localizations.languageCode;
+  bool get isArabic => languageCode == 'ar';
 
-  /// Compatibility properties for existing feature consumers.
-  bool get isArabic => localizations.isArabic;
+  bool get isEnglish => languageCode == 'en';
 
-  bool get isEnglish => localizations.isEnglish;
+  bool get isFrench => languageCode == 'fr';
 
-  bool get isFrench => localizations.isFrench;
+  /// Direction is resolved exclusively by the language registry.
+  bool get isRightToLeft =>
+      MuminLanguageRegistry.isRightToLeft(languageCode);
 
-  /// Direction comes from the central language registry.
-  bool get isRightToLeft => localizations.isRightToLeft;
+  bool get isLeftToRight =>
+      MuminLanguageRegistry.isLeftToRight(languageCode);
 
   TextDirection get textDirection =>
       isRightToLeft ? TextDirection.rtl : TextDirection.ltr;
 
-  /// Formats an integer using the active Flutter locale.
-  ///
-  /// The actual digit presentation is determined by the installed
-  /// MaterialLocalizations implementation for this locale.
+  /// Formats an integer using Flutter's active locale.
   String formatNumber(int value) {
     return materialLocalizations.formatDecimal(value);
   }
 
   /// Formats a prayer time.
   ///
-  /// The default is 24-hour time to preserve the existing prayer schedule
-  /// presentation. Set [alwaysUse24HourFormat] to false when a screen
-  /// explicitly requires the locale's 12/24-hour convention.
+  /// The default is 24-hour time for consistent prayer schedules.
   String formatTime(
     DateTime value, {
     bool alwaysUse24HourFormat = true,
@@ -81,7 +73,6 @@ final class MuminLocaleFormatters {
     );
   }
 
-  /// Formats a Flutter TimeOfDay value using the active locale.
   String formatTimeOfDay(
     TimeOfDay value, {
     bool alwaysUse24HourFormat = true,
@@ -92,22 +83,18 @@ final class MuminLocaleFormatters {
     );
   }
 
-  /// Formats a date in the locale's medium presentation.
   String formatMediumDate(DateTime value) {
     return materialLocalizations.formatMediumDate(value);
   }
 
-  /// Formats a date in the locale's full presentation.
   String formatFullDate(DateTime value) {
     return materialLocalizations.formatFullDate(value);
   }
 
-  /// Formats a date in the locale's short presentation.
   String formatShortDate(DateTime value) {
     return materialLocalizations.formatShortDate(value);
   }
 
-  /// Formats a date and time without changing the supplied date or time.
   String formatDateAndTime(
     DateTime value, {
     bool alwaysUse24HourFormat = true,
