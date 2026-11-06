@@ -14,6 +14,7 @@ import '../../domain/models/quran_bookmark.dart';
 import '../../domain/models/quran_reading_progress.dart';
 import '../../domain/repositories/quran_bookmark_repository.dart';
 import '../../domain/repositories/quran_reading_progress_repository.dart';
+import '../localization/quran_page_localization.dart';
 
 class _SurahInfo {
   final String name;
@@ -1087,13 +1088,20 @@ class _QuranPageState extends State<QuranPage>
                                 ),
                               ),
                             ),
-                            title: Text(
-                              surah.name,
-                              textDirection: TextDirection.rtl,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            
+                            
+title: Text(
+  QuranPageLocalization.surahName(
+    context,
+    index + 1,
+  ),
+  textDirection:
+      QuranPageLocalization.textDirectionOf(context),
+  style: const TextStyle(
+    fontWeight: FontWeight.w600,
+  ),
+),
+
                             trailing: Text('صفحة ${surah.page}'),
                             onTap: () => Navigator.pop(
                               sheetContext,
