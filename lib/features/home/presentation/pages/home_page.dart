@@ -15,6 +15,11 @@ import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
 
+/// Main Mumin Pro dashboard.
+///
+/// The page observes only the prayer data required by its layout.
+/// The one-second countdown remains isolated in PrayerHeroCard through
+/// PrayerController.clockListenable.
 class PrayerHomePage extends StatefulWidget {
   const PrayerHomePage({
     super.key,
@@ -24,9 +29,9 @@ class PrayerHomePage extends StatefulWidget {
     required this.onThemeToggle,
   });
 
-  /// Kept for backward compatibility with existing callers.
+  /// Retained for compatibility with existing application callers.
   ///
-  /// The active language is resolved from the application's Locale.
+  /// The active language is resolved from the Flutter application locale.
   final bool isArabic;
 
   /// Opens the language selector owned by the application root.
@@ -51,8 +56,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     final locale = Localizations.localeOf(context);
     return MuminLocalizations.fromCode(locale.languageCode);
   }
-
-  bool get _isArabic => _localizations.isArabic;
 
   String _t(String key) => _localizations.text(key);
 
@@ -88,6 +91,12 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     _midnightTimer = null;
   }
 
+  bool _isSameDate(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
   void _refreshDate() {
     if (!mounted) return;
 
@@ -100,14 +109,10 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     });
   }
 
-  bool _isSameDate(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
-  }
-
   void _scheduleMidnightRefresh() {
     _cancelMidnightRefresh();
+
+    if (!mounted) return;
 
     final now = DateTime.now();
 
@@ -120,28 +125,36 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     final delay = nextMidnight.difference(now) +
         const Duration(seconds: 1);
 
-    _midnightTimer = Timer(delay, () {
-      if (!mounted) return;
+    _midnightTimer = Timer(delay, _handleMidnightRefresh);
+  }
 
-      _refreshDate();
-      _scheduleMidnightRefresh();
-    });
+  void _handleMidnightRefresh() {
+    if (!mounted) return;
+
+    _refreshDate();
+    _scheduleMidnightRefresh();
   }
 
   String _prayerName(Prayer prayer) {
     switch (prayer) {
       case Prayer.fajr:
         return _localizations.prayerName('fajr');
+
       case Prayer.sunrise:
         return _localizations.prayerName('sunrise');
+
       case Prayer.dhuhr:
         return _localizations.prayerName('dhuhr');
+
       case Prayer.asr:
         return _localizations.prayerName('asr');
+
       case Prayer.maghrib:
         return _localizations.prayerName('maghrib');
+
       case Prayer.isha:
         return _localizations.prayerName('isha');
+
       default:
         return _t('unavailable');
     }
@@ -168,7 +181,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     try {
       await context.read<PrayerController>().retryInitialization();
     } catch (error, stackTrace) {
-      debugPrint('Mumin Pro: prayer initialization retry failed: $error');
+      debugPrint(
+        'Mumin Pro: prayer initialization retry failed: $error',
+      );
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       if (mounted) {
@@ -273,7 +288,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
           return _HomeSnapshot(
             prayerTimes: controller.prayerTimes,
             nextPrayer: controller.nextPrayer,
-            nextPrayerTime: controller.nextPrayerTime,
             city: controller.city,
             isLoadingLocation: controller.isLoadingLocation,
             message: controller.message,
@@ -306,9 +320,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               ? 28.0
                               : 19.0;
 
-                      final contentWidth = width >= 900
-                          ? 820.0
-                          : double.infinity;
+                      final contentWidth =
+                          width >= 900 ? 820.0 : double.infinity;
 
                       return Center(
                         child: ConstrainedBox(
@@ -335,8 +348,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                                 ),
                                 onLanguageToggle:
                                     widget.onLanguageToggle,
-                                onThemeToggle:
-                                    widget.onThemeToggle,
+                                onThemeToggle: widget.onThemeToggle,
                               ),
                               const SizedBox(height: 23),
                               PrayerHeroCard(
@@ -401,11 +413,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 }
 
+/// Immutable projection of the controller state used by the home page.
+///
+/// Countdown clock ticks are deliberately excluded. They are consumed
+/// directly by the hero card and must not rebuild the complete dashboard.
 class _HomeSnapshot {
   const _HomeSnapshot({
     required this.prayerTimes,
     required this.nextPrayer,
-    required this.nextPrayerTime,
     required this.city,
     required this.isLoadingLocation,
     required this.message,
@@ -413,7 +428,6 @@ class _HomeSnapshot {
 
   final PrayerTimes? prayerTimes;
   final Prayer? nextPrayer;
-  final DateTime? nextPrayerTime;
   final String city;
   final bool isLoadingLocation;
   final String? message;
@@ -423,7 +437,6 @@ class _HomeSnapshot {
     return other is _HomeSnapshot &&
         identical(prayerTimes, other.prayerTimes) &&
         nextPrayer == other.nextPrayer &&
-        nextPrayerTime == other.nextPrayerTime &&
         city == other.city &&
         isLoadingLocation == other.isLoadingLocation &&
         message == other.message;
@@ -434,7 +447,6 @@ class _HomeSnapshot {
     return Object.hash(
       identityHashCode(prayerTimes),
       nextPrayer,
-      nextPrayerTime,
       city,
       isLoadingLocation,
       message,
@@ -543,7 +555,7 @@ class _TopBar extends StatelessWidget {
       children: [
         Semantics(
           image: true,
-          label: localizations.text('app_name'),
+          label: localizations.appName,
           child: Container(
             width: 46,
             height: 46,
