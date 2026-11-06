@@ -1,202 +1,79 @@
 
+import 'mumin_language_registry.dart';
+
+export 'mumin_language_registry.dart'
+    show MuminLanguage, MuminTextDirection;
+
 /// Mumin Pro — Central Localization Engine.
 ///
-/// Architecture:
-/// - One language registry.
-/// - One translation catalog.
-/// - One fallback policy.
-/// - One direction resolver.
-/// - Parameter interpolation and plural selection.
-/// - Extensible language registration structure.
+/// Responsibilities:
+/// - Resolve translations for the active launch language.
+/// - Apply the single Arabic fallback policy.
+/// - Interpolate named parameters.
+/// - Select language-aware plural forms.
+/// - Report translation coverage and missing keys.
 ///
-/// Official launch languages:
-/// Arabic (ar), English (en), French (fr).
-///
-/// Adding a future language:
-/// 1. Add its MuminLanguage definition to languageRegistry.
-/// 2. Add its translation map to _translations.
-/// 3. Add its code to supportedLanguageCodes.
-///
-/// The Quranic Arabic text must never be replaced by a translated text.
-/// Translations of meanings are separate from the original Quran text.
-
-enum MuminTextDirection {
-  rtl,
-  ltr,
-}
-
-final class MuminLanguage {
-  const MuminLanguage({
-    required this.code,
-    required this.nativeName,
-    required this.englishName,
-    required this.direction,
-    required this.isLaunchLanguage,
-  });
-
-  final String code;
-  final String nativeName;
-  final String englishName;
-  final MuminTextDirection direction;
-  final bool isLaunchLanguage;
-
-  bool get isRightToLeft => direction == MuminTextDirection.rtl;
-
-  bool get isLeftToRight => direction == MuminTextDirection.ltr;
-}
-
+/// Language metadata and text direction are owned exclusively by
+/// MuminLanguageRegistry. The original Quranic Arabic text is never
+/// replaced by a translation of its meaning.
 final class MuminLocalizations {
   const MuminLocalizations._(this.languageCode);
 
   factory MuminLocalizations.fromCode(String? code) {
-    final normalized = _extractLanguageCode(code);
-
-    if (normalized == null ||
-        !languageRegistry.containsKey(normalized)) {
-      return const MuminLocalizations._(defaultLanguageCode);
-    }
-
-    return MuminLocalizations._(normalized);
+    return MuminLocalizations._(
+      MuminLanguageRegistry.normalizeLanguageCode(code),
+    );
   }
 
-  // ---------------------------------------------------------------------------
-  // LANGUAGE SYSTEM
-  // ---------------------------------------------------------------------------
+  static const String defaultLanguageCode =
+      MuminLanguageRegistry.defaultLanguageCode;
+  static const String fallbackLanguageCode =
+      MuminLanguageRegistry.fallbackLanguageCode;
+  static const String languagePreferenceKey =
+      MuminLanguageRegistry.languagePreferenceKey;
+  static const String legacyLanguagePreferenceKey =
+      MuminLanguageRegistry.legacyLanguagePreferenceKey;
 
-  static const String defaultLanguageCode = 'ar';
+  static Map<String, MuminLanguage> get languageRegistry =>
+      MuminLanguageRegistry.languages;
 
-  static const String fallbackLanguageCode = 'ar';
+  static List<String> get supportedLanguageCodes =>
+      MuminLanguageRegistry.supportedLanguageCodes;
 
-  static const String languagePreferenceKey = 'app_language_code';
-
-  static const String legacyLanguagePreferenceKey = 'app_language_ar';
-
-  /// The official language registry.
-  ///
-  /// Future languages are registered here without changing the engine.
-  static const Map<String, MuminLanguage> languageRegistry =
-      <String, MuminLanguage>{
-    'ar': MuminLanguage(
-      code: 'ar',
-      nativeName: 'العربية',
-      englishName: 'Arabic',
-      direction: MuminTextDirection.rtl,
-      isLaunchLanguage: true,
-    ),
-    'en': MuminLanguage(
-      code: 'en',
-      nativeName: 'English',
-      englishName: 'English',
-      direction: MuminTextDirection.ltr,
-      isLaunchLanguage: true,
-    ),
-    'fr': MuminLanguage(
-      code: 'fr',
-      nativeName: 'Français',
-      englishName: 'French',
-      direction: MuminTextDirection.ltr,
-      isLaunchLanguage: true,
-    ),
-  };
-
-  /// Official languages available in the launch release.
-  static const List<String> supportedLanguageCodes = <String>[
-    'ar',
-    'en',
-    'fr',
-  ];
-
-  /// The currently selected language.
   final String languageCode;
 
   MuminLanguage get language =>
-      languageRegistry[languageCode] ??
-      languageRegistry[defaultLanguageCode]!;
+      MuminLanguageRegistry.launchLanguageFor(languageCode) ??
+      MuminLanguageRegistry.languages[defaultLanguageCode]!;
 
   String get languageNativeName => language.nativeName;
-
   String get languageEnglishName => language.englishName;
-
   MuminTextDirection get direction => language.direction;
 
   bool get isArabic => languageCode == 'ar';
-
   bool get isEnglish => languageCode == 'en';
-
   bool get isFrench => languageCode == 'fr';
-
   bool get isRightToLeft => language.isRightToLeft;
-
   bool get isLeftToRight => language.isLeftToRight;
+  String get localeTag => language.localeTag;
 
-  /// Locale tag used by Flutter and platform localization.
-  String get localeTag => languageCode;
+  static Map<String, String> get languageNativeNames =>
+      MuminLanguageRegistry.languageNativeNames;
 
-  static const Map<String, String> languageNativeNames =
-      <String, String>{
-    'ar': 'العربية',
-    'en': 'English',
-    'fr': 'Français',
-  };
+  static Map<String, String> get languageEnglishNames =>
+      MuminLanguageRegistry.languageEnglishNames;
 
-  static const Map<String, String> languageEnglishNames =
-      <String, String>{
-    'ar': 'Arabic',
-    'en': 'English',
-    'fr': 'French',
-  };
+  static bool isSupported(String? code) =>
+      MuminLanguageRegistry.isSupported(code);
 
-  static String? _extractLanguageCode(String? input) {
-    if (input == null || input.trim().isEmpty) {
-      return null;
-    }
+  static String normalizeLanguageCode(String? code) =>
+      MuminLanguageRegistry.normalizeLanguageCode(code);
 
-    final normalized = input
-        .trim()
-        .replaceAll('_', '-')
-        .toLowerCase();
-
-    final parts = normalized.split('-');
-
-    if (parts.isEmpty || parts.first.isEmpty) {
-      return null;
-    }
-
-    return parts.first;
-  }
-
-  static bool isSupported(String? code) {
-    final normalized = _extractLanguageCode(code);
-
-    return normalized != null &&
-        languageRegistry.containsKey(normalized);
-  }
-
-  static String normalizeLanguageCode(String? code) {
-    final normalized = _extractLanguageCode(code);
-
-    if (normalized != null &&
-        languageRegistry.containsKey(normalized)) {
-      return normalized;
-    }
-
-    return defaultLanguageCode;
-  }
-
-  static MuminLanguage? languageFor(String? code) {
-    final normalized = _extractLanguageCode(code);
-
-    if (normalized == null) {
-      return null;
-    }
-
-    return languageRegistry[normalized];
-  }
+  static MuminLanguage? languageFor(String? code) =>
+      MuminLanguageRegistry.launchLanguageFor(code);
 
   static List<MuminLanguage> get availableLanguages =>
-      supportedLanguageCodes
-          .map((code) => languageRegistry[code]!)
-          .toList(growable: false);
+      MuminLanguageRegistry.availableLanguages;
 
   // ---------------------------------------------------------------------------
   // CENTRAL TRANSLATION ENGINE
@@ -293,6 +170,7 @@ final class MuminLocalizations {
           'إذن الموقع مغلق من إعدادات الجهاز. فعّله متى رغبت في استخدام المواقيت المحلية',
       'location_services_disabled':
           'خدمة تحديد الموقع متوقفة. فعّلها لنحدد مواقيت مدينتك',
+
       'location_temporarily_unavailable':
           'إشارة الموقع غير مستقرة الآن. حاول مرة أخرى بعد لحظات',
       'location_updated': 'تم تحديث موقعك بنجاح',
@@ -364,6 +242,7 @@ final class MuminLocalizations {
 
       // Quran interface.
       'quran_reading': 'قراءة القرآن',
+
       'continue_reading': 'متابعة القراءة',
       'start_reading': 'ابدأ القراءة',
       'resume_reading': 'متابعة من حيث وصلت',
@@ -458,6 +337,7 @@ final class MuminLocalizations {
       'select_language': 'Choose your app language',
       'language': 'Language',
       'language_changed': 'App language changed',
+
       'language_change_failed': 'The selected language could not be saved',
       'language_ar': 'Arabic',
       'language_en': 'English',
@@ -537,6 +417,7 @@ final class MuminLocalizations {
       'location_updated': 'Your location has been updated',
       'location_update_failed':
           'Your location could not be updated. Your previous location has been preserved',
+
       'location_saved': 'Your location has been saved on this device',
       'location_save_failed':
           'Your location was updated, but could not be saved on this device',
@@ -598,6 +479,7 @@ final class MuminLocalizations {
           'More than one profile uses the same identifier',
       'prayer_rules_duplicate_country_profile':
           'Duplicate calculation profiles were found for the same country',
+
       'prayer_rules_unknown_calculation_method':
           'The selected calculation method is unknown or unsupported',
       'prayer_rules_unknown_madhab':
@@ -689,6 +571,7 @@ final class MuminLocalizations {
     },
 
     // -------------------------------------------------------------------------
+
     // FRENCH
     // -------------------------------------------------------------------------
 
@@ -733,7 +616,8 @@ final class MuminLocalizations {
       'next_prayer_eyebrow': 'Prochaine prière',
       'time_remaining': 'Temps restant avant la prière',
       'countdown_auto_update':
-            'countdown_hour_one': 'heure',
+          'Le compte à rebours se met à jour automatiquement',
+      'countdown_hour_one': 'heure',
       'countdown_hour_other': 'heures',
       'countdown_minute_one': 'minute',
       'countdown_minute_other': 'minutes',
@@ -746,7 +630,6 @@ final class MuminLocalizations {
           'Aucun horaire de prière à venir disponible',
       'countdown_semantic_label':
           'Temps restant : {hours}, {minutes} et {seconds}',
-          'Le compte à rebours se met à jour automatiquement',
       'settings': 'Paramètres',
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
@@ -774,6 +657,7 @@ final class MuminLocalizations {
 
       'location_unavailable':
           'Nous ne parvenons pas à déterminer votre position pour le moment',
+
       'location_permission_denied':
           'L’accès à la position n’a pas été autorisé. Vous pouvez activer cette autorisation pour continuer',
       'location_permission_permanently_denied':
@@ -830,6 +714,7 @@ final class MuminLocalizations {
       'prayer_rules_invalid_json':
           'Impossible de lire le fichier des paramètres de prière. Son format est peut-être incorrect',
       'prayer_rules_invalid_configuration_root':
+
           'La structure du fichier des paramètres de prière est incomplète',
       'prayer_rules_unsupported_schema':
           'Ce format de paramètres de prière n’est pas pris en charge',
@@ -896,6 +781,7 @@ final class MuminLocalizations {
       'arabic_text': 'Texte arabe',
       'recitation': 'Récitation',
       'playback': 'Lecture audio',
+
       'play': 'Lire',
       'pause': 'Mettre en pause',
       'stop': 'Arrêter',
@@ -1006,6 +892,7 @@ final class MuminLocalizations {
 
     return selectedCatalog[normalizedKey] ??
         fallbackCatalog[normalizedKey] ??
+
         fallbackCatalog['translation_unavailable']!;
   }
 
@@ -1043,11 +930,14 @@ final class MuminLocalizations {
     final category = _pluralCategory(count);
     final pluralKey = '${key}_$category';
 
-    final selected = hasTranslation(pluralKey)
-        ? pluralKey
-        : hasTranslation('${key}_other')
-            ? '${key}_other'
-            : key;
+    final selected =
+        _currentCatalog.containsKey(pluralKey) ||
+                _fallbackCatalog.containsKey(pluralKey)
+            ? pluralKey
+            : _currentCatalog.containsKey('${key}_other') ||
+                    _fallbackCatalog.containsKey('${key}_other')
+                ? '${key}_other'
+                : key;
 
     final values = <String, Object?>{
       ...arguments,
@@ -1133,6 +1023,7 @@ final class MuminLocalizations {
 
     return referenceKeys
         .where((key) => !selectedKeys.contains(key))
+
         .toList(growable: false);
   }
 
