@@ -2,17 +2,13 @@
 import 'catalogs/mumin_prayer_settings_catalog.dart';
 import 'catalogs/mumin_qibla_catalog.dart';
 import 'catalogs/mumin_quran_catalog.dart';
+import 'catalogs/mumin_quran_reader_catalog.dart';
 import 'mumin_language_registry.dart';
 
 /// Mumin Pro — Unified Domain Catalog Registry.
 ///
-/// Provides one resolution layer for feature-specific translation catalogs.
-/// Each feature owns its own translation data, while this registry owns:
-/// - Language normalization.
-/// - Catalog selection.
-/// - Arabic fallback.
-/// - Parameter interpolation.
-/// - Translation coverage diagnostics.
+/// Owns domain catalog selection, language normalization,
+/// Arabic fallback, interpolation and translation diagnostics.
 ///
 /// Quranic Arabic content is never stored or modified here.
 abstract final class MuminDomainCatalogRegistry {
@@ -32,7 +28,8 @@ abstract final class MuminDomainCatalogRegistry {
     if (normalized.isEmpty) return false;
 
     if (normalized.startsWith(_quranPrefix)) {
-      return MuminQuranCatalog.requiredKeys.contains(normalized);
+      return MuminQuranCatalog.requiredKeys.contains(normalized) ||
+          MuminQuranReaderCatalog.requiredKeys.contains(normalized);
     }
 
     if (normalized.startsWith(_qiblaPrefix)) {
@@ -47,20 +44,18 @@ abstract final class MuminDomainCatalogRegistry {
     return false;
   }
 
-  /// Resolves a domain key for the selected launch language.
+  /// Resolves a registered domain key for the selected language.
   ///
-  /// Returns null when the key does not belong to a domain catalog.
-  /// Missing translations in a registered catalog use Arabic fallback.
+  /// Missing selected-language entries fall back to Arabic.
+  /// Returns null when the key is unknown or has no usable value.
   static String? resolve(
     String? languageCode,
     String key, {
-    Map<String, Object?> parameters =
-        const <String, Object?>{},
+    Map<String, Object?> parameters = const <String, Object?>{},
   }) {
     final normalizedKey = key.trim();
 
-    if (normalizedKey.isEmpty ||
-        !containsKey(normalizedKey)) {
+    if (normalizedKey.isEmpty || !containsKey(normalizedKey)) {
       return null;
     }
 
@@ -68,11 +63,7 @@ abstract final class MuminDomainCatalogRegistry {
     final fallbackLanguage =
         MuminLanguageRegistry.fallbackLanguageCode;
 
-    final selectedCatalog = _catalogFor(
-      language,
-      normalizedKey,
-    );
-
+    final selectedCatalog = _catalogFor(language, normalizedKey);
     final fallbackCatalog = _catalogFor(
       fallbackLanguage,
       normalizedKey,
@@ -95,12 +86,19 @@ abstract final class MuminDomainCatalogRegistry {
     return value;
   }
 
+  /// Combines the two Quran interface catalogs into one domain.
+  ///
+  /// The reader catalog adds interface keys without replacing
+  /// existing Quran catalog entries.
   static Map<String, String>? _catalogFor(
     String languageCode,
     String key,
   ) {
     if (key.startsWith(_quranPrefix)) {
-      return MuminQuranCatalog.forLanguage(languageCode);
+      return <String, String>{
+        ...MuminQuranCatalog.forLanguage(languageCode),
+        ...MuminQuranReaderCatalog.forLanguage(languageCode),
+      };
     }
 
     if (key.startsWith(_qiblaPrefix)) {
@@ -109,9 +107,7 @@ abstract final class MuminDomainCatalogRegistry {
 
     if (key.startsWith(_prayerSettingsPrefix) ||
         key.startsWith(_calculationPrefix)) {
-      return MuminPrayerSettingsCatalog.forLanguage(
-        languageCode,
-      );
+      return MuminPrayerSettingsCatalog.forLanguage(languageCode);
     }
 
     return null;
@@ -121,12 +117,13 @@ abstract final class MuminDomainCatalogRegistry {
   static Set<String> get allKeys {
     return Set<String>.unmodifiable({
       ...MuminQuranCatalog.requiredKeys,
+      ...MuminQuranReaderCatalog.requiredKeys,
       ...MuminQiblaCatalog.requiredKeys,
       ...MuminPrayerSettingsCatalog.keys,
     });
   }
 
-  /// Returns whether a key is explicitly translated in a language.
+  /// Checks whether a key has an explicit translation.
   static bool hasTranslation(
     String? languageCode,
     String key,
@@ -141,7 +138,7 @@ abstract final class MuminDomainCatalogRegistry {
     return catalog?[normalizedKey]?.trim().isNotEmpty == true;
   }
 
-  /// Checks whether every registered domain key is translated.
+  /// Checks whether every registered key is translated.
   static bool isCompleteFor(String? languageCode) {
     final language = normalizeLanguageCode(languageCode);
 
@@ -150,10 +147,8 @@ abstract final class MuminDomainCatalogRegistry {
     );
   }
 
-  /// Returns missing domain keys for one launch language.
-  static List<String> missingKeysFor(
-    String? languageCode,
-  ) {
+  /// Returns missing keys for one launch language.
+  static List<String> missingKeysFor(String? languageCode) {
     final language = normalizeLanguageCode(languageCode);
 
     return List<String>.unmodifiable(
@@ -163,7 +158,7 @@ abstract final class MuminDomainCatalogRegistry {
     );
   }
 
-  /// Domain catalog coverage for each launch language.
+  /// Translation coverage for every registered launch language.
   static Map<String, double> get coverage {
     final keys = allKeys;
 
@@ -176,8 +171,8 @@ abstract final class MuminDomainCatalogRegistry {
     }
 
     return Map<String, double>.unmodifiable({
-      for (final language in MuminLanguageRegistry
-          .supportedLanguageCodes)
+      for (final language
+          in MuminLanguageRegistry.supportedLanguageCodes)
         language: keys
                 .where(
                   (key) => hasTranslation(language, key),
@@ -190,8 +185,8 @@ abstract final class MuminDomainCatalogRegistry {
   /// Per-language integrity report for launch diagnostics.
   static Map<String, bool> get launchIntegrity {
     return Map<String, bool>.unmodifiable({
-      for (final language in MuminLanguageRegistry
-          .supportedLanguageCodes)
+      for (final language
+          in MuminLanguageRegistry.supportedLanguageCodes)
         language: isCompleteFor(language),
     });
   }
