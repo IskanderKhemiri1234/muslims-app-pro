@@ -413,7 +413,7 @@ final class MuminLocalizations {
       'location_services_disabled': 'خدمة تحديد الموقع متوقفة. فعّلها لنحدد مواقيت مدينتك',
       'location_temporarily_unavailable': 'إشارة الموقع غير مستقرة الآن. حاول مرة أخرى بعد لحظات',
       'location_updated': 'تم تحديث موقعك بنجاح',
-      'location_update_failed': 'لم يكتمل تحديث الموقع. موقعك السابق ما زال محفوظاً',
+      'location_update_failed': 'Your location could not be updated. Your previous location is still preserved',
       'location_saved': 'تم حفظ موقعك لهذا الجهاز',
       'location_save_failed': 'تم تحديث الموقع، لكن تعذر حفظه على الجهاز',
 
