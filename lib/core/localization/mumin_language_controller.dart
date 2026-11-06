@@ -8,12 +8,12 @@ import 'mumin_localizations.dart';
 ///
 /// Responsibilities:
 /// - Own the selected language.
-/// - Enforce the official language registry.
-/// - Expose only approved launch languages to Flutter.
-/// - Resolve locale and text direction from central metadata.
-/// - Provide the central translation engine.
+/// - Enforce approved launch languages.
+/// - Expose supported locales to Flutter.
+/// - Resolve locale and text direction centrally.
+/// - Provide access to the central translation engine.
 /// - Persist language changes locally.
-/// - Serialize writes to avoid out-of-order preferences.
+/// - Serialize writes to prevent out-of-order preferences.
 ///
 /// Theme settings deliberately do not belong here.
 final class MuminLanguageController extends ChangeNotifier {
@@ -73,23 +73,29 @@ final class MuminLanguageController extends ChangeNotifier {
 
   bool get canPersist => _preferences != null;
 
-  /// Languages exposed to Flutter in the current release.
+  /// Locales approved for the current release.
   ///
-  /// The registry is the source of truth. A language can be registered
-  /// for future development without becoming available to users until
-  /// it is explicitly marked as a launch language.
+  /// The language registry is the single source of language metadata.
   List<Locale> get supportedLocales {
-    return MuminLocalizations.languageRegistry.values
-        .where((language) => language.isLaunchLanguage)
+    return availableLanguages
         .map((language) => Locale(language.code))
         .toList(growable: false);
   }
 
-  /// Registered languages approved for the current release.
+  /// Languages approved for the current release.
+  ///
+  /// Registered future languages remain unavailable until explicitly
+  /// approved for launch.
   List<MuminLanguage> get availableLanguages {
     return MuminLocalizations.languageRegistry.values
         .where((language) => language.isLaunchLanguage)
         .toList(growable: false);
+  }
+
+  bool _isApprovedLaunchLanguage(String? code) {
+    final language = MuminLocalizations.languageFor(code);
+
+    return language != null && language.isLaunchLanguage;
   }
 
   // ---------------------------------------------------------------------------
@@ -98,22 +104,23 @@ final class MuminLanguageController extends ChangeNotifier {
 
   /// Changes the selected language immediately.
   ///
-  /// Returns false when the requested language is not registered.
+  /// Returns false when the requested language is not approved for launch.
   /// The UI updates before the asynchronous preference write completes.
   bool setLanguage(String languageCode) {
-    if (_isDisposed) {
-      return false;
-    }
-
-    if (!MuminLocalizations.isSupported(languageCode)) {
+    if (_isDisposed ||
+        !_isApprovedLaunchLanguage(languageCode)) {
       debugPrint(
-        'Mumin Pro: unsupported language: $languageCode',
+        'Mumin Pro: unsupported launch language: $languageCode',
       );
       return false;
     }
 
     final normalized =
         MuminLocalizations.normalizeLanguageCode(languageCode);
+
+    if (!_isApprovedLaunchLanguage(normalized)) {
+      return false;
+    }
 
     if (_languageCode == normalized) {
       return true;
@@ -135,8 +142,7 @@ final class MuminLanguageController extends ChangeNotifier {
         normalized,
       );
 
-      // Keep the old Arabic/English preference synchronized
-      // while older screens are being migrated.
+      // Keep the legacy preference synchronized during migration.
       final legacySaved = await preferences.setBool(
         legacyPreferenceKey,
         normalized == 'ar',
@@ -155,7 +161,7 @@ final class MuminLanguageController extends ChangeNotifier {
   /// Restores the language from persistent storage.
   ///
   /// The modern language-code preference has priority.
-  /// The old boolean preference is used only for migration.
+  /// The legacy boolean preference is used only for migration.
   Future<void> restoreLanguage() async {
     if (_isDisposed || _preferences == null) {
       return;
@@ -172,7 +178,7 @@ final class MuminLanguageController extends ChangeNotifier {
       debugPrintStack(stackTrace: stackTrace);
     }
 
-    if (MuminLocalizations.isSupported(savedCode)) {
+    if (_isApprovedLaunchLanguage(savedCode)) {
       final restored =
           MuminLocalizations.normalizeLanguageCode(savedCode);
 
@@ -218,26 +224,48 @@ final class MuminLanguageController extends ChangeNotifier {
   // TRANSLATION ACCESS
   // ---------------------------------------------------------------------------
 
+  /// Resolves a central translation and interpolates its parameters.
   String text(
     String key, {
     Map<String, Object?> parameters = const {},
   }) {
-    return localizations.textWith(
-      key,
+    return _interpolate(
+      localizations.text(key),
       parameters,
     );
   }
 
+  /// Resolves a central translation with an explicit fallback.
+  ///
+  /// The fallback is used only when neither the selected language nor
+  /// the central fallback catalog contains the requested key.
   String textOr(
     String key,
     String fallback, {
     Map<String, Object?> parameters = const {},
   }) {
-    return localizations.textOr(
+    final resolved = localizations.textOr(
       key,
-      fallback,
-      parameters: parameters,
+      fallback: fallback,
     );
+
+    return _interpolate(resolved, parameters);
+  }
+
+  String _interpolate(
+    String value,
+    Map<String, Object?> parameters,
+  ) {
+    var result = value;
+
+    for (final entry in parameters.entries) {
+      result = result.replaceAll(
+        '{${entry.key}}',
+        entry.value?.toString() ?? '',
+      );
+    }
+
+    return result;
   }
 
   String prayerName(String prayerKey) {
@@ -277,8 +305,10 @@ final class MuminLanguageController extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   static String _resolveInitialLanguage(String? code) {
-    if (MuminLocalizations.isSupported(code)) {
-      return MuminLocalizations.normalizeLanguageCode(code);
+    final language = MuminLocalizations.languageFor(code);
+
+    if (language != null && language.isLaunchLanguage) {
+      return language.code;
     }
 
     return MuminLocalizations.defaultLanguageCode;
