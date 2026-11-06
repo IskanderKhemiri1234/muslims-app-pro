@@ -182,7 +182,7 @@ abstract final class MuminGradients {
     ],
   );
 
-  static const LinearGradient spiritualGlow = RadialGradient(
+  static const RadialGradient spiritualGlow = RadialGradient(
     center: Alignment.topRight,
     radius: 1.2,
     colors: [
