@@ -1,4 +1,6 @@
 
+import 'dart:convert';
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -8,10 +10,10 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 
-/// Manages local notifications for the five daily prayers.
+/// Schedules local notifications for the five daily prayers.
 ///
-/// This service schedules prayer notifications only.
-/// It does not start Adhan recordings automatically in the background.
+/// This service only manages notifications. It does not start audio playback
+/// automatically and does not force the application to open over other apps.
 class MuminAdhanNotificationService {
   MuminAdhanNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
@@ -21,13 +23,17 @@ class MuminAdhanNotificationService {
             calculationService ?? const GlobalPrayerCalculationService();
 
   static const String _enabledPrefix = 'mumin_adhan_enabled_';
-  static const String _scheduledIdsKey =
+
+  static const String _scheduleStateKey =
+      'mumin_adhan_schedule_state_v2';
+
+  static const String _legacyScheduledIdsKey =
       'mumin_adhan_scheduled_notification_ids';
 
   static const String channelId = 'mumin_prayer_time_alerts';
   static const String channelName = 'Mumin Pro Prayer Alerts';
 
-  static const List<Prayer> supportedPrayers = [
+  static const List<Prayer> supportedPrayers = <Prayer>[
     Prayer.fajr,
     Prayer.dhuhr,
     Prayer.asr,
@@ -128,8 +134,9 @@ class MuminAdhanNotificationService {
 
   /// Rebuilds notifications for the next seven local calendar days.
   ///
-  /// The previous schedule is preserved if the new schedule fails.
-  /// Newly created notifications are rolled back on failure.
+  /// Two alternating ID banks are used. The currently active bank remains
+  /// untouched until every notification in the replacement bank is scheduled
+  /// and its state has been persisted successfully.
   Future<int> reschedule({
     required PrayerController controller,
     required String Function(Prayer prayer) prayerName,
@@ -180,6 +187,9 @@ class MuminAdhanNotificationService {
         : AndroidScheduleMode.inexactAllowWhileIdle;
 
     final localNow = tz.TZDateTime.now(location);
+    final previousState = await _readScheduleState();
+    final activeBank = previousState.bank;
+    final stagingBank = activeBank == 0 ? 1 : 0;
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -196,7 +206,7 @@ class MuminAdhanNotificationService {
       ),
     );
 
-    final newIds = <int>[];
+    final stagedIds = <int>[];
 
     try {
       for (var dayOffset = 0; dayOffset < 7; dayOffset++) {
@@ -224,7 +234,11 @@ class MuminAdhanNotificationService {
             continue;
           }
 
-          final id = _notificationId(date, prayer);
+          final id = _notificationId(
+            date: date,
+            prayer: prayer,
+            bank: stagingBank,
+          );
 
           await _plugin.zonedSchedule(
             id: id,
@@ -236,49 +250,44 @@ class MuminAdhanNotificationService {
             payload: 'mumin_adhan:${prayer.name}',
           );
 
-          newIds.add(id);
+          stagedIds.add(id);
         }
       }
 
       final preferences = await SharedPreferences.getInstance();
 
-      final previousIds =
-          preferences.getStringList(_scheduledIdsKey) ?? const <String>[];
-
-      final newIdSet = newIds.toSet();
-
-      // Remove only notifications that are no longer part of the new schedule.
-      for (final value in previousIds) {
-        final oldId = int.tryParse(value);
-
-        if (oldId == null || newIdSet.contains(oldId)) continue;
-
-        await _plugin.cancel(id: oldId);
-      }
-
-      final saved = await preferences.setStringList(
-        _scheduledIdsKey,
-        newIds.map((id) => id.toString()).toList(),
+      final stateSaved = await preferences.setString(
+        _scheduleStateKey,
+        jsonEncode(<String, Object>{
+          'bank': stagingBank,
+          'ids': stagedIds,
+        }),
       );
 
-      if (!saved) {
+      if (!stateSaved) {
         throw StateError(
-          'Could not persist scheduled notification identifiers.',
+          'Could not persist the new prayer notification schedule.',
         );
       }
 
-      return newIds.length;
+      // The new schedule is now active. Old notifications can be removed.
+      await _cancelIdsSafely(previousState.ids);
+
+      // Clean up schedules created by the older implementation.
+      final legacyIds = await _readLegacyIds();
+      await _cancelIdsSafely(legacyIds);
+
+      return stagedIds.length;
     } catch (error, stackTrace) {
-      // Roll back newly scheduled notifications so failed attempts
-      // cannot leave untracked alerts on the device.
-      for (final id in newIds) {
-        try {
-          await _plugin.cancel(id: id);
-        } catch (cancelError) {
-          debugPrint(
-            'Mumin Pro: failed to roll back notification $id: $cancelError',
-          );
-        }
+      // If the state was already committed, do not cancel the active bank.
+      final latestState = await _readScheduleState();
+
+      final committed =
+          latestState.bank == stagingBank &&
+          _sameIds(latestState.ids, stagedIds);
+
+      if (!committed) {
+        await _cancelIdsSafely(stagedIds);
       }
 
       debugPrint('Mumin Pro: prayer scheduling failed: $error');
@@ -294,32 +303,122 @@ class MuminAdhanNotificationService {
   }
 
   Future<void> _cancelPreviouslyScheduled() async {
+    final state = await _readScheduleState();
+    final legacyIds = await _readLegacyIds();
+
+    await _cancelIdsSafely(state.ids);
+    await _cancelIdsSafely(legacyIds);
+
     final preferences = await SharedPreferences.getInstance();
 
-    final previousIds =
-        preferences.getStringList(_scheduledIdsKey) ?? const <String>[];
+    await preferences.remove(_scheduleStateKey);
+    await preferences.remove(_legacyScheduledIdsKey);
+  }
 
-    for (final value in previousIds) {
-      final id = int.tryParse(value);
+  Future<_NotificationScheduleState> _readScheduleState() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_scheduleStateKey);
 
-      if (id == null) continue;
-
-      await _plugin.cancel(id: id);
+    if (raw == null || raw.trim().isEmpty) {
+      return const _NotificationScheduleState(
+        bank: 0,
+        ids: <int>[],
+      );
     }
 
-    await preferences.remove(_scheduledIdsKey);
+    try {
+      final decoded = jsonDecode(raw);
+
+      if (decoded is! Map) {
+        throw const FormatException('Invalid schedule state.');
+      }
+
+      final bankValue = decoded['bank'];
+      final idsValue = decoded['ids'];
+
+      final bank = bankValue is int ? bankValue : 0;
+
+      final ids = idsValue is List
+          ? idsValue.whereType<int>().toSet().toList(growable: false)
+          : const <int>[];
+
+      return _NotificationScheduleState(
+        bank: bank == 1 ? 1 : 0,
+        ids: ids,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: invalid saved schedule state: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      // Do not silently erase unknown state. Cancellation is handled
+      // separately by the explicit reset operation.
+      return const _NotificationScheduleState(
+        bank: 0,
+        ids: <int>[],
+      );
+    }
+  }
+
+  Future<List<int>> _readLegacyIds() async {
+    final preferences = await SharedPreferences.getInstance();
+
+    try {
+      final values =
+          preferences.getStringList(_legacyScheduledIdsKey) ??
+              const <String>[];
+
+      return values
+          .map(int.tryParse)
+          .whereType<int>()
+          .toSet()
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint(
+        'Mumin Pro: legacy notification IDs could not be read: $error',
+      );
+      return const <int>[];
+    }
+  }
+
+  Future<void> _cancelIdsSafely(Iterable<int> ids) async {
+    for (final id in ids.toSet()) {
+      try {
+        await _plugin.cancel(id: id);
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Mumin Pro: could not cancel notification $id: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+  }
+
+  bool _sameIds(List<int> first, List<int> second) {
+    if (first.length != second.length) return false;
+
+    final secondSet = second.toSet();
+
+    return first.every(secondSet.contains);
   }
 
   String _preferenceKey(Prayer prayer) =>
       '$_enabledPrefix${prayer.name}';
 
-  int _notificationId(DateTime date, Prayer prayer) {
+  /// Produces Android-safe 32-bit IDs.
+  ///
+  /// The date component is YYYYMMDD. Multiplying by two reserves
+  /// one independent ID bank bit without exceeding signed 32-bit range.
+  int _notificationId({
+    required DateTime date,
+    required Prayer prayer,
+    required int bank,
+  }) {
     final prayerIndex = supportedPrayers.indexOf(prayer) + 1;
 
-    return date.year * 100000 +
-        date.month * 1000 +
-        date.day * 10 +
-        prayerIndex;
+    final dateKey =
+        date.year * 10000 + date.month * 100 + date.day;
+
+    return (dateKey * 10 + prayerIndex) * 2 + bank;
   }
 
   void _validatePrayer(Prayer prayer) {
@@ -331,4 +430,14 @@ class MuminAdhanNotificationService {
       );
     }
   }
+}
+
+class _NotificationScheduleState {
+  const _NotificationScheduleState({
+    required this.bank,
+    required this.ids,
+  });
+
+  final int bank;
+  final List<int> ids;
 }
