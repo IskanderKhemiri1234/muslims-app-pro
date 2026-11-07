@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
@@ -13,8 +12,8 @@ import 'mumin_prayer_countdown_notification_service.dart';
 
 /// Coordinates prayer alerts and the persistent next-prayer countdown.
 ///
-/// The countdown is synchronized only when meaningful application state
-/// changes. Android maintains the visible countdown independently of Flutter.
+/// The countdown is synchronized only after the user explicitly enables it.
+/// Android maintains the visible countdown independently of Flutter.
 class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   MuminAdhanNotificationCoordinator({
     required PrayerController prayerController,
@@ -39,6 +38,10 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
   static const String exactPreferenceKey =
       'mumin_adhan_exact_preference';
+
+  /// Stored only after the user explicitly accepts countdown activation.
+  static const String countdownEnabledPreferenceKey =
+      'mumin_prayer_countdown_enabled_v1';
 
   final PrayerController _prayerController;
   final MuminAdhanNotificationService _notificationService;
@@ -157,10 +160,14 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     final preferExact =
         preferences.getBool(exactPreferenceKey) ?? false;
 
+    final countdownEnabled =
+        preferences.getBool(countdownEnabledPreferenceKey) ?? false;
+
     final signature = <Object?>[
       _buildFingerprint(),
       enabledPrayers.map((prayer) => prayer.name).toList()..sort(),
       preferExact,
+      countdownEnabled,
     ].join('|');
 
     if (!force &&
@@ -170,6 +177,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     final languageCode = _languageController.languageCode;
 
+    // Preserve the existing individual prayer notification schedule.
     await _notificationService.reschedule(
       controller: _prayerController,
       prayerName: (prayer) => _resolvePrayerName(
@@ -182,14 +190,14 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     if (_disposed) return;
 
-    // The Android notification is enabled only while notification
-    // permission is granted by the operating system.
     final notificationsEnabled =
         await _notificationService.areNotificationsEnabled();
 
     if (_disposed) return;
 
-    if (notificationsEnabled) {
+    // The persistent countdown requires BOTH explicit app consent
+    // and notification permission granted by Android.
+    if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
         controller: _prayerController,
         prayerName: (prayer) => _resolvePrayerName(
