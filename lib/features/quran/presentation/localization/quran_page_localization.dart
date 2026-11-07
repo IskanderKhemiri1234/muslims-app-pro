@@ -8,12 +8,12 @@ import '../../../../core/localization/mumin_language_registry.dart';
 
 /// Central localization access for every Quran presentation component.
 ///
-/// This adapter reads the active language from MuminLanguageController
-/// and resolves Quran interface strings through the unified domain
-/// catalog registry.
-///
-/// Quranic verses are never translated or modified by this class.
+/// Quranic verses and canonical Arabic Quran data are never translated
+/// or modified by this adapter.
 abstract final class QuranPageLocalization {
+  static final RegExp _pageReadPattern =
+      RegExp(r'^تم تسجيل قراءة الصفحة (\d+)$');
+
   /// Returns the active application language code.
   static String languageCodeOf(BuildContext context) {
     return Provider.of<MuminLanguageController>(
@@ -23,28 +23,19 @@ abstract final class QuranPageLocalization {
   }
 
   /// Resolves a Quran interface string in the active application language.
-  ///
-  /// Unknown keys are returned unchanged so missing translations remain
-  /// visible during development instead of silently showing unrelated text.
   static String text(
     BuildContext context,
     String key, {
     Map<String, Object?> parameters = const <String, Object?>{},
   }) {
-    final languageCode = languageCodeOf(context);
-
-    return MuminDomainCatalogRegistry.resolve(
-          languageCode,
-          key,
-          parameters: parameters,
-        ) ??
-        key;
+    return textForLanguage(
+      languageCodeOf(context),
+      key,
+      parameters: parameters,
+    );
   }
 
   /// Resolves a Quran interface string using an explicit language code.
-  ///
-  /// This method is useful for non-widget services and background logic
-  /// that already know the active language.
   static String textForLanguage(
     String languageCode,
     String key, {
@@ -58,6 +49,74 @@ abstract final class QuranPageLocalization {
         key;
   }
 
+  /// Localizes legacy Quran feedback messages without changing
+  /// the reading, bookmark, or progress operations that produce them.
+  ///
+  /// The source strings are used only as compatibility identifiers.
+  /// Displayed text always comes from the central Quran catalogs.
+  static String feedback(
+    BuildContext context,
+    String sourceMessage,
+  ) {
+    final languageCode = languageCodeOf(context);
+    final message = sourceMessage.trim();
+
+    final pageReadMatch = _pageReadPattern.firstMatch(message);
+
+    if (pageReadMatch != null) {
+      return textForLanguage(
+        languageCode,
+        'quran_page_marked_read',
+        parameters: <String, Object?>{
+          'page': pageReadMatch.group(1)!,
+        },
+      );
+    }
+
+    const messageKeys = <String, String>{
+      'تعذر تحميل بيانات القراءة المحفوظة':
+          'quran_saved_reading_data_error',
+      'تعذر تحديث الورد اليومي':
+          'quran_daily_reading_update_error',
+      'تعذر حفظ موضع القراءة':
+          'quran_reading_position_save_error',
+      'تعذر حفظ تقدم القراءة. حاول مرة أخرى.':
+          'quran_page_mark_read_error',
+      'تم إلغاء تسجيل قراءة الصفحة':
+          'quran_page_read_mark_removed',
+      'تعذر تحديث سجل القراءة':
+          'quran_reading_record_update_error',
+      'بيانات الآية غير صالحة':
+          'quran_invalid_ayah_data',
+      'هذه الآية محفوظة بالفعل':
+          'quran_ayah_already_saved',
+      'تعذر حفظ الآية':
+          'quran_ayah_save_error',
+      'تم حذف علامة الآية':
+          'quran_ayah_bookmark_removed',
+      'تعذر حذف علامة الآية':
+          'quran_ayah_bookmark_remove_error',
+      'تم حفظ الصفحة في العلامات المرجعية':
+          'quran_page_bookmark_saved',
+      'تم حذف العلامة المرجعية':
+          'quran_page_bookmark_removed',
+      'تعذر حفظ العلامة المرجعية':
+          'quran_page_bookmark_save_error',
+      'تعذر حذف العلامة المرجعية':
+          'quran_page_bookmark_remove_error',
+    };
+
+    final key = messageKeys[message];
+
+    if (key == null) {
+      // Do not silently replace an unknown message with an unrelated
+      // translation. Keep it visible so it can be catalogued correctly.
+      return message;
+    }
+
+    return textForLanguage(languageCode, key);
+  }
+
   /// Returns the canonical display name of a surah.
   ///
   /// Arabic uses the canonical Arabic name.
@@ -66,28 +125,24 @@ abstract final class QuranPageLocalization {
     BuildContext context,
     int surahNumber,
   ) {
-    final languageCode = languageCodeOf(context);
-
     return MuminDomainCatalogRegistry.surahName(
       surahNumber,
-      languageCode: languageCode,
+      languageCode: languageCodeOf(context),
     );
   }
 
   /// Returns all 114 surah names in the active application language.
   static List<String> surahNames(BuildContext context) {
-    final languageCode = languageCodeOf(context);
-
     return MuminDomainCatalogRegistry.surahNames(
-      languageCode: languageCode,
+      languageCode: languageCodeOf(context),
     );
   }
 
   /// Returns the correct text direction for the active language.
   static TextDirection textDirectionOf(BuildContext context) {
-    final languageCode = languageCodeOf(context);
-
-    return MuminLanguageRegistry.isRightToLeft(languageCode)
+    return MuminLanguageRegistry.isRightToLeft(
+      languageCodeOf(context),
+    )
         ? TextDirection.rtl
         : TextDirection.ltr;
   }
@@ -97,10 +152,7 @@ abstract final class QuranPageLocalization {
     return languageCodeOf(context) == 'ar';
   }
 
-  /// Formats a Quran interface value with the active language catalog.
-  ///
-  /// The caller supplies named parameters such as:
-  /// {'page': 12, 'total': 604}
+  /// Formats a Quran interface page position.
   static String pagePosition(
     BuildContext context, {
     required int page,
@@ -124,8 +176,10 @@ abstract final class QuranPageLocalization {
   /// Reports whether the Quran interface catalogs are complete
   /// for all three launch languages.
   static bool get hasCompleteLaunchCatalog {
-    return MuminDomainCatalogRegistry.launchIntegrity['ar'] == true &&
-        MuminDomainCatalogRegistry.launchIntegrity['en'] == true &&
-        MuminDomainCatalogRegistry.launchIntegrity['fr'] == true;
+    final integrity = MuminDomainCatalogRegistry.launchIntegrity;
+
+    return integrity['ar'] == true &&
+        integrity['en'] == true &&
+        integrity['fr'] == true;
   }
 }
