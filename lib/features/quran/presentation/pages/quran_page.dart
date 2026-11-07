@@ -1985,11 +1985,17 @@ appBar: AppBar(
   }
 }
 
+
+enum _QuranReaderTheme {
+  day,
+  night,
+  warmPaper,
+}
+
 class _QuranFullScreenReader extends StatefulWidget {
   final int initialPage;
   final Set<int> completedPages;
   final Set<int> bookmarkedPages;
-  final bool isDark;
 
   final ValueChanged<int> onPageChanged;
   final Future<void> Function() onTogglePageBookmark;
@@ -2000,13 +2006,12 @@ class _QuranFullScreenReader extends StatefulWidget {
   final Future<void> Function() onOpenIndex;
   final Future<void> Function() onOpenPageBookmarks;
   final Future<void> Function() onOpenVerseBookmarks;
-  final Future<int?> Function() onGoToPage; 
+  final Future<int?> Function() onGoToPage;
 
   const _QuranFullScreenReader({
     required this.initialPage,
     required this.completedPages,
     required this.bookmarkedPages,
-    required this.isDark,
     required this.onPageChanged,
     required this.onTogglePageBookmark,
     required this.onMarkPageRead,
@@ -2021,6 +2026,619 @@ class _QuranFullScreenReader extends StatefulWidget {
   @override
   State<_QuranFullScreenReader> createState() =>
       _QuranFullScreenReaderState();
+}
+
+class _QuranFullScreenReaderState
+    extends State<_QuranFullScreenReader> {
+  static const int _totalPages = 604;
+
+  static const String _themeStorageKey =
+      'mumin_pro_quran_reader_theme_v1';
+
+  static const Color _gold = Color(0xFFD8B66A);
+  static const Color _emerald = Color(0xFF075B46);
+
+  late int _currentPage;
+
+  _QuranReaderTheme _readerTheme = _QuranReaderTheme.day;
+
+  Offset? _pointerDownPosition;
+  double? _sliderPreviewPage;
+
+  bool _showControls = true;
+  bool _isThemeLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _currentPage = widget.initialPage.clamp(1, _totalPages);
+
+    _loadReaderTheme();
+  }
+
+  Future<void> _loadReaderTheme() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      final savedTheme = preferences.getString(_themeStorageKey);
+
+      final theme = _QuranReaderTheme.values.firstWhere(
+        (item) => item.name == savedTheme,
+        orElse: () => _QuranReaderTheme.day,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _readerTheme = theme;
+        _isThemeLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _readerTheme = _QuranReaderTheme.day;
+        _isThemeLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _selectReaderTheme(
+    _QuranReaderTheme theme,
+  ) async {
+    if (_readerTheme == theme) return;
+
+    setState(() {
+      _readerTheme = theme;
+    });
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      await preferences.setString(
+        _themeStorageKey,
+        theme.name,
+      );
+    } catch (_) {
+      // The selected theme remains active for this reading session.
+    }
+  }
+
+  bool get _isCompleted =>
+      widget.completedPages.contains(_currentPage);
+
+  bool get _isBookmarked =>
+      widget.bookmarkedPages.contains(_currentPage);
+
+  Color get _background {
+    switch (_readerTheme) {
+      case _QuranReaderTheme.day:
+        return const Color(0xFFF0EBDD);
+      case _QuranReaderTheme.night:
+        return const Color(0xFF071C17);
+      case _QuranReaderTheme.warmPaper:
+        return const Color(0xFFE5D2AE);
+    }
+  }
+
+  Color get _pageBackground {
+    switch (_readerTheme) {
+      case _QuranReaderTheme.day:
+        return const Color(0xFFFFFCF3);
+      case _QuranReaderTheme.night:
+        return const Color(0xFF10271F);
+      case _QuranReaderTheme.warmPaper:
+        return const Color(0xFFF1E3C7);
+    }
+  }
+
+  Color get _textColor {
+    switch (_readerTheme) {
+      case _QuranReaderTheme.day:
+        return const Color(0xFF174333);
+      case _QuranReaderTheme.night:
+        return const Color(0xFFE8DFC9);
+      case _QuranReaderTheme.warmPaper:
+        return const Color(0xFF553A26);
+    }
+  }
+
+  Color get _secondaryTextColor =>
+      _textColor.withValues(alpha: 0.72);
+
+  void _setPage(int page) {
+    if (!mounted || page < 1 || page > _totalPages) return;
+    if (page == _currentPage) return;
+
+    setState(() {
+      _currentPage = page;
+      _sliderPreviewPage = null;
+    });
+
+    widget.onPageChanged(page);
+  }
+
+  Future<void> _previousPage() async {
+    if (_currentPage > 1) {
+      _setPage(_currentPage - 1);
+    }
+  }
+
+  Future<void> _nextPage() async {
+    if (_currentPage < _totalPages) {
+      _setPage(_currentPage + 1);
+    }
+  }
+
+  Future<void> _openGoToPage() async {
+    final target = await widget.onGoToPage();
+
+    if (!mounted || target == null) return;
+
+    _setPage(target);
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerDownPosition = event.position;
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    final start = _pointerDownPosition;
+    _pointerDownPosition = null;
+
+    if (start == null) return;
+
+    final delta = event.position - start;
+
+    if (delta.dx.abs() < 72) return;
+    if (delta.dx.abs() < delta.dy.abs() * 1.25) return;
+
+    if (delta.dx < 0) {
+      _nextPage();
+    } else {
+      _previousPage();
+    }
+  }
+
+  Widget _buildMushafPage() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+
+        final fontSize = (width / 19).clamp(17.0, 25.0);
+
+        return SizedBox(
+          width: width,
+          height: height,
+          child: ColoredBox(
+            color: _pageBackground,
+            child: QuranMadinaFlutter(
+              key: const ValueKey<String>(
+                'mumin_pro_single_mushaf_webview',
+              ),
+              page: _currentPage,
+              height: height,
+              bundled: true,
+              headless: true,
+              fontSize: fontSize,
+              textColor: '#${_textColor.value.toRadixString(16).substring(2).toUpperCase()}',
+              backgroundColor: '#${_pageBackground.value.toRadixString(16).substring(2).toUpperCase()}',
+              ayaActions: [
+                QuranAyaAction(
+                  id: 'save_ayah',
+                  title: QuranPageLocalization.text(
+                    context,
+                    'quran_save_ayah_action',
+                  ),
+                ),
+              ],
+              onAyaAction: widget.onVerseAction,
+            ),
+          ),
+        );
+      },
+    );
+    
+  Widget _buildThemeSelector() {
+    final options = <_QuranReaderTheme, String>{
+      _QuranReaderTheme.day: 'quran_theme_day',
+      _QuranReaderTheme.night: 'quran_theme_night',
+      _QuranReaderTheme.warmPaper: 'quran_theme_warm_paper',
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 5, 12, 9),
+      child: Row(
+        children: options.entries.map((entry) {
+          final selected = _readerTheme == entry.key;
+
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Material(
+                color: selected
+                    ? _gold.withValues(alpha: 0.20)
+                    : _pageBackground.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _selectReaderTheme(entry.key),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selected
+                            ? _gold
+                            : _textColor.withValues(alpha: 0.12),
+                        width: selected ? 1.4 : 0.8,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          entry.key == _QuranReaderTheme.day
+                              ? Icons.light_mode_rounded
+                              : entry.key == _QuranReaderTheme.night
+                                  ? Icons.dark_mode_rounded
+                                  : Icons.menu_book_rounded,
+                          color: selected ? _gold : _textColor,
+                          size: 18,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          QuranPageLocalization.text(
+                            context,
+                            entry.value,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _textColor,
+                            fontSize: 10,
+                            fontWeight: selected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Container(
+      color: _background,
+      padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: QuranPageLocalization.text(
+              context,
+              'quran_back',
+            ),
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: _textColor,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  QuranPageLocalization.text(
+                    context,
+                    'quran_reader_title',
+                  ),
+                  style: TextStyle(
+                    color: _textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  QuranPageLocalization.pagePosition(
+                    context,
+                    page: _currentPage,
+                    total: _totalPages,
+                  ),
+                  style: TextStyle(
+                    color: _secondaryTextColor,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: QuranPageLocalization.text(
+              context,
+              _showControls
+                  ? 'quran_hide_controls'
+                  : 'quran_show_controls',
+            ),
+            onPressed: () {
+              setState(() {
+                _showControls = !_showControls;
+              });
+            },
+            icon: Icon(
+              _showControls
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: _gold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomControls() {
+    return Container(
+      color: _background,
+      padding: const EdgeInsets.fromLTRB(9, 5, 9, 5),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_showControls) ...[
+              _buildThemeSelector(),
+              Row(
+                children: [
+                  Icon(
+                    _isCompleted
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: _isCompleted ? _emerald : _gold,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      QuranPageLocalization.text(
+                        context,
+                        _isCompleted
+                            ? 'quran_page_read_completed'
+                            : 'quran_page_read_question',
+                      ),
+                      style: TextStyle(
+                        color: _textColor,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _isCompleted
+                        ? widget.onUndoPageRead
+                        : widget.onMarkPageRead,
+                    child: Text(
+                      QuranPageLocalization.text(
+                        context,
+                        _isCompleted
+                            ? 'quran_undo'
+                            : 'quran_mark_read',
+                      ),
+                      style: const TextStyle(
+                        color: _gold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: QuranPageLocalization.text(
+                      context,
+                      'quran_previous_short',
+                    ),
+                    onPressed:
+                        _currentPage > 1 ? _previousPage : null,
+                    icon: Icon(
+                      Icons.chevron_right_rounded,
+                      color: _gold,
+                      size: 29,
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: _emerald,
+                        inactiveTrackColor:
+                            _textColor.withValues(alpha: 0.18),
+                        thumbColor: _gold,
+                        overlayColor:
+                            _gold.withValues(alpha: 0.15),
+                        trackHeight: 3,
+                      ),
+                      child: Slider(
+                        min: 1,
+                        max: _totalPages.toDouble(),
+                        divisions: _totalPages - 1,
+                        value: (_sliderPreviewPage ??
+                                _currentPage.toDouble())
+                            .clamp(1.0, _totalPages.toDouble()),
+                        onChanged: (value) {
+                          setState(() {
+                            _sliderPreviewPage = value;
+                          });
+                        },
+                        onChangeEnd: (value) {
+                          _setPage(value.round());
+                        },
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: QuranPageLocalization.text(
+                      context,
+                      'quran_next_short',
+                    ),
+                    onPressed: _currentPage < _totalPages
+                        ? _nextPage
+                        : null,
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: _gold,
+                      size: 29,
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '$_currentPage / $_totalPages',
+                      style: TextStyle(
+                        color: _textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const Spacer(),
+                    _ReaderActionButton(
+                      icon: _isBookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_add_outlined,
+                      label: QuranPageLocalization.text(
+                        context,
+                        'quran_save_page_bookmark',
+                      ),
+                      onTap: widget.onTogglePageBookmark,
+                    ),
+                    _ReaderActionButton(
+                      icon: Icons.toc_rounded,
+                      label: QuranPageLocalization.text(
+                        context,
+                        'quran_index_title',
+                      ),
+                      onTap: widget.onOpenIndex,
+                    ),
+                    _ReaderActionButton(
+                      icon: Icons.bookmarks_outlined,
+                      label: QuranPageLocalization.text(
+                        context,
+                        'quran_bookmarks_short',
+                      ),
+                      onTap: widget.onOpenPageBookmarks,
+                    ),
+                    _ReaderActionButton(
+                      icon: Icons.format_list_numbered_rounded,
+                      label: QuranPageLocalization.text(
+                        context,
+                        'quran_verses_short',
+                      ),
+                      onTap: widget.onOpenVerseBookmarks,
+                    ),
+                    _ReaderActionButton(
+                      icon: Icons.search_rounded,
+                      label: QuranPageLocalization.text(
+                        context,
+                        'quran_go_to_short',
+                      ),
+                      onTap: _openGoToPage,
+                    ),
+                  ],
+                ),
+              ),
+            ] else
+              Row(
+                children: [
+                  Text(
+                    QuranPageLocalization.pagePosition(
+                      context,
+                      page: _currentPage,
+                      total: _totalPages,
+                    ),
+                    style: TextStyle(
+                      color: _textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showControls = true;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.tune_rounded,
+                      color: _gold,
+                    ),
+                    label: Text(
+                      QuranPageLocalization.text(
+                        context,
+                        'quran_show_controls',
+                      ),
+                      style: const TextStyle(color: _gold),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isThemeLoaded) {
+      return Scaffold(
+        backgroundColor: _background,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: _gold,
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: _background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (_showControls) _buildTopBar(),
+            Expanded(
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: _handlePointerDown,
+                onPointerUp: _handlePointerUp,
+                onPointerCancel: (_) {
+                  _pointerDownPosition = null;
+                },
+                child: _buildMushafPage(),
+              ),
+            ),
+            _buildBottomControls(),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _QuranFullScreenReaderState
