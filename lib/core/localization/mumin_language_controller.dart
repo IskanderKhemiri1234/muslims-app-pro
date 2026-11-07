@@ -162,14 +162,20 @@ final class MuminLanguageController extends ChangeNotifier {
   /// The modern language-code preference has priority.
   /// The legacy boolean preference is used only for migration.
   Future<void> restoreLanguage() async {
-    if (_isDisposed || _preferences == null) {
+    if (_isDisposed) {
+      return;
+    }
+
+    final preferences = _preferences;
+
+    if (preferences == null) {
       return;
     }
 
     String? savedCode;
 
     try {
-      savedCode = _preferences!.getString(preferenceKey);
+      savedCode = preferences.getString(preferenceKey);
     } catch (error, stackTrace) {
       debugPrint(
         'Mumin Pro: could not read language preference: $error',
@@ -192,7 +198,7 @@ final class MuminLanguageController extends ChangeNotifier {
     bool? legacyArabic;
 
     try {
-      legacyArabic = _preferences!.getBool(legacyPreferenceKey);
+      legacyArabic = preferences.getBool(legacyPreferenceKey);
     } catch (error, stackTrace) {
       debugPrint(
         'Mumin Pro: legacy language preference is invalid: $error',
@@ -212,7 +218,7 @@ final class MuminLanguageController extends ChangeNotifier {
     }
 
     _enqueueWrite(() async {
-      await _preferences!.setString(
+      await preferences.setString(
         preferenceKey,
         migratedCode,
       );
