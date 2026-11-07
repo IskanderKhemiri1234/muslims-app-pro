@@ -9,20 +9,24 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import 'mumin_adhan_notification_service.dart';
+import 'mumin_prayer_countdown_notification_service.dart';
 
-/// Coordinates prayer notification scheduling with prayer and language state.
+/// Coordinates prayer alerts and the persistent next-prayer countdown.
 ///
-/// It intentionally ignores the prayer controller's per-second clock updates.
-/// Scheduling is refreshed only when meaningful inputs change, when the app
-/// resumes, or when the settings screen explicitly requests a refresh.
+/// The countdown is synchronized only when meaningful application state
+/// changes. Android maintains the visible countdown independently of Flutter.
 class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   MuminAdhanNotificationCoordinator({
     required PrayerController prayerController,
     required MuminAdhanNotificationService notificationService,
     required MuminLanguageController languageController,
+    MuminPrayerCountdownNotificationService? countdownNotificationService,
   })  : _prayerController = prayerController,
         _notificationService = notificationService,
-        _languageController = languageController {
+        _languageController = languageController,
+        _countdownNotificationService =
+            countdownNotificationService ??
+                MuminPrayerCountdownNotificationService() {
     _lastFingerprint = _buildFingerprint();
 
     _prayerController.addListener(_onPrayerControllerChanged);
@@ -39,6 +43,8 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   final PrayerController _prayerController;
   final MuminAdhanNotificationService _notificationService;
   final MuminLanguageController _languageController;
+  final MuminPrayerCountdownNotificationService
+      _countdownNotificationService;
 
   bool _disposed = false;
   bool _refreshing = false;
@@ -49,28 +55,27 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   String? _lastSuccessfulScheduleSignature;
 
   String _buildFingerprint() {
-  final timezone = _prayerController.timezoneLocation;
-  final localNow = timezone == null
-      ? null
-      : tz.TZDateTime.now(timezone);
+    final timezone = _prayerController.timezoneLocation;
+    final localNow =
+        timezone == null ? null : tz.TZDateTime.now(timezone);
 
-  final localDate = localNow == null
-      ? 'unknown-date'
-      : '${localNow.year}-${localNow.month}-${localNow.day}';
+    final localDate = localNow == null
+        ? 'unknown-date'
+        : '${localNow.year}-${localNow.month}-${localNow.day}';
 
-  return <Object?>[
-    _prayerController.isInitialized,
-    _prayerController.hasUsableSchedule,
-    _prayerController.latitude.toStringAsFixed(5),
-    _prayerController.longitude.toStringAsFixed(5),
-    _prayerController.timezoneId,
-    timezone?.name,
-    _prayerController.method.name,
-    _prayerController.madhab.name,
-    localDate,
-    _languageController.languageCode,
-  ].join('|');
-}
+    return <Object?>[
+      _prayerController.isInitialized,
+      _prayerController.hasUsableSchedule,
+      _prayerController.latitude.toStringAsFixed(5),
+      _prayerController.longitude.toStringAsFixed(5),
+      _prayerController.timezoneId,
+      timezone?.name,
+      _prayerController.method.name,
+      _prayerController.madhab.name,
+      localDate,
+      _languageController.languageCode,
+    ].join('|');
+  }
 
   void _onPrayerControllerChanged() {
     if (_disposed) return;
@@ -80,7 +85,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     if (fingerprint == _lastFingerprint) return;
 
     _lastFingerprint = fingerprint;
-
     unawaited(refresh());
   }
 
@@ -88,7 +92,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     if (_disposed) return;
 
     _lastFingerprint = _buildFingerprint();
-
     unawaited(refresh());
   }
 
@@ -102,10 +105,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     }
   }
 
-  /// Requests a serialized schedule refresh.
-  ///
-  /// Repeated requests are coalesced so multiple controller notifications
-  /// cannot start overlapping schedule operations.
+  /// Serializes refresh operations and coalesces repeated requests.
   Future<void> refresh({bool force = false}) async {
     if (_disposed) return;
 
@@ -182,6 +182,31 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     if (_disposed) return;
 
+    // The Android notification is enabled only while notification
+    // permission is granted by the operating system.
+    final notificationsEnabled =
+        await _notificationService.areNotificationsEnabled();
+
+    if (_disposed) return;
+
+    if (notificationsEnabled) {
+      await _countdownNotificationService.synchronize(
+        controller: _prayerController,
+        prayerName: (prayer) => _resolvePrayerName(
+          prayer,
+          languageCode,
+        ),
+        notificationTitle:
+            _countdownNotificationTitle(languageCode),
+        notificationDescription:
+            _countdownNotificationDescription(languageCode),
+      );
+    } else {
+      await _countdownNotificationService.cancel();
+    }
+
+    if (_disposed) return;
+
     _lastSuccessfulScheduleSignature = signature;
   }
 
@@ -212,6 +237,28 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
         return 'C’est maintenant l’heure de la prière.';
       default:
         return 'حان الآن وقت الصلاة.';
+    }
+  }
+
+  String _countdownNotificationTitle(String languageCode) {
+    switch (languageCode) {
+      case 'en':
+        return 'Next prayer';
+      case 'fr':
+        return 'Prochaine prière';
+      default:
+        return 'الصلاة القادمة';
+    }
+  }
+
+  String _countdownNotificationDescription(String languageCode) {
+    switch (languageCode) {
+      case 'en':
+        return 'Time remaining';
+      case 'fr':
+        return 'Temps restant';
+      default:
+        return 'الوقت المتبقي';
     }
   }
 
@@ -270,6 +317,8 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     if (_disposed) return;
 
     await _notificationService.cancelPreviouslyScheduled();
+    await _countdownNotificationService.cancel();
+
     _lastSuccessfulScheduleSignature = null;
   }
 
