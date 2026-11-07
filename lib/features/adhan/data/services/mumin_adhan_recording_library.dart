@@ -32,16 +32,7 @@ class MuminAdhanRecording {
   }
 }
 
-/// Local Adhan recording library.
-///
-/// Supports:
-/// - Importing audio files from the device.
-/// - Keeping multiple recordings in private app storage.
-/// - Selecting the active recording.
-/// - Listing saved recordings.
-/// - Removing recordings safely.
-///
-/// No audio is uploaded to an external server.
+/// Private local library for imported Adhan recordings.
 class MuminAdhanRecordingLibrary {
   MuminAdhanRecordingLibrary();
 
@@ -52,7 +43,7 @@ class MuminAdhanRecordingLibrary {
 
   static const int maxFileSizeBytes = 50 * 1024 * 1024;
 
-  static const List<String> supportedExtensions = [
+  static const List<String> supportedExtensions = <String>[
     'mp3',
     'm4a',
     'aac',
@@ -61,18 +52,16 @@ class MuminAdhanRecordingLibrary {
     'flac',
   ];
 
-  /// Opens the system picker and imports the selected recording.
+  /// Opens the native file picker and imports one audio recording.
   ///
-  /// Returns null if the user cancels the picker.
+  /// Returns null when the user cancels the picker.
   Future<MuminAdhanRecording?> importRecording() async {
-    final PlatformFile? selectedFile = await FilePicker.pickFile(
+    final selectedFile = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: supportedExtensions,
     );
 
-    if (selectedFile == null) {
-      return null;
-    }
+    if (selectedFile == null) return null;
 
     final extension = _extensionOf(selectedFile.name);
 
@@ -82,16 +71,16 @@ class MuminAdhanRecordingLibrary {
       );
     }
 
-    final fileLength =
+    final reportedLength =
         selectedFile.lengthSync() ?? await selectedFile.length();
 
-    if (fileLength == null || fileLength <= 0) {
+    if (reportedLength == null || reportedLength <= 0) {
       throw const FormatException(
         'The selected audio file is empty or unreadable.',
       );
     }
 
-    if (fileLength > maxFileSizeBytes) {
+    if (reportedLength > maxFileSizeBytes) {
       throw const FormatException(
         'The audio file exceeds the 50 MB limit.',
       );
@@ -135,9 +124,9 @@ class MuminAdhanRecordingLibrary {
 
       final savedLength = await destination.length();
 
-      if (savedLength != fileLength) {
+      if (savedLength <= 0 || savedLength != reportedLength) {
         throw const FileSystemException(
-          'The imported recording failed its size verification.',
+          'The imported recording failed size verification.',
         );
       }
 
@@ -159,10 +148,9 @@ class MuminAdhanRecordingLibrary {
     }
   }
 
-  /// Returns all recordings stored in the application library.
+  /// Lists valid recordings stored in the private application directory.
   Future<List<MuminAdhanRecording>> listRecordings() async {
     final directory = await _getLibraryDirectory();
-
     final recordings = <MuminAdhanRecording>[];
 
     await for (final entity in directory.list(
@@ -179,7 +167,9 @@ class MuminAdhanRecordingLibrary {
       try {
         final length = await entity.length();
 
-        if (length <= 0) continue;
+        if (length <= 0 || length > maxFileSizeBytes) {
+          continue;
+        }
 
         recordings.add(
           MuminAdhanRecording(
@@ -194,13 +184,13 @@ class MuminAdhanRecordingLibrary {
     }
 
     recordings.sort(
-      (a, b) => a.name.compareTo(b.name),
+      (a, b) => b.name.compareTo(a.name),
     );
 
-    return List.unmodifiable(recordings);
+    return List<MuminAdhanRecording>.unmodifiable(recordings);
   }
 
-  /// Returns the currently selected recording, if it exists.
+  /// Gets the legacy general recording selection.
   Future<MuminAdhanRecording?> getSelectedRecording() async {
     final preferences = await SharedPreferences.getInstance();
 
@@ -227,7 +217,7 @@ class MuminAdhanRecordingLibrary {
 
       final length = await file.length();
 
-      if (length <= 0) {
+      if (length <= 0 || length > maxFileSizeBytes) {
         await preferences.remove(_selectedRecordingKey);
         return null;
       }
@@ -259,6 +249,23 @@ class MuminAdhanRecordingLibrary {
       );
     }
 
+    final length = await file.length();
+
+    if (length <= 0 || length > maxFileSizeBytes) {
+      throw FileSystemException(
+        'The selected recording has an invalid size.',
+        path,
+      );
+    }
+
+    final extension = _extensionOf(file.path);
+
+    if (!supportedExtensions.contains(extension)) {
+      throw FormatException(
+        'Unsupported audio format: $extension',
+      );
+    }
+
     final preferences = await SharedPreferences.getInstance();
 
     final saved = await preferences.setString(
@@ -275,7 +282,7 @@ class MuminAdhanRecordingLibrary {
 
   /// Deletes a recording from the private library.
   ///
-  /// If it was selected, the active selection is cleared.
+  /// The general selection is cleared if it points to this file.
   Future<void> deleteRecording(String path) async {
     final file = File(path);
 
@@ -300,7 +307,7 @@ class MuminAdhanRecordingLibrary {
     }
   }
 
-  /// Clears the selected recording without deleting library files.
+  /// Clears the general selection without deleting any audio file.
   Future<void> clearSelection() async {
     final preferences = await SharedPreferences.getInstance();
 
