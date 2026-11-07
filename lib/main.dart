@@ -17,6 +17,7 @@ import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
 import 'features/adhan/data/services/mumin_adhan_notification_service.dart';
 import 'features/adhan/data/services/mumin_adhan_prayer_recording_preferences.dart';
 import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart';
+import 'features/adhan/data/services/mumin_adhan_notification_coordinator.dart';
 
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
@@ -434,6 +435,18 @@ Future<void> _showLanguagePicker(
         ChangeNotifierProvider<MuminLanguageController>.value(
           value: widget.languageController,
         ),
+        
+Provider<MuminAdhanNotificationCoordinator>(
+  lazy: false,
+  create: (context) => MuminAdhanNotificationCoordinator(
+    prayerController: context.read<PrayerController>(),
+    notificationService:
+        context.read<MuminAdhanNotificationService>(),
+    languageController:
+        context.read<MuminLanguageController>(),
+  ),
+  dispose: (_, coordinator) => coordinator.dispose(),
+),
 
         ChangeNotifierProvider<SettingsController>.value(
           value: widget.settingsController,
