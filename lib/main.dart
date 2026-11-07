@@ -495,6 +495,13 @@ home: Builder(
   },
 ),
 
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// Language selector row.
 class _LanguageOption extends StatelessWidget {
   const _LanguageOption({
