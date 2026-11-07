@@ -66,7 +66,8 @@ flutter:
     - assets/quran_madina/assets/db/v2/Madina-1441H/
     - assets/quran_madina/assets/img/
     - assets/quran_madina/dist/
-
+    - assets/images/adhan/mumin_adhan_hero.jpg
+    
     # Qibla Atlas data
     - assets/qibla/data/landmarks.json
 
