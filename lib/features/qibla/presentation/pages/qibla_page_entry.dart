@@ -130,15 +130,20 @@ class QiblaPageEntry extends StatelessWidget {
 
     final languageCode = localizations.languageCode;
     final name = landmark.nameForLanguage(languageCode);
+
+    // These fields are optional in the landmark data model.
+    // Normalize missing values before trimming or composing the location.
     final description =
-        landmark.descriptionForLanguage(languageCode).trim();
-    final city = landmark.cityForLanguage(languageCode).trim();
-    final region = landmark.regionForLanguage(languageCode).trim();
+        landmark.descriptionForLanguage(languageCode)?.trim() ?? '';
+    final city = landmark.cityForLanguage(languageCode)?.trim() ?? '';
+    final region = landmark.regionForLanguage(languageCode)?.trim() ?? '';
+
+    final countryCode = landmark.countryCode.trim();
 
     final location = [
       city,
       region,
-      landmark.countryCode,
+      countryCode,
     ].where((value) => value.isNotEmpty).join(' • ');
 
     showDialog<void>(
@@ -204,10 +209,9 @@ class QiblaPageEntry extends StatelessWidget {
                   '${landmark.latitude.toStringAsFixed(5)}, '
                   '${landmark.longitude.toStringAsFixed(5)}',
                   textDirection: TextDirection.ltr,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _gold,
                     fontSize: 12,
-                    fontFeatures: const [],
                   ),
                 ),
               ],
