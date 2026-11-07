@@ -10,6 +10,7 @@ import '../../data/models/mumin_media_asset_registry.dart';
 import '../../data/services/mumin_adhan_asset_playback_service.dart';
 import 'dart:io';
 import '../../data/services/mumin_adhan_artwork_service.dart';
+import '../../data/services/mumin_adhan_artwork_selection_preferences.dart';
 
 class MuminAdhanNowPage extends StatefulWidget {
   const MuminAdhanNowPage({super.key});
@@ -42,7 +43,8 @@ class _MuminAdhanNowPageState extends State<MuminAdhanNowPage> {
 
   StreamSubscription? _stateSubscription;
   late final MuminAdhanArtworkService _artworkService;
-
+  late final MuminAdhanArtworkSelectionPreferences
+    _artworkPreferences; 
 File? _personalArtwork;
 bool _usePersonalArtwork = true;
   @override
@@ -50,21 +52,64 @@ void initState() {
   super.initState();
 
   _artworkService = MuminAdhanArtworkService();
-  _loadPersonalArtwork();
+  _artworkPreferences =
+      MuminAdhanArtworkSelectionPreferences();
+
+  _loadArtworkPreferences();
 }
 
-Future<void> _loadPersonalArtwork() async {
+Future<void> _loadArtworkPreferences() async {
   try {
-    final artwork = await _artworkService.getSavedArtwork();
+    final results = await Future.wait<Object?>([
+      _artworkService.getSavedArtwork(),
+      _artworkPreferences.getSelectedArtworkId(),
+    ]);
+
+    final personalArtwork = results[0] as File?;
+    final savedArtworkId = results[1] as String?;
+
+    final artworks = MuminMediaAssetRegistry.mosqueArtwork;
+
+    final savedArtworkExists = savedArtworkId != null &&
+        artworks.any((item) => item.id == savedArtworkId);
+
+    if (!savedArtworkExists && savedArtworkId != null) {
+      await _artworkPreferences.clearSelectedArtwork();
+    }
 
     if (!mounted) return;
 
     setState(() {
-      _personalArtwork = artwork;
-      _usePersonalArtwork = artwork != null;
+      _personalArtwork = personalArtwork;
+      _selectedArtworkId =
+          savedArtworkExists ? savedArtworkId : null;
+
+      _usePersonalArtwork =
+          !savedArtworkExists && personalArtwork != null;
     });
   } catch (error, stackTrace) {
-    debugPrint('Mumin Pro: personal Adhan artwork loading failed: $error');
+    debugPrint(
+      'Mumin Pro: artwork preferences loading failed: $error',
+    );
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _selectArtwork(String artworkId) async {
+  try {
+    await _artworkPreferences.saveSelectedArtworkId(artworkId);
+
+    if (!mounted) return;
+
+    setState(() {
+      _selectedArtworkId = artworkId;
+      _usePersonalArtwork = false;
+      _error = null;
+    });
+  } catch (error, stackTrace) {
+    debugPrint(
+      'Mumin Pro: artwork selection saving failed: $error',
+    );
     debugPrintStack(stackTrace: stackTrace);
   }
 }
@@ -547,11 +592,8 @@ Future<void> _loadPersonalArtwork() async {
 
               return GestureDetector(
                 onTap: () {
-                  setState(() {
-  _selectedArtworkId = item.id;
-  _usePersonalArtwork = false;
-});
-                },
+               _selectArtwork(item.id);
+               },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   width: 116,
