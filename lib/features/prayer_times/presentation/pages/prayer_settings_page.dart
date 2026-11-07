@@ -38,6 +38,8 @@ class PrayerSettingsPage extends StatelessWidget {
         'calculation_turkey',
       CalculationMethod.tehran =>
         'calculation_tehran',
+      CalculationMethod.moon_sighting_committee =>
+        'calculation_moon_sighting_committee',
       CalculationMethod.other =>
         'calculation_other',
     };
