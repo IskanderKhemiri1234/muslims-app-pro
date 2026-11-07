@@ -28,7 +28,8 @@ class MuminPermissionOnboarding extends StatefulWidget {
 }
 
 class _MuminPermissionOnboardingState
-    extends State<MuminPermissionOnboarding> {
+    extends State<MuminPermissionOnboarding>
+    with WidgetsBindingObserver {
   bool _loading = true;
   bool _setupCompleted = false;
   bool _requesting = false;
@@ -51,9 +52,59 @@ class _MuminPermissionOnboardingState
   }
 
   @override
-  void initState() {
-    super.initState();
-    _restoreSetupState();
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addObserver(this);
+  _restoreSetupState();
+}
+
+@override
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  super.dispose();
+}
+
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  if (state == AppLifecycleState.resumed && !_setupCompleted) {
+    _refreshPermissionStatus();
+  }
+}
+
+  Future<void> _refreshPermissionStatus() async {
+  if (!mounted || _requesting || _setupCompleted) return;
+
+  try {
+    final notificationService =
+        context.read<MuminAdhanNotificationService>();
+
+    final notificationGranted =
+        await notificationService.areNotificationsEnabled();
+
+    final locationPermission = await Geolocator.checkPermission();
+
+    final locationGranted =
+        locationPermission == LocationPermission.whileInUse ||
+        locationPermission == LocationPermission.always;
+
+    final locationPermanentlyDenied =
+        locationPermission == LocationPermission.deniedForever;
+
+    final locationServiceEnabled =
+        await Geolocator.isLocationServiceEnabled();
+
+    if (!mounted) return;
+
+    setState(() {
+      _notificationGranted = notificationGranted;
+      _locationGranted = locationGranted;
+      _locationPermanentlyDenied = locationPermanentlyDenied;
+      _locationServiceEnabled = locationServiceEnabled;
+    });
+  } catch (error, stackTrace) {
+    debugPrint('Mumin permission refresh error: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
   }
 
   Future<void> _restoreSetupState() async {
