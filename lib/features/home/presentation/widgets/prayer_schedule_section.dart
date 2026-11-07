@@ -5,22 +5,20 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 import 'glass_container.dart';
 
-/// Daily prayer schedule.
-///
-/// Language selection and direction are resolved centrally.
-/// Prayer names and time formatting are supplied by the home page.
+/// Displays prayer times from the authoritative timezone-aware schedule.
 class PrayerScheduleSection extends StatelessWidget {
   const PrayerScheduleSection({
     super.key,
-    required this.prayerTimes,
+    required this.schedule,
     required this.nextPrayer,
     required this.prayerName,
     required this.formatTime,
   });
 
-  final PrayerTimes prayerTimes;
+  final GlobalPrayerSchedule schedule;
   final Prayer? nextPrayer;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
@@ -72,7 +70,7 @@ class PrayerScheduleSection extends StatelessWidget {
     final entries = <_PrayerEntry>[];
 
     for (final prayer in prayers) {
-      final time = prayerTimes.timeForPrayer(prayer);
+      final time = schedule.timeForPrayer(prayer);
 
       if (time != null) {
         entries.add(
