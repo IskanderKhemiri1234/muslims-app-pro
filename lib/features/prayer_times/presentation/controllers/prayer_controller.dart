@@ -13,6 +13,7 @@ import '../../data/datasources/location_datasource.dart';
 import '../../domain/services/global_prayer_calculation_service.dart';
 import '../../domain/services/prayer_calculation_service.dart';
 import '../../domain/services/prayer_rules_service.dart';
+import '../../domain/models/location_accuracy_assessment.dart';
 
 /// Central controller for prayer calculations, location and countdown time.
 ///
@@ -175,6 +176,32 @@ class PrayerController extends ChangeNotifier
   bool isInitialized = false;
 
   String? message;
+    
+  // ---------------------------------------------------------------------------
+  // LOCATION ACCURACY STATE
+  // ---------------------------------------------------------------------------
+
+  LocationAccuracyAssessment? _locationAccuracyAssessment;
+
+  /// Quality assessment of the last successfully applied location.
+  LocationAccuracyAssessment? get locationAccuracyAssessment =>
+      _locationAccuracyAssessment;
+
+  LocationAccuracyLevel? get locationAccuracyLevel =>
+      _locationAccuracyAssessment?.level;
+
+  double? get locationAccuracyMeters =>
+      _locationAccuracyAssessment?.accuracyMeters;
+
+  bool get isLocationCached =>
+      _locationAccuracyAssessment?.isCached ?? false;
+
+  bool get isLocationPrecise =>
+      _locationAccuracyAssessment?.isPrecise ?? false;
+
+  String? get locationAccuracyLocalizationKey =>
+      _locationAccuracyAssessment?.localizationKey;
+
 
   bool _disposed = false;
 
@@ -791,14 +818,28 @@ class PrayerController extends ChangeNotifier
     final oldLongitude = longitude;
     final oldCity = city;
     final oldTimezone = _discoveredTimezone;
+    final oldAccuracyAssessment = _locationAccuracyAssessment;
 
     var locationChanged = false;
 
     try {
+      
       final Position position =
           await _locationSource.getCurrentLocation();
 
       if (_disposed) return;
+
+      final assessment = _locationSource.lastAssessment;
+
+      if (assessment == null ||
+          !assessment.canBeUsedForPrayerCalculation) {
+        throw StateError(
+          'The acquired location has no valid accuracy assessment.',
+        );
+      }
+
+      _locationAccuracyAssessment = assessment;
+
 
       final newLatitude = position.latitude;
       final newLongitude = position.longitude;
@@ -856,6 +897,7 @@ class PrayerController extends ChangeNotifier
           longitude: oldLongitude,
           city: oldCity,
           timezone: oldTimezone,
+          accuracyAssessment: oldAccuracyAssessment,
         );
 
         // Restore the previous valid schedule.
@@ -886,17 +928,19 @@ class PrayerController extends ChangeNotifier
       }
     }
   }
-
+  
   void _restoreLocationState({
     required double latitude,
     required double longitude,
     required String city,
     required DiscoveredTimezone? timezone,
+    required LocationAccuracyAssessment? accuracyAssessment,
   }) {
     this.latitude = latitude;
     this.longitude = longitude;
     this.city = city;
     _discoveredTimezone = timezone;
+    _locationAccuracyAssessment = accuracyAssessment;
   }
 
   // ---------------------------------------------------------------------------
