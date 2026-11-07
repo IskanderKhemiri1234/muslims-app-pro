@@ -4,17 +4,9 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
-/// Background audio engine dedicated to Mumin Pro Adhan playback.
+/// Central background audio engine for Mumin Pro Adhan.
 ///
-/// Responsibilities:
-/// - Play bundled Adhan audio assets.
-/// - Play user-selected local audio files.
-/// - Continue playback while the app is in the background.
-/// - Synchronize playback state with Android media controls.
-/// - Expose a single playback handler to the application UI.
-///
-/// This class does not download audio or assume that an audio recording
-/// is already bundled with the application.
+/// Owns one AudioPlayer shared by bundled and imported recordings.
 class MuminAdhanAudioHandler extends BaseAudioHandler
     with SeekHandler {
   MuminAdhanAudioHandler() {
@@ -25,42 +17,43 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
       },
     );
 
-    _player.playerStateStream.listen((_) {
-      _broadcastPlaybackState(_player.playbackEvent);
-    });
+    _playerStateSubscription = _player.playerStateStream.listen(
+      (_) {
+        _broadcastPlaybackState(_player.playbackEvent);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _broadcastError(error);
+      },
+    );
   }
 
   final AudioPlayer _player = AudioPlayer();
 
   StreamSubscription<PlaybackEvent>? _playbackSubscription;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
 
   bool _hasSource = false;
   bool _isDisposed = false;
 
-  /// Current audio engine state.
   bool get isPlaying => _player.playing;
 
-  /// Current playback position.
+  bool get hasSource => _hasSource;
+
+  bool get isPaused =>
+      _hasSource &&
+      !_player.playing &&
+      _player.processingState == ProcessingState.ready;
+
   Duration get position => _player.position;
 
-  /// Total audio duration, when available.
   Duration? get duration => _player.duration;
 
-  /// Playback state stream for the Adhan interface.
   Stream<PlayerState> get playerStateStream =>
       _player.playerStateStream;
 
-  /// Playback position stream for progress indicators.
   Stream<Duration> get positionStream =>
       _player.positionStream;
 
-  /// Load and play an audio file bundled in the application.
-  ///
-  /// Example:
-  /// await handler.playAsset(
-  ///   'assets/audio/adhan/fajr.mp3',
-  ///   title: 'Fajr Adhan',
-  /// );
   Future<void> playAsset(
     String assetPath, {
     required String title,
@@ -81,11 +74,6 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
     );
   }
 
-  /// Load and play an audio file stored locally on the device.
-  ///
-  /// This supports audio selected by the user through the app's
-  /// media picker. The caller is responsible for providing a valid
-  /// local file path.
   Future<void> playFile(
     String filePath, {
     required String title,
@@ -110,16 +98,17 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
     AudioSource source,
     MediaItem item,
   ) async {
-    await _player.stop();
-
-    mediaItem.add(item);
-    queue.add(<MediaItem>[item]);
+    _ensureNotDisposed();
 
     _hasSource = false;
 
+    await _player.stop();
     await _player.setAudioSource(source);
 
     _hasSource = true;
+
+    mediaItem.add(item);
+    queue.add(<MediaItem>[item]);
 
     _broadcastPlaybackState(_player.playbackEvent);
 
@@ -151,6 +140,8 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
 
     await _player.stop();
 
+    _hasSource = false;
+
     playbackState.add(
       PlaybackState(
         controls: const <MediaControl>[
@@ -181,7 +172,6 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
     await _player.seek(position);
   }
 
-  /// Update the media notification and lock-screen playback state.
   void _broadcastPlaybackState(PlaybackEvent event) {
     if (_isDisposed) return;
 
@@ -258,13 +248,17 @@ class MuminAdhanAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Release audio resources when the application shuts down.
   Future<void> dispose() async {
     if (_isDisposed) return;
 
     _isDisposed = true;
 
     await _playbackSubscription?.cancel();
+    await _playerStateSubscription?.cancel();
+
+    _playbackSubscription = null;
+    _playerStateSubscription = null;
+
     await _player.dispose();
   }
 }
