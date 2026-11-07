@@ -118,10 +118,14 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
       if (!mounted) return;
 
-      setState(() {
+            setState(() {
         _setupCompleted = completed;
         _loading = false;
       });
+
+      if (!completed && mounted) {
+        await _refreshPermissionStatus();
+      }
     } catch (error, stackTrace) {
       debugPrint(
         'Mumin Pro: permission setup state could not be restored: $error',
