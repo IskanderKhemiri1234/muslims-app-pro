@@ -12,7 +12,6 @@ import 'features/adhan/data/services/mumin_adhan_prayer_recording_preferences.da
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
-import 'core/notifications/mumin_notification_registry.dart';
 import 'core/notifications/mumin_notification_preferences.dart';
 import 'features/adhan/data/services/mumin_adhan_notification_service.dart';
 import 'core/localization/mumin_localizations_delegate.dart';
