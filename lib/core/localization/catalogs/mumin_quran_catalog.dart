@@ -1,8 +1,8 @@
 
 /// Central Quran interface catalog for Mumin Pro.
 ///
-/// This catalog contains interface labels only.
-/// It must never contain, translate, or modify Quranic verses.
+/// Interface labels and feedback messages only.
+/// Never store, translate, or modify Quranic verses here.
 abstract final class MuminQuranCatalog {
   static const String defaultLanguageCode = 'ar';
 
@@ -57,7 +57,8 @@ abstract final class MuminQuranCatalog {
       'quran_invalid_verse': 'بيانات الآية غير صالحة.',
       'quran_invalid_page': 'رقم الصفحة غير صالح.',
       'quran_loading_error': 'تعذر تحميل بيانات القراءة المحفوظة.',
-      'quran_progress_save_error': 'تعذر حفظ تقدم القراءة. حاول مرة أخرى.',
+      'quran_progress_save_error':
+          'تعذر حفظ تقدم القراءة. حاول مرة أخرى.',
       'quran_progress_update_error': 'تعذر تحديث سجل القراءة.',
       'quran_daily_update_error': 'تعذر تحديث الورد اليومي.',
       'quran_position_save_error': 'تعذر حفظ موضع القراءة.',
@@ -73,7 +74,42 @@ abstract final class MuminQuranCatalog {
           'النص المعروض ترجمة لمعاني الآيات وليس بديلاً عن النص القرآني العربي.',
       'quran_tafsir': 'التفسير',
       'quran_tafsir_unavailable': 'التفسير غير متاح لهذه الآية حالياً.',
+
+      // Quran page feedback.
+      'quran_saved_reading_data_error':
+          'تعذر تحميل بيانات القراءة المحفوظة.',
+      'quran_daily_reading_update_error':
+          'تعذر تحديث الورد اليومي.',
+      'quran_reading_position_save_error':
+          'تعذر حفظ موضع القراءة.',
+      'quran_page_marked_read': 'تم تسجيل قراءة الصفحة {page}.',
+      'quran_page_mark_read_error':
+          'تعذر حفظ تقدم القراءة. حاول مرة أخرى.',
+      'quran_page_read_mark_removed': 'تم إلغاء تسجيل قراءة الصفحة.',
+      'quran_reading_record_update_error':
+          'تعذر تحديث سجل القراءة.',
+      'quran_khatma_congratulations':
+          'مبارك! أتممت ختمة القرآن',
+      'quran_khatma_completion_message':
+          'الحمد لله، أتممت قراءة صفحات المصحف الـ604. هذه ختمتك رقم {count}.',
+      'quran_invalid_ayah_data': 'بيانات الآية غير صالحة.',
+      'quran_ayah_already_saved': 'هذه الآية محفوظة بالفعل.',
+      'quran_ayah_saved':
+          'تم حفظ الآية {ayah} من سورة {surah}.',
+      'quran_ayah_save_error': 'تعذر حفظ الآية.',
+      'quran_ayah_bookmark_removed': 'تم حذف علامة الآية.',
+      'quran_ayah_bookmark_remove_error':
+          'تعذر حذف علامة الآية.',
+      'quran_page_bookmark_saved':
+          'تم حفظ الصفحة في العلامات المرجعية.',
+      'quran_page_bookmark_removed':
+          'تم حذف العلامة المرجعية.',
+      'quran_page_bookmark_save_error':
+          'تعذر حفظ العلامة المرجعية.',
+      'quran_page_bookmark_remove_error':
+          'تعذر حذف العلامة المرجعية.',
     },
+
     'en': {
       'quran_title': 'The Holy Quran',
       'quran_madinah_mushaf': 'Madinah Mushaf',
@@ -142,7 +178,43 @@ abstract final class MuminQuranCatalog {
       'quran_tafsir': 'Tafsir',
       'quran_tafsir_unavailable':
           'Tafsir is not currently available for this verse.',
+
+      // Quran page feedback.
+      'quran_saved_reading_data_error':
+          'Unable to load your saved reading data.',
+      'quran_daily_reading_update_error':
+          'Unable to update the daily reading target.',
+      'quran_reading_position_save_error':
+          'Unable to save the reading position.',
+      'quran_page_marked_read': 'Page {page} marked as read.',
+      'quran_page_mark_read_error':
+          'Unable to save reading progress. Please try again.',
+      'quran_page_read_mark_removed':
+          'The page reading mark was removed.',
+      'quran_reading_record_update_error':
+          'Unable to update the reading record.',
+      'quran_khatma_congratulations':
+          'Congratulations! You completed the Quran.',
+      'quran_khatma_completion_message':
+          'Alhamdulillah, you completed all 604 Mushaf pages. This is your khatm number {count}.',
+      'quran_invalid_ayah_data': 'The verse information is invalid.',
+      'quran_ayah_already_saved': 'This verse is already saved.',
+      'quran_ayah_saved':
+          'Verse {ayah} from Surah {surah} was saved.',
+      'quran_ayah_save_error': 'Unable to save the verse.',
+      'quran_ayah_bookmark_removed': 'The verse bookmark was removed.',
+      'quran_ayah_bookmark_remove_error':
+          'Unable to remove the verse bookmark.',
+      'quran_page_bookmark_saved':
+          'Page added to bookmarks.',
+      'quran_page_bookmark_removed':
+          'The page bookmark was removed.',
+      'quran_page_bookmark_save_error':
+          'Unable to save the page bookmark.',
+      'quran_page_bookmark_remove_error':
+          'Unable to remove the page bookmark.',
     },
+
     'fr': {
       'quran_title': 'Le Saint Coran',
       'quran_madinah_mushaf': 'Mushaf de Médine',
@@ -217,6 +289,42 @@ abstract final class MuminQuranCatalog {
       'quran_tafsir': 'Tafsir',
       'quran_tafsir_unavailable':
           'Le tafsir n’est pas disponible pour ce verset pour le moment.',
+
+      // Quran page feedback.
+      'quran_saved_reading_data_error':
+          'Impossible de charger les données de lecture enregistrées.',
+      'quran_daily_reading_update_error':
+          'Impossible de mettre à jour l’objectif quotidien.',
+      'quran_reading_position_save_error':
+          'Impossible d’enregistrer la position de lecture.',
+      'quran_page_marked_read': 'Page {page} marquée comme lue.',
+      'quran_page_mark_read_error':
+          'Impossible d’enregistrer la progression. Veuillez réessayer.',
+      'quran_page_read_mark_removed':
+          'Le statut de lecture de la page a été annulé.',
+      'quran_reading_record_update_error':
+          'Impossible de mettre à jour l’historique de lecture.',
+      'quran_khatma_congratulations':
+          'Félicitations ! Vous avez terminé le Coran.',
+      'quran_khatma_completion_message':
+          'Alhamdulillah, vous avez lu les 604 pages du Mushaf. Ceci est votre lecture complète numéro {count}.',
+      'quran_invalid_ayah_data': 'Les informations du verset sont invalides.',
+      'quran_ayah_already_saved': 'Ce verset est déjà enregistré.',
+      'quran_ayah_saved':
+          'Le verset {ayah} de la sourate {surah} a été enregistré.',
+      'quran_ayah_save_error': 'Impossible d’enregistrer le verset.',
+      'quran_ayah_bookmark_removed':
+          'Le signet du verset a été supprimé.',
+      'quran_ayah_bookmark_remove_error':
+          'Impossible de supprimer le signet du verset.',
+      'quran_page_bookmark_saved':
+          'Page ajoutée aux signets.',
+      'quran_page_bookmark_removed':
+          'Le signet de la page a été supprimé.',
+      'quran_page_bookmark_save_error':
+          'Impossible d’enregistrer le signet de la page.',
+      'quran_page_bookmark_remove_error':
+          'Impossible de supprimer le signet de la page.',
     },
   };
 
@@ -283,6 +391,25 @@ abstract final class MuminQuranCatalog {
     'quran_translation_disclaimer',
     'quran_tafsir',
     'quran_tafsir_unavailable',
+    'quran_saved_reading_data_error',
+    'quran_daily_reading_update_error',
+    'quran_reading_position_save_error',
+    'quran_page_marked_read',
+    'quran_page_mark_read_error',
+    'quran_page_read_mark_removed',
+    'quran_reading_record_update_error',
+    'quran_khatma_congratulations',
+    'quran_khatma_completion_message',
+    'quran_invalid_ayah_data',
+    'quran_ayah_already_saved',
+    'quran_ayah_saved',
+    'quran_ayah_save_error',
+    'quran_ayah_bookmark_removed',
+    'quran_ayah_bookmark_remove_error',
+    'quran_page_bookmark_saved',
+    'quran_page_bookmark_removed',
+    'quran_page_bookmark_save_error',
+    'quran_page_bookmark_remove_error',
   };
 
   static const List<String> launchLanguageCodes = [
@@ -311,13 +438,13 @@ abstract final class MuminQuranCatalog {
     if (value == null) return normalizedKey;
 
     for (final entry in parameters.entries) {
-      value = value!.replaceAll(
+      value = value.replaceAll(
         '{${entry.key}}',
         entry.value,
       );
     }
 
-    return value!;
+    return value;
   }
 
   static bool isCompleteFor(String languageCode) {
@@ -337,8 +464,24 @@ abstract final class MuminQuranCatalog {
     });
   }
 
-  static List<String> get languageCodes =>
-      List<String>.unmodifiable(_catalogs.keys);
+  static Map<String, int> get missingTranslationCounts {
+    return Map<String, int>.unmodifiable({
+      for (final code in launchLanguageCodes)
+        code: requiredKeys
+            .where((key) => _catalogs[code]?[key]?.trim().isNotEmpty != true)
+            .length,
+    });
+  }
+
+  static List<String> get missingKeysFor(String languageCode) {
+    final normalized = _normalizeLanguageCode(languageCode);
+    final catalog = _catalogs[normalized]!;
+    return List<String>.unmodifiable(
+      requiredKeys.where(
+        (key) => catalog[key]?.trim().isNotEmpty != true,
+      ),
+    );
+  }
 
   static String _normalizeLanguageCode(String languageCode) {
     final normalized = languageCode.trim().toLowerCase().split('-').first;
