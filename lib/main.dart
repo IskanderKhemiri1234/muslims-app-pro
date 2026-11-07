@@ -10,6 +10,9 @@ import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
+import 'core/notifications/mumin_notification_registry.dart';
+import 'core/notifications/mumin_notification_preferences.dart';
+import 'features/adhan/data/services/mumin_adhan_notification_service.dart';
 import 'core/localization/mumin_localizations_delegate.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
@@ -360,9 +363,13 @@ class _MuminAppState extends State<MuminApp> {
     create: (_) => PrayerController(),
   ),
   
-  Provider<MuminAdhanAudioHandler>.value(
-    value: muminAdhanAudioHandler,
-  ),
+Provider<MuminNotificationPreferences>(
+  create: (_) => MuminNotificationPreferences(),
+),
+
+Provider<MuminAdhanNotificationService>(
+  create: (_) => MuminAdhanNotificationService(),
+),
 
   Provider<MuminAdhanRecordingPlaybackService>(
     create: (context) => MuminAdhanRecordingPlaybackService(
