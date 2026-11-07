@@ -8,12 +8,12 @@ import 'package:http/http.dart' as http;
 
 import '../../../../core/localization/mumin_language_controller.dart';
 
-/// Monitors internet availability while the application is active.
+/// Monitors actual internet availability while the application is active.
 ///
-/// Connectivity type alone is not treated as proof of internet access.
-/// A lightweight HTTPS request verifies actual reachability.
+/// Network interfaces are only a trigger. An HTTPS request verifies
+/// whether internet access is actually available.
 ///
-/// This service does not create or modify the persistent prayer countdown.
+/// This service never modifies the persistent prayer countdown.
 class MuminConnectivityNotificationService with WidgetsBindingObserver {
   MuminConnectivityNotificationService({
     required MuminLanguageController languageController,
@@ -51,6 +51,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
   bool _initialized = false;
   bool _disposed = false;
   bool _checking = false;
+  bool _checkAgain = false;
 
   bool? _lastOnline;
 
@@ -93,8 +94,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
         },
       );
 
-      // Establish the initial state silently. Opening the app while
-      // offline must not generate a misleading first-time alert.
+      // Establish the initial state silently.
       await _checkAndUpdateState(notifyTransition: false);
     } catch (error, stackTrace) {
       debugPrint(
@@ -122,7 +122,12 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
   Future<void> _checkAndUpdateState({
     required bool notifyTransition,
   }) async {
-    if (_disposed || !_initialized || _checking) return;
+    if (_disposed || !_initialized) return;
+
+    if (_checking) {
+      _checkAgain = true;
+      return;
+    }
 
     _checking = true;
 
@@ -143,13 +148,8 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
       final previous = _lastOnline;
       _lastOnline = online;
 
-      if (!notifyTransition || previous == null) {
-        return;
-      }
-
-      if (previous == online) {
-        return;
-      }
+      if (!notifyTransition || previous == null) return;
+      if (previous == online) return;
 
       await _showConnectivityNotification(online);
     } catch (error, stackTrace) {
@@ -159,6 +159,11 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _checking = false;
+
+      if (!_disposed && _checkAgain) {
+        _checkAgain = false;
+        _scheduleCheck();
+      }
     }
   }
 
@@ -188,7 +193,8 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
-    final permitted = await android?.areNotificationsEnabled() ?? false;
+    final permitted =
+        await android?.areNotificationsEnabled() ?? false;
 
     if (_disposed || !permitted) return;
 
@@ -196,7 +202,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
 
     final title = online
         ? _languageController.textOr(
-            'prayer_times_ready',
+            'connectivity_restored_title',
             language == 'fr'
                 ? 'Connexion Internet rétablie'
                 : language == 'en'
@@ -204,7 +210,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
                     : 'تم استعادة الاتصال بالإنترنت',
           )
         : _languageController.textOr(
-            'offline_mode',
+            'connectivity_lost_title',
             language == 'fr'
                 ? 'Connexion Internet interrompue'
                 : language == 'en'
@@ -214,7 +220,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
 
     final body = online
         ? _languageController.textOr(
-            'prayer_schedule_refreshed',
+            'connectivity_restored_body',
             language == 'fr'
                 ? 'Votre appareil est de nouveau connecté.'
                 : language == 'en'
@@ -222,7 +228,7 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
                     : 'عاد جهازك للاتصال بالإنترنت.',
           )
         : _languageController.textOr(
-            'offline_mode_description',
+            'connectivity_lost_body',
             language == 'fr'
                 ? 'Certaines fonctions en ligne peuvent être indisponibles.'
                 : language == 'en'
@@ -263,8 +269,6 @@ class MuminConnectivityNotificationService with WidgetsBindingObserver {
     if (_disposed || !_initialized) return;
 
     if (state == AppLifecycleState.resumed) {
-      // Android may suspend connectivity callbacks while the app
-      // is in the background. Recheck when the user returns.
       _scheduleCheck();
     }
   }
