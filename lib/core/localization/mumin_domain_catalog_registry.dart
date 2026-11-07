@@ -70,12 +70,14 @@ abstract final class MuminDomainCatalogRegistry {
       normalizedKey,
     );
 
-    var value = selectedCatalog?[normalizedKey] ??
+    final resolvedValue = selectedCatalog?[normalizedKey] ??
         fallbackCatalog?[normalizedKey];
 
-    if (value == null || value.trim().isEmpty) {
+    if (resolvedValue == null || resolvedValue.trim().isEmpty) {
       return null;
     }
+
+    var value = resolvedValue;
 
     for (final entry in parameters.entries) {
       value = value.replaceAll(
