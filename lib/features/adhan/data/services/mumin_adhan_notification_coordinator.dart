@@ -6,26 +6,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/localization/mumin_language_controller.dart';
+import '../../../notifications/data/services/mumin_connectivity_notification_service.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import 'mumin_adhan_notification_service.dart';
 import 'mumin_prayer_countdown_notification_service.dart';
 
-/// Coordinates prayer alerts and the persistent next-prayer countdown.
-///
-/// The countdown is synchronized only after the user explicitly enables it.
-/// Android maintains the visible countdown independently of Flutter.
+/// Coordinates prayer alerts, the persistent countdown,
+/// and temporary internet connectivity notifications.
 class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   MuminAdhanNotificationCoordinator({
     required PrayerController prayerController,
     required MuminAdhanNotificationService notificationService,
     required MuminLanguageController languageController,
     MuminPrayerCountdownNotificationService? countdownNotificationService,
+    MuminConnectivityNotificationService? connectivityNotificationService,
   })  : _prayerController = prayerController,
         _notificationService = notificationService,
         _languageController = languageController,
         _countdownNotificationService =
             countdownNotificationService ??
                 MuminPrayerCountdownNotificationService() {
+    _connectivityNotificationService =
+        connectivityNotificationService ??
+            MuminConnectivityNotificationService(
+              languageController: languageController,
+            );
+
     _lastFingerprint = _buildFingerprint();
 
     _prayerController.addListener(_onPrayerControllerChanged);
@@ -46,8 +52,12 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   final PrayerController _prayerController;
   final MuminAdhanNotificationService _notificationService;
   final MuminLanguageController _languageController;
+
   final MuminPrayerCountdownNotificationService
       _countdownNotificationService;
+
+  late final MuminConnectivityNotificationService
+      _connectivityNotificationService;
 
   bool _disposed = false;
   bool _refreshing = false;
@@ -59,6 +69,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
   String _buildFingerprint() {
     final timezone = _prayerController.timezoneLocation;
+
     final localNow =
         timezone == null ? null : tz.TZDateTime.now(timezone);
 
@@ -177,7 +188,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     final languageCode = _languageController.languageCode;
 
-    // Preserve the existing individual prayer notification schedule.
+    // Keep the existing individual prayer notification schedule.
     await _notificationService.reschedule(
       controller: _prayerController,
       prayerName: (prayer) => _resolvePrayerName(
@@ -195,7 +206,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     if (_disposed) return;
 
-    // The persistent countdown requires BOTH explicit app consent
+    // The persistent countdown requires explicit app consent
     // and notification permission granted by Android.
     if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
@@ -204,8 +215,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
           prayer,
           languageCode,
         ),
-        notificationTitle:
-            _countdownNotificationTitle(),
+        notificationTitle: _countdownNotificationTitle(),
         notificationDescription:
             _countdownNotificationDescription(),
       );
@@ -248,12 +258,10 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     }
   }
 
-  /// Uses the central localization engine for the countdown title.
   String _countdownNotificationTitle() {
     return _languageController.text('next_prayer');
   }
 
-  /// Uses the central localization engine for the countdown description.
   String _countdownNotificationDescription() {
     return _languageController.text('time_remaining');
   }
@@ -327,5 +335,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     _languageController.removeListener(_onLanguageChanged);
 
     WidgetsBinding.instance.removeObserver(this);
+
+    _connectivityNotificationService.dispose();
   }
 }
