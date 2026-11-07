@@ -1,5 +1,4 @@
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -27,8 +26,6 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
 
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
@@ -37,17 +34,9 @@ void main() {
       (MethodCall call) async {
         switch (call.method) {
           case 'initialize':
-            return true;
-
           case 'areNotificationsEnabled':
-            return true;
-
           case 'requestNotificationsPermission':
-            return true;
-
           case 'canScheduleExactNotifications':
-            return true;
-
           case 'createNotificationChannel':
             return true;
 
@@ -81,8 +70,6 @@ void main() {
   });
 
   tearDown(() {
-    debugDefaultTargetPlatformOverride = null;
-
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
