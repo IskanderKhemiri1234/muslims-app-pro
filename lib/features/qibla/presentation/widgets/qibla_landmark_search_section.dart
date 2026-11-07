@@ -296,7 +296,11 @@ class _QiblaLandmarkSearchSectionState
     Color background,
   ) {
     final name = landmark.nameForLanguage(widget.languageCode);
-    final city = landmark.cityForLanguage(widget.languageCode);
+
+    // City is optional in the domain model.
+    // Normalize it once before checking or displaying it.
+    final city =
+        landmark.cityForLanguage(widget.languageCode)?.trim() ?? '';
 
     return Material(
       color: background,
