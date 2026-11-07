@@ -461,18 +461,21 @@ class _MuminAppState extends State<MuminApp> {
                 child: child ?? const SizedBox.shrink(),
               );
             },
-            home: PrayerHomePage(
-              onLanguageToggle: () {
-                _showLanguagePicker(context, languages);
-              },
-              isDark: settings.isDark,
-              onThemeToggle: settings.toggleTheme,
-            ),
-          );
-        },
-      ),
+            
+home: Builder(
+  builder: (homeContext) {
+    return PrayerHomePage(
+      onLanguageToggle: () {
+        _showLanguagePicker(
+          homeContext,
+          languages,
+        );
+      },
+      isDark: settings.isDark,
+      onThemeToggle: settings.toggleTheme,
     );
-  }
+  },
+),
 }
 
 /// Language selector row.
