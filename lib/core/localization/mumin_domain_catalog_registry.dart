@@ -9,7 +9,7 @@ import 'mumin_language_registry.dart';
 /// Mumin Pro — Unified Domain Catalog Registry.
 ///
 /// Owns domain catalog selection, language normalization,
-/// Arabic fallback, interpolation and translation diagnostics.
+/// interpolation and translation diagnostics.
 ///
 /// Quranic Arabic verses are never stored or modified here.
 abstract final class MuminDomainCatalogRegistry {
@@ -47,7 +47,10 @@ abstract final class MuminDomainCatalogRegistry {
 
   /// Resolves a registered domain key for the selected language.
   ///
-  /// Missing selected-language entries fall back to Arabic.
+  /// Quran keys require an explicit translation in the selected language.
+  /// They never silently fall back to Arabic.
+  ///
+  /// Other registered domains retain the existing Arabic fallback.
   /// Returns null when the key is unknown or has no usable value.
   static String? resolve(
     String? languageCode,
@@ -65,13 +68,22 @@ abstract final class MuminDomainCatalogRegistry {
         MuminLanguageRegistry.fallbackLanguageCode;
 
     final selectedCatalog = _catalogFor(language, normalizedKey);
-    final fallbackCatalog = _catalogFor(
-      fallbackLanguage,
-      normalizedKey,
-    );
 
-    final resolvedValue = selectedCatalog?[normalizedKey] ??
-        fallbackCatalog?[normalizedKey];
+    final String? resolvedValue;
+
+    if (normalizedKey.startsWith(_quranPrefix)) {
+      // Strict mode: Arabic is not an acceptable substitute
+      // for a missing English or French Quran interface translation.
+      resolvedValue = selectedCatalog?[normalizedKey];
+    } else {
+      final fallbackCatalog = _catalogFor(
+        fallbackLanguage,
+        normalizedKey,
+      );
+
+      resolvedValue = selectedCatalog?[normalizedKey] ??
+          fallbackCatalog?[normalizedKey];
+    }
 
     if (resolvedValue == null || resolvedValue.trim().isEmpty) {
       return null;
@@ -152,7 +164,7 @@ abstract final class MuminDomainCatalogRegistry {
     });
   }
 
-  /// Checks whether a key has an explicit translation.
+  /// Checks whether the active language has an explicit translation.
   static bool hasTranslation(
     String? languageCode,
     String key,
