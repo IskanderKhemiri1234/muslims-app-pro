@@ -87,6 +87,30 @@ final class MuminLocalizations {
 
     'ar': <String, String>{
       'app_name': 'Mumin Pro',
+      
+'permission_setup_title': 'لنُعِدّ Mumin Pro معاً',
+'permission_setup_description':
+    'فعّل الأذونات اللازمة لتصلك تنبيهات الصلاة وتظهر لك المواقيت واتجاه القبلة بدقة.',
+'permission_notifications_title': 'إشعارات الصلاة والأذان',
+'permission_notifications_description':
+    'لإرسال تنبيهات مواقيت الصلاة والتذكيرات التي تختارها.',
+'permission_location_title': 'الموقع الجغرافي',
+'permission_location_description':
+    'لتحديد مواقيت الصلاة المحلية وحساب اتجاه القبلة.',
+'permission_status_granted': 'تم السماح',
+'permission_status_pending': 'لم يتم السماح بعد',
+'permission_location_service_disabled':
+    'إذن الموقع ممنوح، لكن خدمة تحديد الموقع متوقفة في الجهاز.',
+'permission_open_location_settings': 'تفعيل خدمة الموقع',
+'permission_allow_and_continue': 'السماح والمتابعة',
+'permission_continue': 'متابعة إلى التطبيق',
+'permission_open_app_settings': 'إعدادات أذونات التطبيق',
+'permission_skip_for_now': 'تخطي الآن',
+'permission_privacy_note':
+    'نحترم خصوصيتك. لا نطلب إلا الأذونات اللازمة للميزات التي تستخدمها.',
+'permission_setup_save_failed':
+    'تعذر حفظ إعدادات التهيئة. حاول مرة أخرى.',
+
       'tagline': 'رفيقك لعبادة أكثر طمأنينة',
 
       'select_language': 'اختر لغة التطبيق',
@@ -332,6 +356,30 @@ final class MuminLocalizations {
 
     'en': <String, String>{
       'app_name': 'Mumin Pro',
+        
+'permission_setup_title': 'Let’s set up Mumin Pro',
+'permission_setup_description':
+    'Enable the permissions needed for prayer alerts, accurate prayer times and Qibla direction.',
+'permission_notifications_title': 'Prayer and Adhan notifications',
+'permission_notifications_description':
+    'Receive prayer-time alerts and the reminders you choose.',
+'permission_location_title': 'Location access',
+'permission_location_description':
+    'Calculate local prayer times and determine the Qibla direction.',
+'permission_status_granted': 'Permission granted',
+'permission_status_pending': 'Not granted yet',
+'permission_location_service_disabled':
+    'Location permission is granted, but device location services are turned off.',
+'permission_open_location_settings': 'Enable location services',
+'permission_allow_and_continue': 'Allow and continue',
+'permission_continue': 'Continue to app',
+'permission_open_app_settings': 'App permission settings',
+'permission_skip_for_now': 'Skip for now',
+'permission_privacy_note':
+    'Your privacy matters. We request only permissions needed for the features you use.',
+'permission_setup_save_failed':
+    'Could not save setup preferences. Please try again.',
+
       'tagline': 'Your companion for a more mindful daily practice',
 
       'select_language': 'Choose your app language',
@@ -577,6 +625,30 @@ final class MuminLocalizations {
 
     'fr': <String, String>{
       'app_name': 'Mumin Pro',
+        
+'permission_setup_title': 'Configurons Mumin Pro',
+'permission_setup_description':
+    'Activez les autorisations nécessaires aux alertes de prière, aux horaires précis et à la direction de la Qibla.',
+'permission_notifications_title': 'Notifications de prière et d’Adhan',
+'permission_notifications_description':
+    'Recevez les alertes des horaires de prière et les rappels de votre choix.',
+'permission_location_title': 'Accès à la localisation',
+'permission_location_description':
+    'Calculer les horaires de prière locaux et déterminer la direction de la Qibla.',
+'permission_status_granted': 'Autorisation accordée',
+'permission_status_pending': 'Pas encore autorisée',
+'permission_location_service_disabled':
+    'L’autorisation est accordée, mais le service de localisation est désactivé.',
+'permission_open_location_settings': 'Activer la localisation',
+'permission_allow_and_continue': 'Autoriser et continuer',
+'permission_continue': 'Continuer vers l’application',
+'permission_open_app_settings': 'Paramètres des autorisations',
+'permission_skip_for_now': 'Ignorer pour le moment',
+'permission_privacy_note':
+    'Votre confidentialité compte. Nous demandons uniquement les autorisations nécessaires aux fonctionnalités utilisées.',
+'permission_setup_save_failed':
+    'Impossible d’enregistrer la configuration. Veuillez réessayer.',
+
       'tagline': 'Votre compagnon pour une pratique quotidienne sereine',
 
       'select_language': 'Choisissez la langue de l’application',
