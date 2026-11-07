@@ -5,19 +5,25 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audio_service/audio_service.dart';
 
-import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart';
-import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
-import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
-import 'features/adhan/data/services/mumin_adhan_prayer_recording_preferences.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
-import 'core/notifications/mumin_notification_preferences.dart';
-import 'features/adhan/data/services/mumin_adhan_notification_service.dart';
 import 'core/localization/mumin_localizations_delegate.dart';
+import 'core/notifications/mumin_notification_preferences.dart';
+
+import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
+import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
+import 'features/adhan/data/services/mumin_adhan_notification_service.dart';
+import 'features/adhan/data/services/mumin_adhan_prayer_recording_preferences.dart';
+import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart';
+
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
+/// Initialized only by the real application entry point.
+///
+/// Widget tests can construct MuminApp directly without initializing
+/// platform audio services.
 late final MuminAdhanAudioHandler muminAdhanAudioHandler;
 
 Future<void> main() async {
@@ -33,7 +39,7 @@ Future<void> main() async {
       androidStopForegroundOnPause: true,
     ),
   );
-  
+
   runApp(const MuminBootstrap());
 }
 
@@ -151,6 +157,7 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
           return MuminApp(
             languageController: snapshot.data!.languageController,
             settingsController: snapshot.data!.settingsController,
+            audioHandler: muminAdhanAudioHandler,
           );
         }
 
@@ -168,6 +175,7 @@ class _MuminBootstrapState extends State<MuminBootstrap> {
               preferences: null,
               isDark: true,
             ),
+            audioHandler: muminAdhanAudioHandler,
           );
         }
 
@@ -274,15 +282,20 @@ class SettingsController extends ChangeNotifier {
 }
 
 /// Root application widget.
+///
+/// Audio is optional here because widget tests and previews must be able
+/// to construct the application without invoking platform audio plugins.
 class MuminApp extends StatefulWidget {
   const MuminApp({
     required this.languageController,
     required this.settingsController,
+    this.audioHandler,
     super.key,
   });
 
   final MuminLanguageController languageController;
   final SettingsController settingsController;
+  final MuminAdhanAudioHandler? audioHandler;
 
   @override
   State<MuminApp> createState() => _MuminAppState();
@@ -330,7 +343,8 @@ class _MuminAppState extends State<MuminApp> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
-                    for (final language in languages.availableLanguages)
+                    for (final language
+                        in languages.availableLanguages)
                       _LanguageOption(
                         language: language,
                         selected:
@@ -355,55 +369,68 @@ class _MuminAppState extends State<MuminApp> {
       },
     );
   }
-    @override
-Widget build(BuildContext context) {
-  return MultiProvider(
-    providers: [
-      ChangeNotifierProvider<PrayerController>(
-        create: (_) => PrayerController(),
-      ),
 
-      Provider<MuminNotificationPreferences>(
-        create: (_) => MuminNotificationPreferences(),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    final audioHandler = widget.audioHandler;
 
-      Provider<MuminAdhanNotificationService>(
-        create: (_) => MuminAdhanNotificationService(),
-      ),
-
-      Provider<MuminAdhanRecordingPlaybackService>(
-        create: (context) => MuminAdhanRecordingPlaybackService(
-          audioHandler: context.read<MuminAdhanAudioHandler>(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<PrayerController>(
+          create: (_) => PrayerController(),
         ),
-      ),
 
-      Provider<MuminAdhanAudioHandler>.value(
-        value: muminAdhanAudioHandler,
-      ),
-
-      Provider<MuminAdhanAssetPlaybackService>(
-        create: (context) => MuminAdhanAssetPlaybackService(
-          audioHandler: context.read<MuminAdhanAudioHandler>(),
+        Provider<MuminNotificationPreferences>(
+          create: (_) => MuminNotificationPreferences(),
         ),
-      ),
 
-      Provider<MuminAdhanPrayerRecordingPreferences>(
-        create: (_) => MuminAdhanPrayerRecordingPreferences(),
-      ),
+        Provider<MuminAdhanNotificationService>(
+          create: (_) => MuminAdhanNotificationService(),
+        ),
 
-      ChangeNotifierProvider<MuminLanguageController>.value(
-        value: widget.languageController,
-      ),
+        Provider<MuminAdhanPrayerRecordingPreferences>(
+          create: (_) => MuminAdhanPrayerRecordingPreferences(),
+        ),
 
-      ChangeNotifierProvider<SettingsController>.value(
-        value: widget.settingsController,
-      ),
-    ],
-    child: Consumer2<MuminLanguageController, SettingsController>(
-      builder: (context, languages, settings, child) {
-        final localizations = languages.localizations;
+        // Register audio-dependent services only when the real
+        // application has initialized its audio handler.
+        if (audioHandler != null) ...[
+          Provider<MuminAdhanAudioHandler>.value(
+            value: audioHandler,
+          ),
 
-        return MaterialApp(
+          Provider<MuminAdhanRecordingPlaybackService>(
+            create: (context) =>
+                MuminAdhanRecordingPlaybackService(
+              audioHandler:
+                  context.read<MuminAdhanAudioHandler>(),
+            ),
+          ),
+
+          Provider<MuminAdhanAssetPlaybackService>(
+            create: (context) =>
+                MuminAdhanAssetPlaybackService(
+              audioHandler:
+                  context.read<MuminAdhanAudioHandler>(),
+            ),
+          ),
+        ],
+
+        ChangeNotifierProvider<MuminLanguageController>.value(
+          value: widget.languageController,
+        ),
+
+        ChangeNotifierProvider<SettingsController>.value(
+          value: widget.settingsController,
+        ),
+      ],
+      child: Consumer2<
+          MuminLanguageController,
+          SettingsController>(
+        builder: (context, languages, settings, child) {
+          final localizations = languages.localizations;
+
+          return MaterialApp(
             title: localizations.appName,
             debugShowCheckedModeBanner: false,
             theme: MuminTheme.light,
@@ -415,7 +442,8 @@ Widget build(BuildContext context) {
               MuminLocalizationsDelegate(),
               ...GlobalMaterialLocalizations.delegates,
             ],
-            localeResolutionCallback: (deviceLocale, supportedLocales) {
+            localeResolutionCallback:
+                (deviceLocale, supportedLocales) {
               for (final supportedLocale in supportedLocales) {
                 if (supportedLocale.languageCode ==
                     languages.languageCode) {
