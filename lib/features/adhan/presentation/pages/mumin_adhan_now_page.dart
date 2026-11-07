@@ -121,13 +121,56 @@ Future<void> _selectArtwork(String artworkId) async {
     debugPrintStack(stackTrace: stackTrace);
   }
 }
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
 
-    _playback = context.read<MuminAdhanAssetPlaybackService>();
-    _languages = context.read<MuminLanguageController>();
+  _playback = context.read<MuminAdhanAssetPlaybackService>();
+  _recordingPlayback =
+      context.read<MuminAdhanRecordingPlaybackService>();
+  _prayerRecordingPreferences =
+      context.read<MuminAdhanPrayerRecordingPreferences>();
+  _languages = context.read<MuminLanguageController>();
+
+  if (!_dependenciesInitialized) {
+    _dependenciesInitialized = true;
+    _loadAssignedRecording(_selectedPrayer);
   }
+}
+
+Future<void> _loadAssignedRecording(Prayer prayer) async {
+  try {
+    final recording =
+        await _prayerRecordingPreferences.getForPrayer(prayer);
+
+    if (!mounted || _selectedPrayer != prayer) return;
+
+    setState(() {
+      _assignedRecording = recording;
+      _error = null;
+    });
+  } catch (error, stackTrace) {
+    debugPrint(
+      'Mumin Pro: assigned Adhan recording loading failed: $error',
+    );
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
+
+Future<void> _playSelectedPrayerRecording() async {
+  final assignedRecording = _assignedRecording;
+
+  if (assignedRecording != null) {
+    await _recordingPlayback.playRecording(assignedRecording);
+    return;
+  }
+
+  await _playback.playById(
+    _selectedRecording.id,
+    languageCode: _languageCode,
+  );
+}
 
   String get _languageCode => _languages.languageCode;
 
@@ -180,73 +223,68 @@ Future<void> _selectArtwork(String artworkId) async {
     return artworks.first;
   }
 
-  Future<void> _play() async {
-    if (_busy) return;
+  
+Future<void> _play() async {
+  if (_busy) return;
+
+  setState(() {
+    _busy = true;
+    _error = null;
+  });
+
+  try {
+    await _playSelectedPrayerRecording();
+  } catch (error) {
+    if (!mounted) return;
 
     setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    try {
-      await _playback.playById(
-        _selectedRecording.id,
-        languageCode: _languageCode,
+      _error = _t(
+        'تعذر تشغيل التسجيل المختار. تحقق من وجود الملف وسلامته.',
+        'Could not play the selected recording. Check that the file exists and is valid.',
+        'Impossible de lire le son choisi. Vérifiez que le fichier existe et est valide.',
       );
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        _error = _t(
-          'تعذر تشغيل التسجيل. تحقق من إضافة ملف الصوت إلى أصول التطبيق.',
-          'Could not play this recording. Check that the audio asset has been added.',
-          'Lecture impossible. Vérifiez que le fichier audio est ajouté aux ressources.',
-        );
-      });
-
-      debugPrint('Mumin Pro Adhan playback error: $error');
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
-  }
-
-  Future<void> _togglePlayback() async {
-    if (_busy) return;
-
-    setState(() {
-      _busy = true;
-      _error = null;
     });
 
-    try {
-      if (_playback.isPlaying) {
-        await _playback.pause();
-      } else {
-        await _playback.playById(
-          _selectedRecording.id,
-          languageCode: _languageCode,
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        _error = _t(
-          'تعذر التحكم في التشغيل. تحقق من ملفات الصوت.',
-          'Playback control failed. Check the audio assets.',
-          'Le contrôle audio a échoué. Vérifiez les fichiers audio.',
-        );
-      });
-
-      debugPrint('Mumin Pro Adhan control error: $error');
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+    debugPrint('Mumin Pro Adhan playback error: $error');
+  } finally {
+    if (mounted) {
+      setState(() => _busy = false);
     }
   }
+}
+  
+Future<void> _togglePlayback() async {
+  if (_busy) return;
+
+  setState(() {
+    _busy = true;
+    _error = null;
+  });
+
+  try {
+    if (_playback.isPlaying) {
+      await _playback.pause();
+    } else {
+      await _playSelectedPrayerRecording();
+    }
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _error = _t(
+        'تعذر التحكم في التشغيل. تحقق من التسجيل المختار.',
+        'Playback control failed. Check the selected recording.',
+        'Le contrôle audio a échoué. Vérifiez le son sélectionné.',
+      );
+    });
+
+    debugPrint('Mumin Pro Adhan control error: $error');
+  } finally {
+    if (mounted) {
+      setState(() => _busy = false);
+    }
+  }
+}
 
   Future<void> _stop() async {
     try {
@@ -325,7 +363,7 @@ Future<void> _selectArtwork(String artworkId) async {
             ),
             const SizedBox(height: 7),
             Text(
-              recording.titleFor(_languageCode),
+              _assignedRecording?.name ?? recording.titleFor(_languageCode),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: _ivory.withValues(alpha: 0.68),
@@ -554,9 +592,12 @@ Future<void> _selectArtwork(String artworkId) async {
                 if (prayer == null) return;
 
                 setState(() {
-                  _selectedPrayer = prayer;
-                  _error = null;
+                _selectedPrayer = prayer;
+                _assignedRecording = null;
+                _error = null;
                 });
+
+                _loadAssignedRecording(prayer);
               },
             ),
           ),
