@@ -8,10 +8,10 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 
-/// Schedules local notifications for the five daily prayers.
+/// Manages local notifications for the five daily prayers.
 ///
-/// This service schedules notifications only.
-/// It does not start a complete Adhan recording in the background.
+/// This service schedules prayer notifications only.
+/// It does not start Adhan recordings automatically in the background.
 class MuminAdhanNotificationService {
   MuminAdhanNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
@@ -101,8 +101,7 @@ class MuminAdhanNotificationService {
 
     return Set<Prayer>.unmodifiable(
       supportedPrayers.where(
-        (prayer) =>
-            preferences.getBool(_preferenceKey(prayer)) ?? false,
+        (prayer) => preferences.getBool(_preferenceKey(prayer)) ?? false,
       ),
     );
   }
@@ -127,10 +126,10 @@ class MuminAdhanNotificationService {
     }
   }
 
-  /// Rebuilds the next seven local calendar days.
+  /// Rebuilds notifications for the next seven local calendar days.
   ///
-  /// Existing notification IDs are retained when they are still needed.
-  /// Only stale IDs are cancelled after the new schedule succeeds.
+  /// The previous schedule is preserved if the new schedule fails.
+  /// Newly created notifications are rolled back on failure.
   Future<int> reschedule({
     required PrayerController controller,
     required String Function(Prayer prayer) prayerName,
@@ -138,6 +137,14 @@ class MuminAdhanNotificationService {
     bool preferExact = false,
   }) async {
     await initialize();
+
+    if (notificationBody.trim().isEmpty) {
+      throw ArgumentError.value(
+        notificationBody,
+        'notificationBody',
+        'Notification body cannot be empty.',
+      );
+    }
 
     final enabledPrayers = await getEnabledPrayers();
 
@@ -236,10 +243,11 @@ class MuminAdhanNotificationService {
       final preferences = await SharedPreferences.getInstance();
 
       final previousIds =
-          preferences.getStringList(_scheduledIdsKey) ?? const [];
+          preferences.getStringList(_scheduledIdsKey) ?? const <String>[];
 
       final newIdSet = newIds.toSet();
 
+      // Remove only notifications that are no longer part of the new schedule.
       for (final value in previousIds) {
         final oldId = int.tryParse(value);
 
@@ -261,6 +269,18 @@ class MuminAdhanNotificationService {
 
       return newIds.length;
     } catch (error, stackTrace) {
+      // Roll back newly scheduled notifications so failed attempts
+      // cannot leave untracked alerts on the device.
+      for (final id in newIds) {
+        try {
+          await _plugin.cancel(id: id);
+        } catch (cancelError) {
+          debugPrint(
+            'Mumin Pro: failed to roll back notification $id: $cancelError',
+          );
+        }
+      }
+
       debugPrint('Mumin Pro: prayer scheduling failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
@@ -277,10 +297,11 @@ class MuminAdhanNotificationService {
     final preferences = await SharedPreferences.getInstance();
 
     final previousIds =
-        preferences.getStringList(_scheduledIdsKey) ?? const [];
+        preferences.getStringList(_scheduledIdsKey) ?? const <String>[];
 
     for (final value in previousIds) {
       final id = int.tryParse(value);
+
       if (id == null) continue;
 
       await _plugin.cancel(id: id);
