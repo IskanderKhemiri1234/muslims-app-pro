@@ -10,6 +10,7 @@ import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/localization/mumin_locale_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
+import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 import '../../../qibla/presentation/pages/qibla_page_entry.dart';
 import '../../../quran/presentation/pages/quran_page.dart';
 import '../widgets/glass_container.dart';
@@ -253,7 +254,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       child: Selector<PrayerController, _HomeSnapshot>(
         selector: (context, controller) {
           return _HomeSnapshot(
-            prayerTimes: controller.prayerTimes,
+            schedule: controller.globalSchedule,
             nextPrayer: controller.nextPrayer,
             city: controller.city,
             isLoadingLocation: controller.isLoadingLocation,
@@ -261,7 +262,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
           );
         },
         builder: (context, snapshot, child) {
-          if (snapshot.prayerTimes == null) {
+          if (snapshot.schedule == null) {
             return _HomeLoadingView(
               localizations: localizations,
               message: snapshot.message,
@@ -357,13 +358,13 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           ),
                           const SizedBox(height: 30),
                           RepaintBoundary(
-                            child: PrayerScheduleSection(
-                              prayerTimes: snapshot.prayerTimes!,
-                              nextPrayer: snapshot.nextPrayer,
-                              prayerName: _prayerName,
-                              formatTime: _formatTime,
-                            ),
-                          ),
+  child: PrayerScheduleSection(
+    schedule: snapshot.schedule!,
+    nextPrayer: snapshot.nextPrayer,
+    prayerName: _prayerName,
+    formatTime: _formatTime,
+  ),
+),
                           const SizedBox(height: 19),
                           _LocationAction(
                             localizations: localizations,
@@ -397,16 +398,17 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 ///
 /// Clock ticks are intentionally excluded to prevent unnecessary
 /// rebuilds of the complete dashboard.
+
 class _HomeSnapshot {
   const _HomeSnapshot({
-    required this.prayerTimes,
+    required this.schedule,
     required this.nextPrayer,
     required this.city,
     required this.isLoadingLocation,
     required this.message,
   });
 
-  final PrayerTimes? prayerTimes;
+  final GlobalPrayerSchedule? schedule;
   final Prayer? nextPrayer;
   final String city;
   final bool isLoadingLocation;
@@ -415,7 +417,7 @@ class _HomeSnapshot {
   @override
   bool operator ==(Object other) {
     return other is _HomeSnapshot &&
-        identical(prayerTimes, other.prayerTimes) &&
+        identical(schedule, other.schedule) &&
         nextPrayer == other.nextPrayer &&
         city == other.city &&
         isLoadingLocation == other.isLoadingLocation &&
@@ -425,7 +427,7 @@ class _HomeSnapshot {
   @override
   int get hashCode {
     return Object.hash(
-      identityHashCode(prayerTimes),
+      identityHashCode(schedule),
       nextPrayer,
       city,
       isLoadingLocation,
