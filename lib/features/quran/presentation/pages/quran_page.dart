@@ -2222,8 +2222,8 @@ class _QuranFullScreenReaderState
               bundled: true,
               headless: true,
               fontSize: fontSize,
-              textColor: '#${_textColor.value.toRadixString(16).substring(2).toUpperCase()}',
-              backgroundColor: '#${_pageBackground.value.toRadixString(16).substring(2).toUpperCase()}',
+              textColor: '#${_textColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+              backgroundColor: '#${_pageBackground.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
               ayaActions: [
                 QuranAyaAction(
                   id: 'save_ayah',
