@@ -36,13 +36,13 @@ abstract final class MuminQuranLocalizations {
   }
 
   /// Checks whether a Quran key has an explicit translation
-  /// in every launch language.
+  /// in every approved launch language.
   static bool isQuranTranslationComplete(String key) {
     if (!hasQuranTranslation(key)) {
       return false;
     }
 
-    return MuminLanguageRegistry.launchLanguageCodes.every(
+    return MuminLanguageRegistry.supportedLanguageCodes.every(
       (languageCode) => MuminDomainCatalogRegistry.hasTranslation(
         languageCode,
         key,
@@ -62,31 +62,31 @@ abstract final class MuminQuranLocalizations {
 
   /// Returns the translation integrity status for all launch languages.
   static Map<String, bool> get quranCatalogIntegrity {
-    return Map.unmodifiable({
+    return Map<String, bool>.unmodifiable({
       for (final languageCode
-          in MuminLanguageRegistry.launchLanguageCodes)
+          in MuminLanguageRegistry.supportedLanguageCodes)
         languageCode: isQuranCatalogComplete(languageCode),
     });
   }
 
-  /// Returns all launch language codes.
+  /// Returns all approved launch language codes.
   static List<String> get languageCodes {
-    return List.unmodifiable(
-      MuminLanguageRegistry.launchLanguageCodes,
+    return List<String>.unmodifiable(
+      MuminLanguageRegistry.supportedLanguageCodes,
     );
   }
 
   /// Returns every registered Quran interface key,
   /// including reader-specific keys.
   static Set<String> get quranTranslationKeys {
-    return Set.unmodifiable({
+    return Set<String>.unmodifiable({
       ...MuminQuranCatalog.requiredKeys,
       ...MuminQuranReaderCatalog.requiredKeys,
     });
   }
 
   /// Checks whether every Quran interface translation is complete
-  /// across the three launch languages.
+  /// across all approved launch languages.
   static bool get isQuranCatalogCompleteForLaunch {
     return languageCodes.every(isQuranCatalogComplete);
   }
