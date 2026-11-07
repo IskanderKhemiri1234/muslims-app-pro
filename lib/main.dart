@@ -29,11 +29,7 @@ Future<void> main() async {
       androidStopForegroundOnPause: true,
     ),
   );
-  Provider<MuminAdhanRecordingPlaybackService>(
-  create: (context) => MuminAdhanRecordingPlaybackService(
-    audioHandler: context.read<MuminAdhanAudioHandler>(),
-  ),
-),
+  
   runApp(const MuminBootstrap());
 }
 
@@ -362,6 +358,16 @@ class _MuminAppState extends State<MuminApp> {
   providers: [
   ChangeNotifierProvider<PrayerController>(
     create: (_) => PrayerController(),
+  ),
+  
+  Provider<MuminAdhanAudioHandler>.value(
+    value: muminAdhanAudioHandler,
+  ),
+
+  Provider<MuminAdhanRecordingPlaybackService>(
+    create: (context) => MuminAdhanRecordingPlaybackService(
+      audioHandler: context.read<MuminAdhanAudioHandler>(),
+    ),
   ),
 
   Provider<MuminAdhanAudioHandler>.value(
