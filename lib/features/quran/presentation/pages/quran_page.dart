@@ -15,6 +15,7 @@ import '../../domain/models/quran_reading_progress.dart';
 import '../../domain/repositories/quran_bookmark_repository.dart';
 import '../../domain/repositories/quran_reading_progress_repository.dart';
 import '../localization/quran_page_localization.dart';
+import '../widgets/quran_surah_navigation_bar.dart';
 
 class _SurahInfo {
   final String name;
@@ -1907,6 +1908,16 @@ Text(
     );
   }
 
+void _openSurahFromNavigation(int page) {
+  if (_isLoading || !_isValidPage(page)) return;
+
+  _selectPage(
+    page,
+    saveImmediately: true,
+  );
+
+  _openFullReader();
+}
   @override
   Widget build(BuildContext context) {
     final isDark =
@@ -1967,12 +1978,36 @@ appBar: AppBar(
                       constraints: BoxConstraints(
                         minHeight: constraints.maxHeight,
                       ),
-                      child: Column(
-                        children: [
-                          _buildHeader(isDark),
-                          _buildDailyCard(isDark),
-                          _buildReaderPreview(isDark),
-                          _buildReaderControls(isDark),
+                      child: Column(       
+children: [
+  QuranSurahNavigationBar(
+    title: QuranPageLocalization.text(
+      context,
+      'quran_surahs_tab',
+    ),
+    items: List<QuranSurahNavigationItem>.generate(
+      _surahs.length,
+      (index) {
+        final surah = _surahs[index];
+
+        return QuranSurahNavigationItem(
+          number: index + 1,
+          name: QuranPageLocalization.surahName(
+            context,
+            index + 1,
+          ),
+          startPage: surah.page,
+        );
+      },
+      growable: false,
+    ),
+    currentPage: _currentPage,
+    onSurahSelected: _openSurahFromNavigation,
+  ),
+  _buildHeader(isDark),
+  _buildDailyCard(isDark),
+  _buildReaderPreview(isDark),
+  _buildReaderControls(isDark),
                         ],
                       ),
                     ),
