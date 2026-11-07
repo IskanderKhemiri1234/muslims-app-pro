@@ -14,30 +14,38 @@ class GlobalPrayerSchedule {
   /// IANA timezone identifier, for example: Africa/Casablanca.
   final String timezoneId;
 
-  /// Date-only value represented at UTC midnight.
+  /// Calendar date represented at UTC midnight.
   ///
-  /// This is a calendar date, not a prayer instant.
+  /// This is a date-only value, not a prayer instant.
   final DateTime calculationDate;
 
   final Map<Prayer, tz.TZDateTime> _times;
 
   /// Returns the prayer instant in the selected timezone.
-  tz.TZDateTime? timeForPrayer(Prayer prayer) {
-    return _times[prayer];
-  }
+  tz.TZDateTime? timeForPrayer(Prayer prayer) => _times[prayer];
 
   /// Returns an immutable map of all calculated prayer times.
   Map<Prayer, tz.TZDateTime> get allTimes => _times;
+
+  /// Whether the schedule contains every required prayer event.
+  bool get isComplete =>
+      GlobalPrayerCalculationService.supportedPrayers.every(
+        _times.containsKey,
+      );
 }
 
 /// Calculates prayer instants independently of the device timezone.
 ///
-/// The supplied localDate must represent the calendar date in the
+/// The supplied [localDate] must represent the calendar date in the
 /// target timezone, not necessarily the device's calendar date.
+///
+/// This service does not claim universal religious or observational
+/// precision: results depend on the selected calculation method,
+/// madhab, high-latitude rule and the accuracy of the supplied location.
 class GlobalPrayerCalculationService {
   const GlobalPrayerCalculationService();
 
-  static const List<Prayer> supportedPrayers = [
+  static const List<Prayer> supportedPrayers = <Prayer>[
     Prayer.fajr,
     Prayer.sunrise,
     Prayer.dhuhr,
@@ -67,7 +75,7 @@ class GlobalPrayerCalculationService {
     );
 
     // Extract the intended calendar date without inheriting
-    // the device's timezone or UTC offset.
+    // the device timezone or its UTC offset.
     final dateComponents = DateComponents(
       localDate.year,
       localDate.month,
@@ -78,7 +86,7 @@ class GlobalPrayerCalculationService {
       ..madhab = madhab
       ..highLatitudeRule = highLatitudeRule;
 
-    // Calculate absolute UTC instants.
+    // Calculate absolute instants using the UTC calculation API.
     final utcSchedule = PrayerTimes.utc(
       coordinates,
       dateComponents,
@@ -96,15 +104,18 @@ class GlobalPrayerCalculationService {
         );
       }
 
-      localTimes[prayer] = tz.TZDateTime.from(
+      final localTime = tz.TZDateTime.from(
         utcTime,
         timezone,
       );
+
+      localTimes[prayer] = localTime;
     }
 
+    _validateScheduleCompleteness(localTimes);
     _validateChronologicalOrder(localTimes);
 
-    return GlobalPrayerSchedule(
+    final schedule = GlobalPrayerSchedule(
       timezoneId: timezone.name,
       calculationDate: DateTime.utc(
         localDate.year,
@@ -113,11 +124,19 @@ class GlobalPrayerCalculationService {
       ),
       times: localTimes,
     );
+
+    if (!schedule.isComplete) {
+      throw StateError(
+        'The calculated prayer schedule is incomplete.',
+      );
+    }
+
+    return schedule;
   }
 
-  // --------------------------------------------------
-  // VALIDATION
-  // --------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // INPUT VALIDATION
+  // ---------------------------------------------------------------------------
 
   static void _validateCoordinates(
     double latitude,
@@ -152,12 +171,36 @@ class GlobalPrayerCalculationService {
     final day = date.day;
 
     if (year < 1 || year > 9999) {
-      throw ArgumentError.value(year, 'year');
+      throw ArgumentError.value(
+        year,
+        'year',
+        'Year is outside the supported range.',
+      );
     }
 
-    final normalized = DateTime.utc(year, month, day);
+    if (month < 1 || month > 12) {
+      throw ArgumentError.value(
+        month,
+        'month',
+        'Month must be between 1 and 12.',
+      );
+    }
+
+    if (day < 1 || day > 31) {
+      throw ArgumentError.value(
+        day,
+        'day',
+        'Day must be between 1 and 31.',
+      );
+    }
 
     // DateTime normalizes invalid dates, so compare the components.
+    final normalized = DateTime.utc(
+      year,
+      month,
+      day,
+    );
+
     if (normalized.year != year ||
         normalized.month != month ||
         normalized.day != day) {
@@ -170,7 +213,9 @@ class GlobalPrayerCalculationService {
   }
 
   static void _validateTimezone(tz.Location timezone) {
-    if (timezone.name.trim().isEmpty) {
+    final timezoneId = timezone.name.trim();
+
+    if (timezoneId.isEmpty) {
       throw ArgumentError.value(
         timezone.name,
         'timezone',
@@ -179,24 +224,48 @@ class GlobalPrayerCalculationService {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // RESULT VALIDATION
+  // ---------------------------------------------------------------------------
+
+  static void _validateScheduleCompleteness(
+    Map<Prayer, tz.TZDateTime> times,
+  ) {
+    for (final prayer in supportedPrayers) {
+      if (!times.containsKey(prayer)) {
+        throw StateError(
+          'A required prayer time is missing: $prayer.',
+        );
+      }
+    }
+  }
+
+  /// Ensures all daily prayer events follow the expected sequence.
+  ///
+  /// The order includes sunrise because it is a significant boundary
+  /// in the daily prayer schedule.
   static void _validateChronologicalOrder(
     Map<Prayer, tz.TZDateTime> times,
   ) {
-    for (var i = 0; i < supportedPrayers.length - 1; i++) {
-      final current = times[supportedPrayers[i]];
-      final next = times[supportedPrayers[i + 1]];
+    for (var index = 0;
+        index < supportedPrayers.length - 1;
+        index++) {
+      final currentPrayer = supportedPrayers[index];
+      final nextPrayer = supportedPrayers[index + 1];
 
-      if (current == null || next == null) {
+      final currentTime = times[currentPrayer];
+      final nextTime = times[nextPrayer];
+
+      if (currentTime == null || nextTime == null) {
         throw StateError(
           'A required prayer time is missing.',
         );
       }
 
-      if (!current.isBefore(next)) {
+      if (!currentTime.isBefore(nextTime)) {
         throw StateError(
           'Invalid prayer sequence between '
-          '${supportedPrayers[i]} and '
-          '${supportedPrayers[i + 1]}.',
+          '$currentPrayer and $nextPrayer.',
         );
       }
     }
