@@ -309,24 +309,32 @@ class _MuminAppState extends State<MuminApp> {
     super.dispose();
   }
 
-  Future<void> _showLanguagePicker(
-    BuildContext context,
-    MuminLanguageController languageController,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: false,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (sheetContext) {
-        return Consumer<MuminLanguageController>(
-          builder: (context, languages, child) {
-            final localizations = languages.localizations;
+  
+Future<void> _showLanguagePicker(
+  BuildContext context,
+  MuminLanguageController languageController,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (sheetContext) {
+      return Consumer<MuminLanguageController>(
+        builder: (context, languages, child) {
+          final localizations = languages.localizations;
+          final colorScheme = Theme.of(context).colorScheme;
 
-            return Directionality(
-              textDirection: languages.textDirection,
-              child: Padding(
+          return Directionality(
+            textDirection: languages.textDirection,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight:
+                    MediaQuery.of(context).size.height * 0.55,
+              ),
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
                   16,
                   8,
@@ -340,7 +348,13 @@ class _MuminAppState extends State<MuminApp> {
                     Text(
                       localizations.selectLanguage,
                       textAlign: TextAlign.start,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.onSurface,
+                          ),
                     ),
                     const SizedBox(height: 12),
                     for (final language
@@ -363,13 +377,13 @@ class _MuminAppState extends State<MuminApp> {
                   ],
                 ),
               ),
-            );
-          },
-        );
-      },
-    );
-  }
-
+            ),
+          );
+        },
+      );
+    },
+  );
+}
   @override
   Widget build(BuildContext context) {
     final audioHandler = widget.audioHandler;
