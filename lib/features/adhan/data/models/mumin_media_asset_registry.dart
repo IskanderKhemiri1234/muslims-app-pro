@@ -3,6 +3,8 @@
 abstract final class MuminMediaAssetRegistry {
   static const String adhanBasePath = 'assets/audio/adhan';
   static const String mosqueBasePath = 'assets/images/mosques';
+  static const String adhanHeroPath =
+      'assets/images/adhan/mumin_adhan_hero.jpg';
 
   static const adhanRecordings = <MuminAdhanAsset>[
     MuminAdhanAsset(
@@ -63,6 +65,16 @@ abstract final class MuminMediaAssetRegistry {
   ];
 
   static const mosqueArtwork = <MuminMosqueArtwork>[
+    MuminMosqueArtwork(
+      id: 'mumin_adhan_hero',
+      titleAr: 'مشهد المسجد المعتمد للأذان',
+      titleEn: 'Mumin Pro Adhan Mosque',
+      titleFr: 'Mosquée principale de Mumin Pro',
+      assetPath: adhanHeroPath,
+      license: 'User supplied; rights not independently verified',
+      sourceUrl: '',
+      attribution: 'User supplied image',
+    ),
     MuminMosqueArtwork(
       id: 'hassan_mosque_rabat',
       titleAr: 'مسجد حسان – الرباط',
@@ -150,7 +162,6 @@ class MuminAdhanAsset {
         return titleEn;
       case 'fr':
         return titleFr;
-      case 'ar':
       default:
         return titleAr;
     }
@@ -184,7 +195,6 @@ class MuminMosqueArtwork {
         return titleEn;
       case 'fr':
         return titleFr;
-      case 'ar':
       default:
         return titleAr;
     }
