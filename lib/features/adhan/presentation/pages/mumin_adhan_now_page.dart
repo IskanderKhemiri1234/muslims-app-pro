@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/models/mumin_media_asset_registry.dart';
 import '../../data/services/mumin_adhan_asset_playback_service.dart';
+import '../../data/services/mumin_adhan_recording_playback_service.dart';
+import '../../data/services/mumin_adhan_prayer_recording_preferences.dart';
+import '../../data/services/mumin_adhan_recording_library.dart';
 import 'dart:io';
 import '../../data/services/mumin_adhan_artwork_service.dart';
 import '../../data/services/mumin_adhan_artwork_selection_preferences.dart';
@@ -35,6 +38,11 @@ class _MuminAdhanNowPageState extends State<MuminAdhanNowPage> {
 
   late MuminAdhanAssetPlaybackService _playback;
   late MuminLanguageController _languages;
+  late MuminAdhanRecordingPlaybackService _recordingPlayback;
+  late MuminAdhanPrayerRecordingPreferences _prayerRecordingPreferences;
+
+MuminAdhanRecording? _assignedRecording;
+bool _dependenciesInitialized = false;
 
   Prayer _selectedPrayer = Prayer.fajr;
   String? _selectedArtworkId;
