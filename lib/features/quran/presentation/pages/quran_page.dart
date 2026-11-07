@@ -2072,7 +2072,6 @@ class _QuranFullScreenReaderState
       'mumin_pro_quran_reader_theme_v1';
 
   static const Color _gold = Color(0xFFD8B66A);
-  static const Color _emerald = Color(0xFF075B46);
 
   late int _currentPage;
   late final PageController _pageController;
