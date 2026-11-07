@@ -9,6 +9,7 @@ import '../../data/services/mumin_adhan_artwork_service.dart';
 import '../../data/services/mumin_adhan_recording_library.dart';
 import '../../data/services/mumin_adhan_recording_playback_service.dart';
 import 'mumin_adhan_now_page.dart';
+import '../../data/models/mumin_media_asset_registry.dart';
 
 class AdhanPage extends StatefulWidget {
   const AdhanPage({super.key});
@@ -418,100 +419,109 @@ appBar: AppBar(
     );
   }
 
-  Widget _buildArtworkCard(bool isDark) {
-    return Container(
-      height: 320,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: _gold.withValues(alpha: 0.45),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _emerald.withValues(alpha: 0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+  
+Widget _buildArtworkCard(bool isDark) {
+  return Container(
+    height: 320,
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(
+        color: _gold.withValues(alpha: 0.45),
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_artwork != null && _artwork!.existsSync())
-            Image.file(
-              _artwork!,
+      boxShadow: [
+        BoxShadow(
+          color: _emerald.withValues(alpha: 0.16),
+          blurRadius: 24,
+          offset: const Offset(0, 12),
+        ),
+      ],
+    ),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_artwork != null && _artwork!.existsSync())
+          Image.file(
+            _artwork!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Image.asset(
+              MuminMediaAssetRegistry.adhanHeroPath,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _artworkFallback(),
-            )
-          else
-            _artworkFallback(),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.04),
-                  Colors.black.withValues(alpha: 0.22),
-                  _midnight.withValues(alpha: 0.94),
-                ],
-                stops: const [0, 0.48, 1],
-              ),
             ),
+          )
+        else
+          Image.asset(
+            MuminMediaAssetRegistry.adhanHeroPath,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _artworkFallback(),
           ),
-          PositionedDirectional(
-            top: 16,
-            end: 16,
-            child: _artworkButton(),
-          ),
-          PositionedDirectional(
-            start: 22,
-            end: 22,
-            bottom: 22,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.nights_stay_rounded,
-                  color: _gold,
-                  size: 25,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _t(
-                    'نداء الصلاة',
-                    'The call to prayer',
-                    'L’appel à la prière',
-                  ),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _t(
-                    'سكينة في كل موعد',
-                    'A moment of peace at every prayer',
-                    'Un moment de paix à chaque prière',
-                  ),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.84),
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _buildPlaybackControls(),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.04),
+                Colors.black.withValues(alpha: 0.22),
+                _midnight.withValues(alpha: 0.94),
               ],
+              stops: const [0, 0.48, 1],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        PositionedDirectional(
+          top: 16,
+          end: 16,
+          child: _artworkButton(),
+        ),
+        PositionedDirectional(
+          start: 22,
+          end: 22,
+          bottom: 22,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.nights_stay_rounded,
+                color: _gold,
+                size: 25,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _t(
+                  'نداء الصلاة',
+                  'The call to prayer',
+                  'L’appel à la prière',
+                ),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                _t(
+                  'سكينة في كل موعد',
+                  'A moment of peace at every prayer',
+                  'Un moment de paix à chaque prière',
+                ),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _buildPlaybackControls(),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _artworkFallback() {
     return Container(
