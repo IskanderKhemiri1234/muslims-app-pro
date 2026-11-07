@@ -53,6 +53,8 @@ abstract final class MuminPrayerSettingsCatalog {
     'calculation_north_america': 'أمريكا الشمالية',
     'calculation_turkey': 'تركيا',
     'calculation_tehran': 'طهران',
+    'calculation_moon_sighting_committee':
+        'لجنة تحري الهلال',
     'calculation_other': 'إعدادات مخصصة',
   };
 
@@ -96,6 +98,8 @@ abstract final class MuminPrayerSettingsCatalog {
     'calculation_north_america': 'North America',
     'calculation_turkey': 'Turkey',
     'calculation_tehran': 'Tehran',
+    'calculation_moon_sighting_committee':
+        'Moon Sighting Committee',
     'calculation_other': 'Custom settings',
   };
 
@@ -140,6 +144,8 @@ abstract final class MuminPrayerSettingsCatalog {
     'calculation_north_america': 'Amérique du Nord',
     'calculation_turkey': 'Turquie',
     'calculation_tehran': 'Téhéran',
+    'calculation_moon_sighting_committee':
+        'Comité d’observation du croissant',
     'calculation_other': 'Réglages personnalisés',
   };
 
