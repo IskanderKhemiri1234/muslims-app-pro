@@ -1016,8 +1016,9 @@ class _QuranPageState extends State<QuranPage>
     }
   }
   
-  Future<void> _goToPage() async {
-    if (_isLoading || !mounted) return;
+  
+Future<int?> _goToPage() async {
+    if (_isLoading || !mounted) return null;
 
     final controller = TextEditingController(
       text: _currentPage.toString(),
@@ -1098,9 +1099,8 @@ class _QuranPageState extends State<QuranPage>
       controller.dispose();
     }
 
-    if (selectedPage != null && mounted) {
-      _selectPage(selectedPage, saveImmediately: true);
-    }
+    
+   return selectedPage;
   }
   
   Future<void> _openIndex() async {
@@ -2000,7 +2000,7 @@ class _QuranFullScreenReader extends StatefulWidget {
   final Future<void> Function() onOpenIndex;
   final Future<void> Function() onOpenPageBookmarks;
   final Future<void> Function() onOpenVerseBookmarks;
-  final Future<void> Function() onGoToPage;
+  final Future<int?> Function() onGoToPage; 
 
   const _QuranFullScreenReader({
     required this.initialPage,
@@ -2029,8 +2029,9 @@ class _QuranFullScreenReaderState
 
   static const Color _green = Color(0xFF075B46);
   static const Color _gold = Color(0xFFD8B66A);
-
-  late final PageController _pageController;
+  
+Offset? _pointerDownPosition;
+double? _sliderPreviewPage;
 
   late int _currentPage;
 
@@ -2042,14 +2043,13 @@ class _QuranFullScreenReaderState
 
     _currentPage = widget.initialPage.clamp(1, _totalPages);
 
-    _pageController = PageController(
+    (
       initialPage: _currentPage - 1,
     );
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -2071,46 +2071,112 @@ class _QuranFullScreenReaderState
       ? const Color(0xFFE8DFC9)
       : const Color(0xFF26382C);
 
-  void _onPageChanged(int index) {
-    final page = index + 1;
+  
+  void _setPage(int page) {
+    if (!mounted || page < 1 || page > _totalPages) return;
+    if (page == _currentPage) return;
 
     setState(() {
       _currentPage = page;
+      _sliderPreviewPage = null;
     });
 
     widget.onPageChanged(page);
   }
 
   Future<void> _previousPage() async {
-    if (_currentPage <= 1) return;
-
-    await _pageController.previousPage(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+    if (_currentPage > 1) {
+      _setPage(_currentPage - 1);
+    }
   }
 
   Future<void> _nextPage() async {
-    if (_currentPage >= _totalPages) return;
-
-    await _pageController.nextPage(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+    if (_currentPage < _totalPages) {
+      _setPage(_currentPage + 1);
+    }
   }
 
   Future<void> _openGoToPage() async {
-    await widget.onGoToPage();
+    final target = await widget.onGoToPage();
 
-    if (!mounted) return;
+    if (!mounted || target == null) return;
 
-    final target = _currentPage;
+    _setPage(target);
+  }
 
-    if (_pageController.hasClients &&
-        target >= 1 &&
-        target <= _totalPages) {
-      _pageController.jumpToPage(target - 1);
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerDownPosition = event.position;
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    final start = _pointerDownPosition;
+    _pointerDownPosition = null;
+
+    if (start == null) return;
+
+    final delta = event.position - start;
+
+    if (delta.dx.abs() < 72) return;
+    if (delta.dx.abs() < delta.dy.abs() * 1.25) return;
+
+    if (delta.dx < 0) {
+      _nextPage();
+    } else {
+      _previousPage();
     }
+  }
+
+  Widget _buildMushafPage() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const pageAspectRatio = 0.707;
+
+        final availableWidth = constraints.maxWidth < 760
+            ? constraints.maxWidth
+            : 760.0;
+
+        final widthFromHeight =
+            constraints.maxHeight * pageAspectRatio;
+
+        final pageWidth = availableWidth < widthFromHeight
+            ? availableWidth
+            : widthFromHeight;
+
+        final pageHeight = pageWidth / pageAspectRatio;
+
+        final fontSize = (pageWidth / 19).clamp(17.0, 25.0);
+
+        return Center(
+          child: SizedBox(
+            width: pageWidth,
+            height: pageHeight,
+            child: QuranMadinaFlutter(
+              key: const ValueKey<String>(
+                'mumin_pro_single_mushaf_webview',
+              ),
+              page: _currentPage,
+              height: pageHeight,
+              bundled: true,
+              headless: true,
+              fontSize: fontSize,
+              textColor: widget.isDark ? '#E8DFC9' : '#26382C',
+              backgroundColor:
+                  widget.isDark ? '#202A23' : '#FFFCF3',
+              ayaActions: [
+                QuranAyaAction(
+                  id: 'save_ayah',
+                  title: QuranPageLocalization.text(
+                    context,
+                    'quran_save_verse',
+                  ),
+                ),
+              ],
+              onAyaAction: widget.onVerseAction,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildMushafPage(int page) {
@@ -2285,13 +2351,20 @@ class _QuranFullScreenReaderState
                       min: 1,
                       max: _totalPages.toDouble(),
                       divisions: _totalPages - 1,
-                      value: _currentPage.toDouble(),
-                      onChanged: (value) {
-                        final page = value.round();
+                      
+value: (_sliderPreviewPage ?? _currentPage.toDouble())
+    .clamp(1.0, _totalPages.toDouble()),
 
-                        setState(() {
-                          _currentPage = page;
-                        });
+onChanged: (value) {
+  setState(() {
+    _sliderPreviewPage = value;
+  });
+},
+
+onChangeEnd: (value) {
+  _setPage(value.round());
+},
+
 
                         _pageController.jumpToPage(page - 1);
                         widget.onPageChanged(page);
@@ -2365,25 +2438,19 @@ class _QuranFullScreenReaderState
       body: SafeArea(
         child: Column(
           children: [
-            if (_showControls) _buildTopBar(),
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _totalPages,
-                onPageChanged: _onPageChanged,
-                physics: const PageScrollPhysics(),
-                itemBuilder: (context, index) {
-                  return _buildMushafPage(index + 1);
-                },
-              ),
-            ),
-            if (_showControls) _buildBottomControls(),
-          ],
-        ),
-      ),
-    );
-  }
-}
+            if (_showControls) _buildTopBar(),  
+Expanded(
+  child: Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: _handlePointerDown,
+    onPointerUp: _handlePointerUp,
+    onPointerCancel: (_) {
+      _pointerDownPosition = null;
+    },
+    child: _buildMushafPage(),
+  ),
+),
+            }
 
 class _ReaderActionButton extends StatelessWidget {
   final IconData icon;
