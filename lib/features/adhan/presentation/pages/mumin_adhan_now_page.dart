@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/models/mumin_media_asset_registry.dart';
 import '../../data/services/mumin_adhan_asset_playback_service.dart';
+import 'dart:io';
+import '../../data/services/mumin_adhan_artwork_service.dart';
 
 class MuminAdhanNowPage extends StatefulWidget {
   const MuminAdhanNowPage({super.key});
@@ -39,7 +41,33 @@ class _MuminAdhanNowPageState extends State<MuminAdhanNowPage> {
   String? _error;
 
   StreamSubscription? _stateSubscription;
+  late final MuminAdhanArtworkService _artworkService;
 
+File? _personalArtwork;
+bool _usePersonalArtwork = true;
+  @override
+void initState() {
+  super.initState();
+
+  _artworkService = MuminAdhanArtworkService();
+  _loadPersonalArtwork();
+}
+
+Future<void> _loadPersonalArtwork() async {
+  try {
+    final artwork = await _artworkService.getSavedArtwork();
+
+    if (!mounted) return;
+
+    setState(() {
+      _personalArtwork = artwork;
+      _usePersonalArtwork = artwork != null;
+    });
+  } catch (error, stackTrace) {
+    debugPrint('Mumin Pro: personal Adhan artwork loading failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+}
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -270,89 +298,118 @@ class _MuminAdhanNowPageState extends State<MuminAdhanNowPage> {
   }
 
   Widget _buildArtwork(MuminMosqueArtwork? artwork) {
-    return AspectRatio(
-      aspectRatio: 1.18,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(27),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (artwork != null)
-              Image.asset(
-                artwork.assetPath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildArtworkFallback(),
-              )
-            else
-              _buildArtworkFallback(),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.02),
-                    Colors.black.withValues(alpha: 0.12),
-                    _emerald.withValues(alpha: 0.94),
-                  ],
-                  stops: const [0.0, 0.48, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 18,
-              right: 18,
-              child: _glassIcon(Icons.mosque_rounded),
-            ),
-            Positioned(
-              left: 18,
-              right: 18,
-              bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: _gold,
-                    size: 19,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    artwork?.titleFor(_languageCode) ??
-                        _t(
-                          'مساجد العالم الإسلامي',
-                          'Mosques of the Muslim World',
-                          'Mosquées du monde musulman',
-                        ),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: _ivory,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _t(
-                      'جمال معماري يرافق لحظة الأذان',
-                      'Architecture accompanying the call to prayer',
-                      'Une architecture au rythme de l’appel à la prière',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _ivory.withValues(alpha: 0.76),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  final personalArtwork = _usePersonalArtwork &&
+      _personalArtwork != null &&
+      _personalArtwork!.existsSync();
 
+  return AspectRatio(
+    aspectRatio: 1.18,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(27),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (personalArtwork)
+            Image.file(
+              _personalArtwork!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) {
+                return artwork != null
+                    ? Image.asset(
+                        artwork.assetPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _buildArtworkFallback(),
+                      )
+                    : _buildArtworkFallback();
+              },
+            )
+          else if (artwork != null)
+            Image.asset(
+              artwork.assetPath,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  _buildArtworkFallback(),
+            )
+          else
+            _buildArtworkFallback(),
+
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.02),
+                  Colors.black.withValues(alpha: 0.12),
+                  _emerald.withValues(alpha: 0.94),
+                ],
+                stops: const [0.0, 0.48, 1.0],
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: 18,
+            right: 18,
+            child: _glassIcon(Icons.mosque_rounded),
+          ),
+
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: _gold,
+                  size: 19,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  personalArtwork
+                      ? _t(
+                          'الصورة المختارة',
+                          'Selected artwork',
+                          'Image sélectionnée',
+                        )
+                      : artwork?.titleFor(_languageCode) ??
+                          _t(
+                            'مساجد العالم الإسلامي',
+                            'Mosques of the Muslim World',
+                            'Mosquées du monde musulman',
+                          ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _ivory,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _t(
+                    'جمال معماري يرافق لحظة الأذان',
+                    'Architecture accompanying the call to prayer',
+                    'Une architecture au rythme de l’appel à la prière',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _ivory.withValues(alpha: 0.76),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  }
+  
   Widget _buildArtworkFallback() {
     return Container(
       decoration: const BoxDecoration(
@@ -491,8 +548,9 @@ class _MuminAdhanNowPageState extends State<MuminAdhanNowPage> {
               return GestureDetector(
                 onTap: () {
                   setState(() {
-                    _selectedArtworkId = item.id;
-                  });
+  _selectedArtworkId = item.id;
+  _usePersonalArtwork = false;
+});
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
