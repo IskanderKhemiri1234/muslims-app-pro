@@ -5,6 +5,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
@@ -49,36 +50,28 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   String? _lastSuccessfulScheduleSignature;
 
   String _buildFingerprint() {
-    final timezone = _prayerController.timezoneLocation;
+  final timezone = _prayerController.timezoneLocation;
+  final localNow = timezone == null
+      ? null
+      : tz.TZDateTime.now(timezone);
 
-    final localDate = timezone == null
-        ? 'unknown-date'
-        : () {
-            final now = DateTime.now();
-            final local = DateTime.fromMillisecondsSinceEpoch(
-              now.millisecondsSinceEpoch,
-              isUtc: true,
-            );
+  final localDate = localNow == null
+      ? 'unknown-date'
+      : '${localNow.year}-${localNow.month}-${localNow.day}';
 
-            // The timezone identifier is included separately. The local
-            // calendar date is derived from the device clock here only as
-            // a lightweight change detector; actual scheduling uses tz.
-            return '${local.year}-${local.month}-${local.day}';
-          }();
-
-    return <Object?>[
-      _prayerController.isInitialized,
-      _prayerController.hasUsableSchedule,
-      _prayerController.latitude.toStringAsFixed(5),
-      _prayerController.longitude.toStringAsFixed(5),
-      _prayerController.timezoneId,
-      timezone?.name,
-      _prayerController.method.name,
-      _prayerController.madhab.name,
-      localDate,
-      _languageController.languageCode,
-    ].join('|');
-  }
+  return <Object?>[
+    _prayerController.isInitialized,
+    _prayerController.hasUsableSchedule,
+    _prayerController.latitude.toStringAsFixed(5),
+    _prayerController.longitude.toStringAsFixed(5),
+    _prayerController.timezoneId,
+    timezone?.name,
+    _prayerController.method.name,
+    _prayerController.madhab.name,
+    localDate,
+    _languageController.languageCode,
+  ].join('|');
+}
 
   void _onPrayerControllerChanged() {
     if (_disposed) return;
