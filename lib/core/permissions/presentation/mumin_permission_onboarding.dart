@@ -9,9 +9,8 @@ import '../../../features/adhan/data/services/mumin_adhan_notification_service.d
 
 /// First-launch permission setup.
 ///
-/// Native permissions are requested only after the user presses the
-/// confirmation button. The application remains usable if permissions
-/// are declined.
+/// Permissions are requested only after an explicit user action.
+/// The application remains usable when permissions are declined.
 class MuminPermissionOnboarding extends StatefulWidget {
   const MuminPermissionOnboarding({
     required this.child,
@@ -37,6 +36,7 @@ class _MuminPermissionOnboardingState
   bool _notificationGranted = false;
   bool _locationGranted = false;
   bool _locationServiceEnabled = false;
+  bool _locationPermanentlyDenied = false;
 
   String? _errorMessage;
 
@@ -44,6 +44,10 @@ class _MuminPermissionOnboardingState
     return MuminLocalizations.fromCode(
       Localizations.localeOf(context).languageCode,
     );
+  }
+
+  bool get _allPermissionsGranted {
+    return _notificationGranted && _locationGranted;
   }
 
   @override
@@ -55,6 +59,7 @@ class _MuminPermissionOnboardingState
   Future<void> _restoreSetupState() async {
     try {
       final preferences = await SharedPreferences.getInstance();
+
       final completed = preferences.getBool(
             MuminPermissionOnboarding.completedPreferenceKey,
           ) ??
@@ -88,41 +93,61 @@ class _MuminPermissionOnboardingState
       _errorMessage = null;
     });
 
-    var notificationGranted = false;
-    var locationGranted = false;
-    var locationServiceEnabled = false;
+    var notificationGranted = _notificationGranted;
+    var locationGranted = _locationGranted;
+    var locationServiceEnabled = _locationServiceEnabled;
+    var locationPermanentlyDenied = _locationPermanentlyDenied;
 
-    try {
-      final notificationService =
-          context.read<MuminAdhanNotificationService>();
+    // Request notifications only when they have not already been granted.
+    if (!notificationGranted) {
+      try {
+        final notificationService =
+            context.read<MuminAdhanNotificationService>();
 
-      notificationGranted =
-          await notificationService.requestNotificationPermission();
-    } catch (error, stackTrace) {
-      debugPrint(
-        'Mumin Pro: notification permission request failed: $error',
-      );
-      debugPrintStack(stackTrace: stackTrace);
+        notificationGranted =
+            await notificationService.requestNotificationPermission();
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Mumin Pro: notification permission request failed: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      }
     }
 
-    try {
-      var permission = await Geolocator.checkPermission();
+    // Request location independently from notification permission.
+    if (!locationGranted) {
+      try {
+        var permission = await Geolocator.checkPermission();
 
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+
+        locationGranted =
+            permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always;
+
+        locationPermanentlyDenied =
+            permission == LocationPermission.deniedForever;
+
+        locationServiceEnabled =
+            await Geolocator.isLocationServiceEnabled();
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Mumin Pro: location permission request failed: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
       }
-
-      locationGranted =
-          permission == LocationPermission.whileInUse ||
-          permission == LocationPermission.always;
-
-      locationServiceEnabled =
-          await Geolocator.isLocationServiceEnabled();
-    } catch (error, stackTrace) {
-      debugPrint(
-        'Mumin Pro: location permission request failed: $error',
-      );
-      debugPrintStack(stackTrace: stackTrace);
+    } else {
+      try {
+        locationServiceEnabled =
+            await Geolocator.isLocationServiceEnabled();
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Mumin Pro: location service status check failed: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      }
     }
 
     if (!mounted) return;
@@ -131,11 +156,14 @@ class _MuminPermissionOnboardingState
       _notificationGranted = notificationGranted;
       _locationGranted = locationGranted;
       _locationServiceEnabled = locationServiceEnabled;
+      _locationPermanentlyDenied = locationPermanentlyDenied;
       _requesting = false;
     });
   }
 
   Future<void> _finishSetup() async {
+    if (_requesting) return;
+
     try {
       final preferences = await SharedPreferences.getInstance();
 
@@ -215,7 +243,6 @@ class _MuminPermissionOnboardingState
   Widget _buildSetupScreen() {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -223,12 +250,7 @@ class _MuminPermissionOnboardingState
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                22,
-                28,
-                22,
-                24,
-              ),
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - 52,
@@ -285,24 +307,37 @@ class _MuminPermissionOnboardingState
                     const SizedBox(height: 30),
                     _PermissionCard(
                       icon: Icons.notifications_active_rounded,
-                      title: _texts.text('permission_notifications_title'),
-                      description:
-                          _texts.text('permission_notifications_description'),
+                      title: _texts.text(
+                        'permission_notifications_title',
+                      ),
+                      description: _texts.text(
+                        'permission_notifications_description',
+                      ),
                       granted: _notificationGranted,
-                      statusGranted: _texts.text('permission_status_granted'),
-                      statusPending: _texts.text('permission_status_pending'),
+                      statusGranted: _texts.text(
+                        'permission_status_granted',
+                      ),
+                      statusPending: _texts.text(
+                        'permission_status_pending',
+                      ),
                     ),
                     const SizedBox(height: 14),
                     _PermissionCard(
                       icon: Icons.location_on_rounded,
                       title: _texts.text('permission_location_title'),
-                      description:
-                          _texts.text('permission_location_description'),
+                      description: _texts.text(
+                        'permission_location_description',
+                      ),
                       granted: _locationGranted,
-                      statusGranted: _texts.text('permission_status_granted'),
-                      statusPending: _texts.text('permission_status_pending'),
+                      statusGranted: _texts.text(
+                        'permission_status_granted',
+                      ),
+                      statusPending: _texts.text(
+                        'permission_status_pending',
+                      ),
                     ),
-                    if (_locationGranted && !_locationServiceEnabled) ...[
+                    if (_locationGranted &&
+                        !_locationServiceEnabled) ...[
                       const SizedBox(height: 12),
                       _InformationNotice(
                         message: _texts.text(
@@ -314,7 +349,21 @@ class _MuminPermissionOnboardingState
                         onPressed: _openLocationSettings,
                         icon: const Icon(Icons.gps_fixed_rounded),
                         label: Text(
-                          _texts.text('permission_open_location_settings'),
+                          _texts.text(
+                            'permission_open_location_settings',
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_locationPermanentlyDenied) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _openAppSettings,
+                        icon: const Icon(Icons.settings_rounded),
+                        label: Text(
+                          _texts.text(
+                            'permission_open_app_settings',
+                          ),
                         ),
                       ),
                     ],
@@ -333,7 +382,7 @@ class _MuminPermissionOnboardingState
                     FilledButton(
                       onPressed: _requesting
                           ? null
-                          : (_notificationGranted || _locationGranted)
+                          : _allPermissionsGranted
                               ? _finishSetup
                               : _requestPermissions,
                       style: FilledButton.styleFrom(
@@ -354,9 +403,11 @@ class _MuminPermissionOnboardingState
                               ),
                             )
                           : Text(
-                              (_notificationGranted || _locationGranted)
+                              _allPermissionsGranted
                                   ? _texts.text('permission_continue')
-                                  : _texts.text('permission_allow_and_continue'),
+                                  : _texts.text(
+                                      'permission_allow_and_continue',
+                                    ),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
                               ),
@@ -367,7 +418,9 @@ class _MuminPermissionOnboardingState
                       OutlinedButton(
                         onPressed: _openAppSettings,
                         child: Text(
-                          _texts.text('permission_open_app_settings'),
+                          _texts.text(
+                            'permission_open_app_settings',
+                          ),
                         ),
                       ),
                     ],
