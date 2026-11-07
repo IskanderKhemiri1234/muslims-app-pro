@@ -8,6 +8,7 @@ import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/services/mumin_adhan_artwork_service.dart';
 import '../../data/services/mumin_adhan_recording_library.dart';
 import '../../data/services/mumin_adhan_recording_playback_service.dart';
+import 'mumin_adhan_now_page.dart';
 
 class AdhanPage extends StatefulWidget {
   const AdhanPage({super.key});
@@ -341,15 +342,36 @@ class _AdhanPageState extends State<AdhanPage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          _t('الأذان', 'Adhan', 'Adhan'),
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+      
+appBar: AppBar(
+  title: Text(
+    _t('الأذان', 'Adhan', 'Adhan'),
+    style: const TextStyle(fontWeight: FontWeight.w800),
+  ),
+  centerTitle: true,
+  backgroundColor: Colors.transparent,
+  elevation: 0,
+  actions: [
+    IconButton(
+      tooltip: _t(
+        'فتح واجهة الأذان',
+        'Open Adhan screen',
+        'Ouvrir l’écran Adhan',
       ),
+      icon: const Icon(
+        Icons.open_in_full_rounded,
+        color: Color(0xFFD8B66A),
+      ),
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const MuminAdhanNowPage(),
+          ),
+        );
+      },
+    ),
+  ],
+),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(),
