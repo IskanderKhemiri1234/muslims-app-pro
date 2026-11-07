@@ -7,12 +7,13 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../notifications/data/services/mumin_connectivity_notification_service.dart';
+import '../../../notifications/data/services/mumin_location_change_notification_service.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import 'mumin_adhan_notification_service.dart';
 import 'mumin_prayer_countdown_notification_service.dart';
 
 /// Coordinates prayer alerts, the persistent countdown,
-/// and temporary internet connectivity notifications.
+/// connectivity notifications and confirmed location changes.
 class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   MuminAdhanNotificationCoordinator({
     required PrayerController prayerController,
@@ -20,6 +21,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     required MuminLanguageController languageController,
     MuminPrayerCountdownNotificationService? countdownNotificationService,
     MuminConnectivityNotificationService? connectivityNotificationService,
+    MuminLocationChangeNotificationService? locationNotificationService,
   })  : _prayerController = prayerController,
         _notificationService = notificationService,
         _languageController = languageController,
@@ -29,6 +31,12 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     _connectivityNotificationService =
         connectivityNotificationService ??
             MuminConnectivityNotificationService(
+              languageController: languageController,
+            );
+
+    _locationNotificationService =
+        locationNotificationService ??
+            MuminLocationChangeNotificationService(
               languageController: languageController,
             );
 
@@ -45,7 +53,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   static const String exactPreferenceKey =
       'mumin_adhan_exact_preference';
 
-  /// Stored only after the user explicitly accepts countdown activation.
   static const String countdownEnabledPreferenceKey =
       'mumin_prayer_countdown_enabled_v1';
 
@@ -59,6 +66,9 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   late final MuminConnectivityNotificationService
       _connectivityNotificationService;
 
+  late final MuminLocationChangeNotificationService
+      _locationNotificationService;
+
   bool _disposed = false;
   bool _refreshing = false;
   bool _refreshRequested = false;
@@ -66,6 +76,8 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
   String? _lastFingerprint;
   String? _lastSuccessfulScheduleSignature;
+
+  String? _lastLocationFingerprint;
 
   String _buildFingerprint() {
     final timezone = _prayerController.timezoneLocation;
@@ -91,8 +103,44 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     ].join('|');
   }
 
+  String _buildLocationFingerprint() {
+    return '${_prayerController.latitude.toStringAsFixed(4)}|'
+        '${_prayerController.longitude.toStringAsFixed(4)}';
+  }
+
+  /// Establishes the initial location silently.
+  ///
+  /// Only a subsequent confirmed coordinate change triggers
+  /// a temporary location notification.
+  void _checkForLocationChange() {
+    if (_disposed ||
+        !_prayerController.isInitialized ||
+        !_prayerController.hasUsableSchedule ||
+        _prayerController.timezoneLocation == null) {
+      return;
+    }
+
+    final current = _buildLocationFingerprint();
+    final previous = _lastLocationFingerprint;
+
+    if (previous == null) {
+      _lastLocationFingerprint = current;
+      return;
+    }
+
+    if (previous == current) return;
+
+    _lastLocationFingerprint = current;
+
+    unawaited(
+      _locationNotificationService.showLocationChanged(),
+    );
+  }
+
   void _onPrayerControllerChanged() {
     if (_disposed) return;
+
+    _checkForLocationChange();
 
     final fingerprint = _buildFingerprint();
 
@@ -188,7 +236,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     final languageCode = _languageController.languageCode;
 
-    // Keep the existing individual prayer notification schedule.
     await _notificationService.reschedule(
       controller: _prayerController,
       prayerName: (prayer) => _resolvePrayerName(
@@ -206,8 +253,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     if (_disposed) return;
 
-    // The persistent countdown requires explicit app consent
-    // and notification permission granted by Android.
     if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
         controller: _prayerController,
@@ -337,5 +382,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
 
     _connectivityNotificationService.dispose();
+    _locationNotificationService.dispose();
   }
 }
