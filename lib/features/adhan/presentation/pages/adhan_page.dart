@@ -10,6 +10,7 @@ import '../../data/services/mumin_adhan_recording_library.dart';
 import '../../data/services/mumin_adhan_recording_playback_service.dart';
 import 'mumin_adhan_now_page.dart';
 import '../../data/models/mumin_media_asset_registry.dart';
+import 'adhan_recording_settings_page.dart';
 
 class AdhanPage extends StatefulWidget {
   const AdhanPage({super.key});
@@ -353,25 +354,43 @@ appBar: AppBar(
   backgroundColor: Colors.transparent,
   elevation: 0,
   actions: [
-    IconButton(
-      tooltip: _t(
-        'فتح واجهة الأذان',
-        'Open Adhan screen',
-        'Ouvrir l’écran Adhan',
-      ),
-      icon: const Icon(
-        Icons.open_in_full_rounded,
-        color: Color(0xFFD8B66A),
-      ),
-      onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const MuminAdhanNowPage(),
-          ),
-        );
-      },
+  IconButton(
+    tooltip: _t(
+      'تخصيص صوت كل صلاة',
+      'Customize each prayer sound',
+      'Personnaliser le son de chaque prière',
     ),
-  ],
+    icon: const Icon(
+      Icons.tune_rounded,
+      color: Color(0xFFD8B66A),
+    ),
+    onPressed: () {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const AdhanRecordingSettingsPage(),
+        ),
+      );
+    },
+  ),
+  IconButton(
+    tooltip: _t(
+      'فتح واجهة الأذان',
+      'Open Adhan screen',
+      'Ouvrir l’écran Adhan',
+    ),
+    icon: const Icon(
+      Icons.open_in_full_rounded,
+      color: Color(0xFFD8B66A),
+    ),
+    onPressed: () {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const MuminAdhanNowPage(),
+        ),
+      );
+    },
+  ),
+],
 ),
       body: _loading
           ? const Center(
