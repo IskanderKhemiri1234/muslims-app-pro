@@ -10,6 +10,7 @@ import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
 import 'core/localization/mumin_localizations_delegate.dart';
 import 'core/notifications/mumin_notification_preferences.dart';
+import 'core/permissions/presentation/mumin_permission_onboarding.dart';
 
 import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
 import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
@@ -476,26 +477,23 @@ Future<void> _showLanguagePicker(
               );
             },
 
-            home: Builder(
-              builder: (homeContext) {
-                return PrayerHomePage(
-                  onLanguageToggle: () {
-                    _showLanguagePicker(
-                      homeContext,
-                      languages,
-                    );
-                  },
-                  isDark: settings.isDark,
-                  onThemeToggle: settings.toggleTheme,
-                );
-              },
-            ),
+            
+home: Builder(
+  builder: (homeContext) {
+    return MuminPermissionOnboarding(
+      child: PrayerHomePage(
+        onLanguageToggle: () {
+          _showLanguagePicker(
+            homeContext,
+            languages,
           );
         },
+        isDark: settings.isDark,
+        onThemeToggle: settings.toggleTheme,
       ),
     );
-  }
-}
+  },
+),
 
 /// Language selector row.
 class _LanguageOption extends StatelessWidget {
