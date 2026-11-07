@@ -8,11 +8,10 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 
-/// Local prayer notification scheduler.
+/// Schedules local notifications for the five daily prayers.
 ///
 /// This service schedules notifications only.
-/// It does not claim to start a complete Adhan audio recording
-/// while the application is terminated or in the background.
+/// It does not start a complete Adhan recording in the background.
 class MuminAdhanNotificationService {
   MuminAdhanNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
@@ -40,10 +39,8 @@ class MuminAdhanNotificationService {
   final GlobalPrayerCalculationService _calculationService;
 
   Future<void>? _initialization;
-
   bool _isInitialized = false;
 
-  /// Initializes the local notification plugin once.
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -66,7 +63,6 @@ class MuminAdhanNotificationService {
     await _plugin.initialize(settings: settings);
   }
 
-  /// Requests Android notification permission after a user action.
   Future<bool> requestNotificationPermission() async {
     await initialize();
 
@@ -78,9 +74,6 @@ class MuminAdhanNotificationService {
     return await android.requestNotificationsPermission() ?? false;
   }
 
-  /// Requests Android exact-alarm access after a user action.
-  ///
-  /// If access is denied, scheduling can still use inexact alarms.
   Future<bool> requestExactAlarmPermission() async {
     await initialize();
 
@@ -92,7 +85,6 @@ class MuminAdhanNotificationService {
     return await android.requestExactAlarmsPermission() ?? false;
   }
 
-  /// Checks whether Android currently allows exact notifications.
   Future<bool> canScheduleExactNotifications() async {
     await initialize();
 
@@ -104,7 +96,6 @@ class MuminAdhanNotificationService {
     return await android.canScheduleExactNotifications() ?? false;
   }
 
-  /// Reads the user's enabled prayer notifications.
   Future<Set<Prayer>> getEnabledPrayers() async {
     final preferences = await SharedPreferences.getInstance();
 
@@ -116,7 +107,6 @@ class MuminAdhanNotificationService {
     );
   }
 
-  /// Saves one prayer's notification preference.
   Future<void> setPrayerEnabled(
     Prayer prayer, {
     required bool enabled,
@@ -137,13 +127,10 @@ class MuminAdhanNotificationService {
     }
   }
 
-  /// Rebuilds the next seven days of enabled prayer notifications.
+  /// Rebuilds the next seven local calendar days.
   ///
-  /// The caller supplies localized prayer names and notification text,
-  /// keeping translation ownership outside this service.
-  ///
-  /// Exact alarms are used only when [preferExact] is true and
-  /// Android confirms that exact-alarm access is currently granted.
+  /// Existing notification IDs are retained when they are still needed.
+  /// Only stale IDs are cancelled after the new schedule succeeds.
   Future<int> reschedule({
     required PrayerController controller,
     required String Function(Prayer prayer) prayerName,
@@ -187,7 +174,7 @@ class MuminAdhanNotificationService {
 
     final localNow = tz.TZDateTime.now(location);
 
-    final notificationDetails = NotificationDetails(
+    final details = NotificationDetails(
       android: AndroidNotificationDetails(
         channelId,
         channelName,
@@ -237,7 +224,7 @@ class MuminAdhanNotificationService {
             title: prayerName(prayer),
             body: notificationBody,
             scheduledDate: prayerTime,
-            notificationDetails: notificationDetails,
+            notificationDetails: details,
             androidScheduleMode: scheduleMode,
             payload: 'mumin_adhan:${prayer.name}',
           );
@@ -246,9 +233,20 @@ class MuminAdhanNotificationService {
         }
       }
 
-      await _cancelPreviouslyScheduled();
-
       final preferences = await SharedPreferences.getInstance();
+
+      final previousIds =
+          preferences.getStringList(_scheduledIdsKey) ?? const [];
+
+      final newIdSet = newIds.toSet();
+
+      for (final value in previousIds) {
+        final oldId = int.tryParse(value);
+
+        if (oldId == null || newIdSet.contains(oldId)) continue;
+
+        await _plugin.cancel(id: oldId);
+      }
 
       final saved = await preferences.setStringList(
         _scheduledIdsKey,
@@ -263,16 +261,6 @@ class MuminAdhanNotificationService {
 
       return newIds.length;
     } catch (error, stackTrace) {
-      for (final id in newIds) {
-        try {
-          await _plugin.cancel(id: id);
-        } catch (cancelError) {
-          debugPrint(
-            'Mumin Pro: notification rollback failed: $cancelError',
-          );
-        }
-      }
-
       debugPrint('Mumin Pro: prayer scheduling failed: $error');
       debugPrintStack(stackTrace: stackTrace);
 
@@ -280,7 +268,6 @@ class MuminAdhanNotificationService {
     }
   }
 
-  /// Cancels only notifications created by this scheduler.
   Future<void> cancelPreviouslyScheduled() async {
     await initialize();
     await _cancelPreviouslyScheduled();
@@ -294,7 +281,6 @@ class MuminAdhanNotificationService {
 
     for (final value in previousIds) {
       final id = int.tryParse(value);
-
       if (id == null) continue;
 
       await _plugin.cancel(id: id);
@@ -303,9 +289,8 @@ class MuminAdhanNotificationService {
     await preferences.remove(_scheduledIdsKey);
   }
 
-  String _preferenceKey(Prayer prayer) {
-    return '$_enabledPrefix${prayer.name}';
-  }
+  String _preferenceKey(Prayer prayer) =>
+      '$_enabledPrefix${prayer.name}';
 
   int _notificationId(DateTime date, Prayer prayer) {
     final prayerIndex = supportedPrayers.indexOf(prayer) + 1;
@@ -321,7 +306,7 @@ class MuminAdhanNotificationService {
       throw ArgumentError.value(
         prayer,
         'prayer',
-        'Only the five daily prayers can have Adhan notifications.',
+        'Only the five daily prayers can have notifications.',
       );
     }
   }
