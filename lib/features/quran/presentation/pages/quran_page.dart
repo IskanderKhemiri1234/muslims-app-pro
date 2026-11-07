@@ -1263,7 +1263,6 @@ Future<int?> _goToPage() async {
           initialPage: _currentPage,
           completedPages: _completedPages,
           bookmarkedPages: _bookmarks,
-          isDark: Theme.of(context).brightness == Brightness.dark,
           onPageChanged: (page) {
             _selectPage(page, saveImmediately: true);
           },
