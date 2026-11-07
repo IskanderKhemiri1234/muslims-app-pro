@@ -70,6 +70,19 @@ class MuminAdhanNotificationService {
   }
 
   Future<bool> requestNotificationPermission() async {
+   
+  /// Checks the current notification permission without prompting the user.
+  Future<bool> areNotificationsEnabled() async {
+    await initialize();
+
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    if (android == null) return false;
+
+    return await android.areNotificationsEnabled() ?? false;
+  }
+
     await initialize();
 
     final android = _plugin.resolvePlatformSpecificImplementation<
