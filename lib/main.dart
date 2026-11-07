@@ -7,6 +7,7 @@ import 'package:audio_service/audio_service.dart';
 
 import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart';
 import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
+import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
@@ -380,6 +381,12 @@ Provider<MuminAdhanNotificationService>(
   Provider<MuminAdhanAudioHandler>.value(
     value: muminAdhanAudioHandler,
   ),
+    
+  Provider<MuminAdhanAssetPlaybackService>(
+  create: (context) => MuminAdhanAssetPlaybackService(
+    audioHandler: context.read<MuminAdhanAudioHandler>(),
+  ),
+),
 
   ChangeNotifierProvider<MuminLanguageController>.value(
     value: widget.languageController,
