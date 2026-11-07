@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audio_service/audio_service.dart';
 
+import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart';
 import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
@@ -28,7 +29,11 @@ Future<void> main() async {
       androidStopForegroundOnPause: true,
     ),
   );
-
+  Provider<MuminAdhanRecordingPlaybackService>(
+  create: (context) => MuminAdhanRecordingPlaybackService(
+    audioHandler: context.read<MuminAdhanAudioHandler>(),
+  ),
+),
   runApp(const MuminBootstrap());
 }
 
@@ -353,21 +358,24 @@ class _MuminAppState extends State<MuminApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<PrayerController>(
-          create: (_) => PrayerController(),
-          Provider<MuminAdhanAudioHandler>.value(
-          value: muminAdhanAudioHandler,
-          ),
-        ),
-        ChangeNotifierProvider<MuminLanguageController>.value(
-          value: widget.languageController,
-        ),
-        ChangeNotifierProvider<SettingsController>.value(
-          value: widget.settingsController,
-        ),
-      ],
+    return MultiProvider(    
+  providers: [
+  ChangeNotifierProvider<PrayerController>(
+    create: (_) => PrayerController(),
+  ),
+
+  Provider<MuminAdhanAudioHandler>.value(
+    value: muminAdhanAudioHandler,
+  ),
+
+  ChangeNotifierProvider<MuminLanguageController>.value(
+    value: widget.languageController,
+  ),
+
+  ChangeNotifierProvider<SettingsController>.value(
+    value: widget.settingsController,
+  ),
+  ],
       child: Consumer2<MuminLanguageController, SettingsController>(
         builder: (context, languages, settings, child) {
           final localizations = languages.localizations;
