@@ -10,6 +10,7 @@ import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/localization/mumin_locale_formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
+import '../../../adhan/presentation/pages/adhan_page.dart';
 import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 import '../../../qibla/presentation/pages/qibla_page_entry.dart';
 import '../../../quran/presentation/pages/quran_page.dart';
@@ -208,8 +209,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
         _openPage(const QuranPage());
         return;
       case 'adhan':
-        _showMessage(_localizations.text('adhan_in_development'));
-        return;
+        _openPage(const AdhanPage());
+        return; 
       case 'adhkar':
         _showMessage(_localizations.text('adhkar_in_development'));
         return;
