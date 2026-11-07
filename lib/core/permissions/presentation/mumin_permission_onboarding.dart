@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../localization/mumin_localizations.dart';
 import '../../../features/adhan/data/services/mumin_adhan_notification_service.dart';
+import '../../../features/adhan/data/services/mumin_adhan_notification_coordinator.dart';
 
 /// First-launch permission setup.
 ///
@@ -52,59 +52,59 @@ class _MuminPermissionOnboardingState
   }
 
   @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addObserver(this);
-  _restoreSetupState();
-}
-
-@override
-void dispose() {
-  WidgetsBinding.instance.removeObserver(this);
-  super.dispose();
-}
-
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  if (state == AppLifecycleState.resumed && !_setupCompleted) {
-    _refreshPermissionStatus();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restoreSetupState();
   }
-}
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_setupCompleted) {
+      _refreshPermissionStatus();
+    }
+  }
 
   Future<void> _refreshPermissionStatus() async {
-  if (!mounted || _requesting || _setupCompleted) return;
+    if (!mounted || _requesting || _setupCompleted) return;
 
-  try {
-    final notificationService =
-        context.read<MuminAdhanNotificationService>();
+    try {
+      final notificationService =
+          context.read<MuminAdhanNotificationService>();
 
-    final notificationGranted =
-        await notificationService.areNotificationsEnabled();
+      final notificationGranted =
+          await notificationService.areNotificationsEnabled();
 
-    final locationPermission = await Geolocator.checkPermission();
+      final locationPermission = await Geolocator.checkPermission();
 
-    final locationGranted =
-        locationPermission == LocationPermission.whileInUse ||
-        locationPermission == LocationPermission.always;
+      final locationGranted =
+          locationPermission == LocationPermission.whileInUse ||
+              locationPermission == LocationPermission.always;
 
-    final locationPermanentlyDenied =
-        locationPermission == LocationPermission.deniedForever;
+      final locationPermanentlyDenied =
+          locationPermission == LocationPermission.deniedForever;
 
-    final locationServiceEnabled =
-        await Geolocator.isLocationServiceEnabled();
+      final locationServiceEnabled =
+          await Geolocator.isLocationServiceEnabled();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _notificationGranted = notificationGranted;
-      _locationGranted = locationGranted;
-      _locationPermanentlyDenied = locationPermanentlyDenied;
-      _locationServiceEnabled = locationServiceEnabled;
-    });
-  } catch (error, stackTrace) {
-    debugPrint('Mumin permission refresh error: $error');
-    debugPrintStack(stackTrace: stackTrace);
-  }
+      setState(() {
+        _notificationGranted = notificationGranted;
+        _locationGranted = locationGranted;
+        _locationPermanentlyDenied = locationPermanentlyDenied;
+        _locationServiceEnabled = locationServiceEnabled;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Mumin permission refresh error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _restoreSetupState() async {
@@ -118,7 +118,7 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
       if (!mounted) return;
 
-            setState(() {
+      setState(() {
         _setupCompleted = completed;
         _loading = false;
       });
@@ -137,6 +137,30 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  /// Saves the user's explicit countdown choice and refreshes Android.
+  Future<void> _saveCountdownConsent(bool enabled) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      await preferences.setBool(
+        MuminAdhanNotificationCoordinator
+            .countdownEnabledPreferenceKey,
+        enabled,
+      );
+
+      if (!mounted) return;
+
+      await context
+          .read<MuminAdhanNotificationCoordinator>()
+          .refresh(force: true);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Mumin Pro: countdown consent synchronization failed: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
@@ -180,7 +204,7 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 
         locationGranted =
             permission == LocationPermission.whileInUse ||
-            permission == LocationPermission.always;
+                permission == LocationPermission.always;
 
         locationPermanentlyDenied =
             permission == LocationPermission.deniedForever;
@@ -214,13 +238,47 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
       _locationPermanentlyDenied = locationPermanentlyDenied;
       _requesting = false;
     });
+
+    // Pressing the allow-and-continue button is the explicit app consent.
+    // A denied OS permission is saved as disabled.
+    await _saveCountdownConsent(notificationGranted);
   }
 
-  Future<void> _finishSetup() async {
+  /// Completes onboarding.
+  ///
+  /// Only the main Continue button passes enableCountdown: true.
+  /// The Skip button uses the default false and never grants consent.
+  Future<void> _finishSetup({
+    bool enableCountdown = false,
+  }) async {
     if (_requesting) return;
 
     try {
       final preferences = await SharedPreferences.getInstance();
+
+      if (enableCountdown) {
+        final notificationService =
+            context.read<MuminAdhanNotificationService>();
+
+        final notificationsEnabled =
+            await notificationService.areNotificationsEnabled();
+
+        await preferences.setBool(
+          MuminAdhanNotificationCoordinator
+              .countdownEnabledPreferenceKey,
+          notificationsEnabled,
+        );
+
+        if (notificationsEnabled && mounted) {
+          await context
+              .read<MuminAdhanNotificationCoordinator>()
+              .refresh(force: true);
+        } else if (mounted) {
+          await context
+              .read<MuminAdhanNotificationCoordinator>()
+              .refresh(force: true);
+        }
+      }
 
       final saved = await preferences.setBool(
         MuminPermissionOnboarding.completedPreferenceKey,
@@ -438,7 +496,9 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
                       onPressed: _requesting
                           ? null
                           : _allPermissionsGranted
-                              ? _finishSetup
+                              ? () => _finishSetup(
+                                    enableCountdown: true,
+                                  )
                               : _requestPermissions,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF075B46),
@@ -481,7 +541,9 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
                     ],
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: _requesting ? null : _finishSetup,
+                      onPressed: _requesting
+                          ? null
+                          : _finishSetup,
                       child: Text(
                         _texts.text('permission_skip_for_now'),
                         style: TextStyle(
