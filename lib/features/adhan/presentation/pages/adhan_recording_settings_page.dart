@@ -328,8 +328,8 @@ class _AdhanRecordingSettingsPageState
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: selectedPath,
-              isExpanded: true,
+            initialValue: selectedPath,
+            isExpanded: true,
               decoration: InputDecoration(
                 labelText: _t(
                   'التسجيل المخصص',
