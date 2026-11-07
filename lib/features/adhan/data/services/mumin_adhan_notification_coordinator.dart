@@ -205,9 +205,9 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
           languageCode,
         ),
         notificationTitle:
-            _countdownNotificationTitle(languageCode),
+            _countdownNotificationTitle(),
         notificationDescription:
-            _countdownNotificationDescription(languageCode),
+            _countdownNotificationDescription(),
       );
     } else {
       await _countdownNotificationService.cancel();
@@ -248,26 +248,14 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     }
   }
 
-  String _countdownNotificationTitle(String languageCode) {
-    switch (languageCode) {
-      case 'en':
-        return 'Next prayer';
-      case 'fr':
-        return 'Prochaine prière';
-      default:
-        return 'الصلاة القادمة';
-    }
+  /// Uses the central localization engine for the countdown title.
+  String _countdownNotificationTitle() {
+    return _languageController.text('next_prayer');
   }
 
-  String _countdownNotificationDescription(String languageCode) {
-    switch (languageCode) {
-      case 'en':
-        return 'Time remaining';
-      case 'fr':
-        return 'Temps restant';
-      default:
-        return 'الوقت المتبقي';
-    }
+  /// Uses the central localization engine for the countdown description.
+  String _countdownNotificationDescription() {
+    return _languageController.text('time_remaining');
   }
 
   String _arabicPrayerName(Prayer prayer) {
