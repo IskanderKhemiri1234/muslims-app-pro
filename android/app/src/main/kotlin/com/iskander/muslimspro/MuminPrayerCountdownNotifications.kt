@@ -1,4 +1,3 @@
-
 package com.iskander.muslimspro
 
 import android.Manifest
@@ -129,15 +128,12 @@ object MuminPrayerCountdownNotifications {
             ?: "Mumin Pro"
         val description = preferences.getString(DESCRIPTION_KEY, "")
             ?: ""
-        val timezone = preferences.getString(TIMEZONE_KEY, "")
-            ?: ""
 
         showNotification(
             context = context,
             title = title,
             prayerName = name,
             description = description,
-            timezone = timezone,
             targetTime = nextTime
         )
 
@@ -153,7 +149,7 @@ object MuminPrayerCountdownNotifications {
 
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Mumin Pro - Next Prayer",
+            "Mumin Pro",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = "Persistent countdown to the next prayer"
@@ -169,7 +165,6 @@ object MuminPrayerCountdownNotifications {
         title: String,
         prayerName: String,
         description: String,
-        timezone: String,
         targetTime: Long
     ) {
         if (
@@ -204,10 +199,15 @@ object MuminPrayerCountdownNotifications {
             Notification.Builder(context)
                 .setPriority(Notification.PRIORITY_LOW)
         }.apply {
-            setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            setSmallIcon(R.drawable.ic_mumin_notification)
             setContentTitle(title)
-            setContentText("$prayerName • $description")
-            setSubText(timezone)
+            setContentText(
+                if (description.isBlank()) {
+                    prayerName
+                } else {
+                    "$prayerName • $description"
+                }
+            )
             setContentIntent(contentIntent)
             setCategory(Notification.CATEGORY_STATUS)
             setVisibility(Notification.VISIBILITY_PUBLIC)
