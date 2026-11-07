@@ -49,6 +49,16 @@ abstract final class MuminQuranReaderCatalog {
       'quran_page_position': 'الصفحة {page} من {total}',
       'quran_hide_controls': 'إخفاء أدوات القراءة',
       'quran_show_controls': 'إظهار أدوات القراءة',
+
+      'quran_theme_day': 'النهاري',
+      'quran_theme_night': 'الليلي',
+      'quran_theme_warm_paper': 'الورقي الدافئ',
+      'quran_back': 'رجوع',
+      'quran_reader_title': 'المصحف الشريف',
+      'quran_page_read_completed': 'تمت قراءة هذه الصفحة',
+      'quran_page_read_question': 'هل قرأت هذه الصفحة؟',
+      'quran_undo': 'تراجع',
+      'quran_mark_read': 'تمت القراءة',
     },
     'en': {
       'quran_delete': 'Delete',
@@ -94,6 +104,16 @@ abstract final class MuminQuranReaderCatalog {
       'quran_page_position': 'Page {page} of {total}',
       'quran_hide_controls': 'Hide reading controls',
       'quran_show_controls': 'Show reading controls',
+
+      'quran_theme_day': 'Day',
+      'quran_theme_night': 'Night',
+      'quran_theme_warm_paper': 'Warm paper',
+      'quran_back': 'Back',
+      'quran_reader_title': 'Quran Reader',
+      'quran_page_read_completed': 'Page completed',
+      'quran_page_read_question': 'Have you read this page?',
+      'quran_undo': 'Undo',
+      'quran_mark_read': 'Mark as read',
     },
     'fr': {
       'quran_delete': 'Supprimer',
@@ -127,7 +147,8 @@ abstract final class MuminQuranReaderCatalog {
       'quran_daily_pages_progress': '{read} sur {target} pages',
       'quran_current_page_title': 'Page {page}',
       'quran_open_full_mushaf': 'Ouvrir le Mushaf complet',
-      'quran_reader_open_hint': 'Touchez pour ouvrir la page complète du Coran',
+      'quran_reader_open_hint':
+          'Touchez pour ouvrir la page complète du Coran',
       'quran_save_ayah_action': 'Enregistrer le verset',
       'quran_previous_short': 'Précédente',
       'quran_next_short': 'Suivante',
@@ -139,6 +160,16 @@ abstract final class MuminQuranReaderCatalog {
       'quran_page_position': 'Page {page} sur {total}',
       'quran_hide_controls': 'Masquer les commandes de lecture',
       'quran_show_controls': 'Afficher les commandes de lecture',
+
+      'quran_theme_day': 'Clair',
+      'quran_theme_night': 'Sombre',
+      'quran_theme_warm_paper': 'Papier chaud',
+      'quran_back': 'Retour',
+      'quran_reader_title': 'Lecture du Coran',
+      'quran_page_read_completed': 'Page lue',
+      'quran_page_read_question': 'Avez-vous lu cette page ?',
+      'quran_undo': 'Annuler',
+      'quran_mark_read': 'Marquer comme lue',
     },
   };
 
@@ -184,6 +215,15 @@ abstract final class MuminQuranReaderCatalog {
     'quran_page_position',
     'quran_hide_controls',
     'quran_show_controls',
+    'quran_theme_day',
+    'quran_theme_night',
+    'quran_theme_warm_paper',
+    'quran_back',
+    'quran_reader_title',
+    'quran_page_read_completed',
+    'quran_page_read_question',
+    'quran_undo',
+    'quran_mark_read',
   };
 
   static const List<String> launchLanguageCodes = [
@@ -193,7 +233,8 @@ abstract final class MuminQuranReaderCatalog {
   ];
 
   static Map<String, String> forLanguage(String languageCode) {
-    final normalized = languageCode.trim().toLowerCase().split('-').first;
+    final normalized =
+        languageCode.trim().toLowerCase().split('-').first;
     return _catalogs[normalized] ?? _catalogs['ar']!;
   }
 
@@ -208,8 +249,12 @@ abstract final class MuminQuranReaderCatalog {
     final selected = forLanguage(languageCode);
     final fallback = _catalogs['ar']!;
 
-    var value = selected[normalizedKey] ?? fallback[normalizedKey];
-    if (value == null) return normalizedKey;
+    final resolvedValue =
+        selected[normalizedKey] ?? fallback[normalizedKey];
+
+    if (resolvedValue == null) return normalizedKey;
+
+    var value = resolvedValue;
 
     for (final entry in parameters.entries) {
       value = value.replaceAll(
