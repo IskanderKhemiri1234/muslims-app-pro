@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audio_service/audio_service.dart';
 
+import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
 import 'core/design_system/mumin_theme.dart';
 import 'core/localization/mumin_language_controller.dart';
 import 'core/localization/mumin_localizations.dart';
@@ -11,8 +13,22 @@ import 'core/localization/mumin_localizations_delegate.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
+late final MuminAdhanAudioHandler muminAdhanAudioHandler;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  muminAdhanAudioHandler =
+      await AudioService.init<MuminAdhanAudioHandler>(
+    builder: MuminAdhanAudioHandler.new,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.iskander.muslimspro.adhan',
+      androidNotificationChannelName: 'Mumin Pro Adhan',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ),
+  );
+
   runApp(const MuminBootstrap());
 }
 
@@ -341,6 +357,9 @@ class _MuminAppState extends State<MuminApp> {
       providers: [
         ChangeNotifierProvider<PrayerController>(
           create: (_) => PrayerController(),
+          Provider<MuminAdhanAudioHandler>.value(
+          value: muminAdhanAudioHandler,
+          ),
         ),
         ChangeNotifierProvider<MuminLanguageController>.value(
           value: widget.languageController,
