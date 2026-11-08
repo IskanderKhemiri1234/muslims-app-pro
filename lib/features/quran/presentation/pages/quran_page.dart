@@ -1711,41 +1711,51 @@ class _QuranFullScreenReaderState
     }
   }
 
-  
 Widget _buildMushafPage({
   required int page,
   required double width,
   required double height,
 }) {
+  // Render the Madina page at its natural portrait ratio,
+  // then fit the complete page into the available viewport.
+  final pageHeight = (width * 1.4142).clamp(100.0, 4000.0);
   final fontSize = (width / 19).clamp(17.0, 25.0);
 
-  return SizedBox(
-    width: double.infinity,
-    height: height,
-    child: ColoredBox(
-      color: _pageBackground,
-      child: RepaintBoundary(
-        child: QuranMadinaFlutter(
-          key: ValueKey<String>(
-            'mumin_mushaf_page_$page',
-          ),
-          page: page,
-          height: height.clamp(100.0, 2000.0),
-          bundled: true,
-          headless: true,
-          fontSize: fontSize,
-          textColor: _cssColor(_textColor),
-          backgroundColor: _cssColor(_pageBackground),
-          ayaActions: [
-            QuranAyaAction(
-              id: 'save_ayah',
-              title: QuranPageLocalization.text(
-                context,
-                'quran_save_ayah_action',
+  return SizedBox.expand(
+    child: ClipRect(
+      child: FittedBox(
+        fit: BoxFit.fill,
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: width,
+          height: pageHeight,
+          child: ColoredBox(
+            color: _pageBackground,
+            child: RepaintBoundary(
+              child: QuranMadinaFlutter(
+                key: ValueKey<String>(
+                  'mumin_mushaf_page_$page',
+                ),
+                page: page,
+                height: pageHeight,
+                bundled: true,
+                headless: true,
+                fontSize: fontSize,
+                textColor: _cssColor(_textColor),
+                backgroundColor: _cssColor(_pageBackground),
+                ayaActions: [
+                  QuranAyaAction(
+                    id: 'save_ayah',
+                    title: QuranPageLocalization.text(
+                      context,
+                      'quran_save_ayah_action',
+                    ),
+                  ),
+                ],
+                onAyaAction: widget.onVerseAction,
               ),
             ),
-          ],
-          onAyaAction: widget.onVerseAction,
+          ),
         ),
       ),
     ),
