@@ -349,7 +349,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                     ? 36.0
                     : width >= 600
                         ? 26.0
-                        : 18.0;
+                        : 13.0;
                 final maximumContentWidth =
                     width >= 900 ? 820.0 : 680.0;
 
@@ -370,15 +370,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: EdgeInsets.fromLTRB(
                           horizontalPadding,
-                          12,
+                          8,
                           horizontalPadding,
                           34,
                         ),
                         children: [
-                                                    _HomeHeader(
+                          _HomeHeader(
                             localizations: localizations,
                             city: snapshot.city,
-                            date: _formatDate(_currentDate),
                             isDark: widget.isDark,
                             isLoadingLocation:
                                 snapshot.isLoadingLocation,
@@ -386,9 +385,11 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             onLanguageToggle: widget.onLanguageToggle,
                             onThemeToggle: widget.onThemeToggle,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 10),
                           RepaintBoundary(
-                            child: PrayerHeroCard(
+                            child: SizedBox(
+                              height: 216,
+                              child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
                               prayerName: _prayerName,
@@ -401,16 +402,17 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                                   ),
                                 );
                               },
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 12),
                           RepaintBoundary(
                             child: QuickActions(
                               onAction: _handleQuickAction,
                             ),
                           ),
         
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 12),
                           RepaintBoundary(
   child: PrayerScheduleSection(
     schedule: snapshot.schedule!,
@@ -580,7 +582,6 @@ class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
     required this.localizations,
     required this.city,
-    required this.date,
     required this.isDark,
     required this.isLoadingLocation,
     required this.onLocationUpdate,
@@ -590,7 +591,6 @@ class _HomeHeader extends StatelessWidget {
 
   final MuminLocalizations localizations;
   final String city;
-  final String date;
   final bool isDark;
   final bool isLoadingLocation;
   final VoidCallback onLocationUpdate;
@@ -604,175 +604,114 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        RepaintBoundary(
-          child: Container(
-            width: 49,
-            height: 49,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF0B7053),
-                  Color(0xFF063E31),
-                  Color(0xFF05271F),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(
-                color: AppColors.gold.withValues(alpha: 0.48),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.emerald.withValues(alpha: 0.16),
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.mosque_rounded,
-              color: AppColors.goldLight,
-              size: 27,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                localizations.appName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.1,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Tooltip(
-                    message: isLoadingLocation
-                        ? localizations.updatingLocation
-                        : localizations.updateLocation,
-                    child: IconButton(
-                      onPressed: isLoadingLocation
-                          ? null
-                          : onLocationUpdate,
-                      tooltip: isLoadingLocation
-                          ? localizations.updatingLocation
-                          : localizations.updateLocation,
-                      iconSize: 25,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      splashRadius: 23,
-                      visualDensity: VisualDensity.compact,
-                      icon: isLoadingLocation
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: AppColors.gold,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.location_on_rounded,
-                              color: AppColors.gold,
-                              size: 25,
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      '$city · $date',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 4),
-        _HeaderIconButton(
-          tooltip: isDark
-              ? localizations.lightMode
-              : localizations.darkMode,
-          icon: isDark
-              ? Icons.light_mode_rounded
-              : Icons.dark_mode_rounded,
-          onPressed: onThemeToggle,
-        ),
-        const SizedBox(width: 5),
-        Semantics(
-          button: true,
-          label: _languageTooltip,
-          value: localizations.languageNativeName,
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+    return SizedBox(
+      height: 40,
+      child: Row(
+        children: [
+          Tooltip(
+            message: isLoadingLocation
+                ? localizations.updatingLocation
+                : localizations.updateLocation,
             child: InkWell(
-              onTap: onLanguageToggle,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                constraints: const BoxConstraints(
-                  minWidth: 53,
-                  minHeight: 43,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.42),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      localizations.languageCode.toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.emeraldLight,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    const Icon(
-                      Icons.expand_more_rounded,
-                      size: 17,
-                      color: AppColors.gold,
-                    ),
-                  ],
+              onTap: isLoadingLocation ? null : onLocationUpdate,
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 32,
+                height: 36,
+                child: Center(
+                  child: isLoadingLocation
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.gold,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.location_on_rounded,
+                          color: AppColors.gold,
+                          size: 19,
+                        ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 3),
+          Expanded(
+            child: Text(
+              city,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _HeaderIconButton(
+            tooltip: isDark
+                ? localizations.lightMode
+                : localizations.darkMode,
+            icon: isDark
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded,
+            onPressed: onThemeToggle,
+          ),
+          const SizedBox(width: 6),
+          Semantics(
+            button: true,
+            label: _languageTooltip,
+            value: localizations.languageNativeName,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: onLanguageToggle,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minWidth: 46,
+                    minHeight: 36,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.42),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        localizations.languageCode.toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.emeraldLight,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.expand_more_rounded,
+                        size: 15,
+                        color: AppColors.gold,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -802,8 +741,8 @@ class _HeaderIconButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
-            width: 43,
-            height: 43,
+            width: 36,
+            height: 36,
             child: Icon(
               icon,
               color: AppColors.gold,
