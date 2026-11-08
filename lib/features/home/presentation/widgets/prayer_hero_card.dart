@@ -156,7 +156,7 @@ class _HeroSurface extends StatelessWidget {
             border: Border.all(
               color: AppColors.gold.withValues(alpha: 0.42),
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(11),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF075B46)
@@ -197,7 +197,7 @@ class _HeroSurface extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 9,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -212,10 +212,10 @@ class _HeroSurface extends StatelessWidget {
                     const SizedBox(height: 5),
                     Material(
                       color: Colors.white.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(11),
                       child: InkWell(
                         onTap: onHijriTap,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(11),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
