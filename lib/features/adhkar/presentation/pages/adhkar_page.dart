@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/design_system/mumin_design_tokens.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
-import '../../../../core/theme/app_colors.dart';
 
 class AdhkarPage extends StatefulWidget {
   const AdhkarPage({super.key});
@@ -26,8 +25,8 @@ class _AdhkarPageState extends State<AdhkarPage> {
       target: 100,
       occasionKey: 'adhkar_daily',
       occasionFallback: 'خلال اليوم',
-      source: 'حصن المسلم 96',
-      reference: 'صحيح البخاري، وراجع صحيح مسلم 2702',
+      source: 'صحيح البخاري 6307',
+reference: 'الحديث يذكر الاستغفار والتوبة أكثر من 70 مرة يومياً؛ والعدد 100 هنا هدف للعدّ وليس تحديداً لهذا الحديث.',
     ),
     _Dhikr(
       id: 'subhanallah',
@@ -90,7 +89,8 @@ class _AdhkarPageState extends State<AdhkarPage> {
 
       for (final dhikr in _adhkar) {
         final saved = preferences.getInt(_storageKey(dhikr));
-        restored[dhikr.id] = (saved ?? 0).clamp(0, dhikr.target);
+        restored[dhikr.id] =
+    (saved ?? 0).clamp(0, dhikr.target).toInt();
       }
 
       if (!mounted) return;
