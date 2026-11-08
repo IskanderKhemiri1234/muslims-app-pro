@@ -2654,9 +2654,6 @@ Widget _buildMushafPage({
 }
 
   Widget _buildBottomControls() {
-    if (!_showControls) {
-      return const SizedBox.shrink();
-    }
 
     final maxHeight =
         MediaQuery.of(context).size.height * 0.42;
