@@ -843,60 +843,37 @@ class _LocationAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      enabled: !isLoading,
-      label: isLoading
-          ? localizations.updatingLocation
-          : localizations.updateLocation,
-      child: Tooltip(
-        message: isLoading
-            ? localizations.updatingLocation
-            : localizations.updateLocation,
-        child: Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            onTap: isLoading ? null : onPressed,
-            customBorder: const CircleBorder(),
-            child: Ink(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF071C17)
-                    .withValues(alpha: 0.88),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.85),
-                  width: 1.4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.gold.withValues(alpha: 0.20),
-                    blurRadius: 13,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.gold,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.my_location_rounded,
-                        color: AppColors.gold,
-                        size: 18,
-                      ),
-              ),
-            ),
-          ),
+    final tooltip = isLoading
+        ? localizations.updatingLocation
+        : localizations.updateLocation;
+
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        onPressed: isLoading ? null : onPressed,
+        tooltip: tooltip,
+        iconSize: 28,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: 44,
+          minHeight: 44,
         ),
+        splashRadius: 23,
+        visualDensity: VisualDensity.compact,
+        icon: isLoading
+            ? const SizedBox(
+                width: 21,
+                height: 21,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: AppColors.gold,
+                ),
+              )
+            : const Icon(
+                Icons.my_location_rounded,
+                color: AppColors.gold,
+                size: 28,
+              ),
       ),
     );
   }
