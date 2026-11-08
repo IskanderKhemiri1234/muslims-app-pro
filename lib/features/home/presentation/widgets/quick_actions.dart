@@ -242,9 +242,15 @@ class _QuickActionsState extends State<QuickActions>
         return;
       }
 
+            setState(() {
+        _manualDragOffset =
+            (_manualDragOffset -
+                    (_cycleWidth * _animationController.value)) %
+                _cycleWidth;
+      });
+
       _animationController.repeat(
         period: _animationDuration,
-        from: _animationController.value,
       );
     });
   }
