@@ -34,6 +34,7 @@ class _QuickActionsState extends State<QuickActions>
       (_itemWidth * _actionCount) +
       (_spacing * (_actionCount - 1));
 
+    late final Duration _animationDuration;
   late final AnimationController _animationController;
 
   bool _motionDisabled = false;
@@ -51,9 +52,12 @@ class _QuickActionsState extends State<QuickActions>
     final durationMilliseconds =
         (_cycleWidth / _pixelsPerSecond * 1000).round();
 
+    _animationDuration =
+        Duration(milliseconds: durationMilliseconds);
+
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: durationMilliseconds),
+      duration: _animationDuration,
     )..repeat();
   }
 
@@ -176,7 +180,7 @@ class _QuickActionsState extends State<QuickActions>
     );
   }
     
-  void _handlePointerDown(PointerDownEvent event) {
+    void _handlePointerDown(PointerDownEvent event) {
     if (_dragPointer != null) return;
 
     _dragPointer = event.pointer;
@@ -184,6 +188,9 @@ class _QuickActionsState extends State<QuickActions>
     _dragStartY = event.position.dy;
     _lastDragX = event.position.dx;
     _isHorizontalDrag = false;
+
+    // Freeze the marquee while the user touches it.
+    _animationController.stop(canceled: false);
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
@@ -212,12 +219,30 @@ class _QuickActionsState extends State<QuickActions>
     final delta = event.position.dx - lastX;
     _lastDragX = event.position.dx;
 
-    if (delta == 0) return;
+    if (delta == 0 || !mounted) return;
 
     setState(() {
       _manualDragOffset =
           (_manualDragOffset + delta) % _cycleWidth;
     });
+  }
+
+  void _handlePointerEnd(PointerEvent event) {
+    if (event.pointer != _dragPointer) return;
+
+    _dragPointer = null;
+    _dragStartX = null;
+    _dragStartY = null;
+    _lastDragX = null;
+    _isHorizontalDrag = false;
+
+    // Resume from the exact animation position.
+    if (mounted && !_motionDisabled) {
+      _animationController.repeat(
+        period: _animationDuration,
+        from: _animationController.value,
+      );
+    }
   }
 
   void _handlePointerEnd(PointerEvent event) {
