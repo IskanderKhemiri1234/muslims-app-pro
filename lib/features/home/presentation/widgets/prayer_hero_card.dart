@@ -233,7 +233,7 @@ class _HeroSurface extends StatelessWidget {
                                 textDirection: isRtl
                                     ? TextDirection.rtl
                                     : TextDirection.ltr,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.86),
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
