@@ -1,10 +1,10 @@
+
 /// Mumin Pro — Worldwide Mosque Discovery.
 ///
-/// A source-aware domain model for mosques and Muslim prayer places
-/// discovered from OpenStreetMap-compatible geographic datasets.
+/// Source-aware domain model for mosques and Muslim prayer places.
+/// Independent from Flutter, GPS, networking and map rendering.
 ///
-/// This model contains no Flutter, map-rendering, GPS, or networking
-/// dependencies. It never invents missing mosque information.
+/// Missing information is never fabricated.
 enum MosquePlaceType {
   mosque,
   prayerRoom,
@@ -12,15 +12,6 @@ enum MosquePlaceType {
   unknown,
 }
 
-/// A geographic mosque or Muslim prayer place.
-///
-/// Supported OpenStreetMap element types:
-/// - node
-/// - way
-/// - relation
-///
-/// For ways and relations, coordinates may be supplied through
-/// the Overpass `center` object.
 final class NearbyMosque {
   const NearbyMosque({
     required this.id,
@@ -47,65 +38,45 @@ final class NearbyMosque {
     this.lastUpdated,
   });
 
-  /// Stable source identifier, for example `node/123456`.
   final String id;
-
-  /// Default display name supplied by the source.
   final String name;
 
-  /// Optional language-specific names.
   final String? nameAr;
   final String? nameEn;
   final String? nameFr;
 
-  /// WGS84 latitude.
   final double latitude;
-
-  /// WGS84 longitude.
   final double longitude;
 
-  /// Type of Muslim prayer place.
   final MosquePlaceType placeType;
-
-  /// Dataset identifier, normally `openstreetmap`.
   final String source;
 
-  /// Available address information.
   final String? address;
   final String? city;
   final String? region;
   final String? countryCode;
   final String? postcode;
 
-  /// Optional contact information.
   final String? phone;
   final String? website;
 
-  /// Optional operational information.
   final String? openingHours;
   final String? wheelchair;
   final String? operator;
   final String? denomination;
 
-  /// Distance from the user's selected reference point.
-  ///
-  /// Null means that no distance has been calculated.
   final double? distanceMeters;
-
-  /// Source modification timestamp, when available.
   final DateTime? lastUpdated;
 
-  /// Resolves the best available name for the selected language.
+  /// Resolves the best available source-provided name.
   ///
-  /// Fallback order:
-  /// Arabic: Arabic, default name, English, French.
-  /// English: English, default name, Arabic, French.
-  /// French: French, default name, English, Arabic.
+  /// Returns an empty string when the source has no name.
+  /// The presentation layer must then use a localized place-type label.
   String nameForLanguage(String languageCode) {
     final code = languageCode
         .trim()
         .toLowerCase()
-        .split('-')
+        .split(RegExp('[-_]'))
         .first;
 
     final candidates = switch (code) {
@@ -125,7 +96,6 @@ final class NearbyMosque {
     return '';
   }
 
-  /// Returns whether the coordinates are geographically valid.
   bool get hasValidCoordinates =>
       latitude.isFinite &&
       longitude.isFinite &&
@@ -134,20 +104,15 @@ final class NearbyMosque {
       longitude >= -180 &&
       longitude <= 180;
 
-  /// Returns whether the source identity is usable.
   bool get hasValidIdentity =>
-      id.trim().isNotEmpty &&
-      source.trim().isNotEmpty;
+      id.trim().isNotEmpty && source.trim().isNotEmpty;
 
-  /// Returns whether this record can be displayed as a result.
+  /// A mosque does not need a registered name to be a valid place.
   bool get isValid =>
       hasValidIdentity &&
       hasValidCoordinates &&
-      name.trim().isNotEmpty;
+      placeType != MosquePlaceType.unknown;
 
-  /// Returns a human-readable distance.
-  ///
-  /// The value is only displayed when a real distance is available.
   String? distanceLabel({
     String lessThanOneKilometer = 'Less than 1 km',
   }) {
@@ -172,35 +137,35 @@ final class NearbyMosque {
     return '${kilometers.toStringAsFixed(1)} km';
   }
 
-  /// Creates a validated model from an OpenStreetMap Overpass element.
+  /// Safely parses a supported OpenStreetMap Overpass element.
   ///
-  /// The parser accepts:
-  /// - node coordinates (`lat`, `lon`)
-  /// - way/relation center coordinates (`center.lat`, `center.lon`)
+  /// Returns null for invalid, unsupported or non-Muslim places.
   ///
-  /// Invalid or unsupported records return null.
-  factory NearbyMosque.fromOpenStreetMapElement(
+  /// Accepted coordinates:
+  /// - node: lat / lon
+  /// - way and relation: center.lat / center.lon
+  static NearbyMosque? tryFromOpenStreetMapElement(
     Map<String, dynamic> element,
   ) {
     final type = _readString(element['type']);
-    final rawId = _readString(element['id']);
+    final rawId = _readIdentifier(element['id']);
 
     if (type == null ||
         rawId == null ||
         !const {'node', 'way', 'relation'}.contains(type)) {
-      return _invalidElement();
+      return null;
     }
 
     final tags = _readMap(element['tags']);
 
     if (tags == null) {
-      return _invalidElement();
+      return null;
     }
 
     final placeType = _resolvePlaceType(tags);
 
     if (placeType == MosquePlaceType.unknown) {
-      return _invalidElement();
+      return null;
     }
 
     final center = _readMap(element['center']);
@@ -214,7 +179,7 @@ final class NearbyMosque {
     );
 
     if (latitude == null || longitude == null) {
-      return _invalidElement();
+      return null;
     }
 
     final defaultName = _firstValue([
@@ -226,19 +191,9 @@ final class NearbyMosque {
       tags['name:fr'],
     ]);
 
-    if (defaultName == null) {
-      return _invalidElement();
-    }
-
-    final address = _buildAddress(tags);
-
-    final timestamp = _readDateTime(
-      element['timestamp'],
-    );
-
     final mosque = NearbyMosque(
       id: '$type/$rawId',
-      name: defaultName,
+      name: defaultName ?? '',
       nameAr: _readString(tags['name:ar']),
       nameEn: _readString(tags['name:en']),
       nameFr: _readString(tags['name:fr']),
@@ -246,7 +201,7 @@ final class NearbyMosque {
       longitude: longitude,
       placeType: placeType,
       source: 'openstreetmap',
-      address: address,
+      address: _buildAddress(tags),
       city: _firstValue([
         tags['addr:city'],
         tags['addr:town'],
@@ -274,13 +229,12 @@ final class NearbyMosque {
       wheelchair: _readString(tags['wheelchair']),
       operator: _readString(tags['operator']),
       denomination: _readString(tags['denomination']),
-      lastUpdated: timestamp,
+      lastUpdated: _readDateTime(element['timestamp']),
     );
 
-    return mosque.isValid ? mosque : _invalidElement();
+    return mosque.isValid ? mosque : null;
   }
 
-  /// Creates a copy with an updated calculated distance.
   NearbyMosque copyWith({
     double? distanceMeters,
   }) {
@@ -313,13 +267,28 @@ final class NearbyMosque {
   static MosquePlaceType _resolvePlaceType(
     Map<String, dynamic> tags,
   ) {
-    final amenity = _readString(tags['amenity']);
-    final placeOfWorship = _readString(
+    final amenity = _normalizedTag(tags['amenity']);
+    final placeOfWorship = _normalizedTag(
       tags['place_of_worship'],
     );
+    final religion = _normalizedTag(tags['religion']);
 
-    if (amenity == 'place_of_worship' ||
-        placeOfWorship == 'mosque') {
+    final isMuslimReligion =
+        religion == 'muslim' || religion == 'islam';
+
+    final hasConflictingReligion =
+        religion != null && !isMuslimReligion;
+
+    if (hasConflictingReligion) {
+      return MosquePlaceType.unknown;
+    }
+
+    if (placeOfWorship == 'mosque') {
+      return MosquePlaceType.mosque;
+    }
+
+    if (amenity == 'place_of_worship' &&
+        isMuslimReligion) {
       return MosquePlaceType.mosque;
     }
 
@@ -338,11 +307,14 @@ final class NearbyMosque {
     Map<String, dynamic> tags,
   ) {
     final parts = <String>[
-      if (_readString(tags['addr:housenumber']) case final value?)
+      if (_readString(tags['addr:housenumber'])
+          case final value?)
         value,
-      if (_readString(tags['addr:street']) case final value?)
+      if (_readString(tags['addr:street'])
+          case final value?)
         value,
-      if (_readString(tags['addr:suburb']) case final value?)
+      if (_readString(tags['addr:suburb'])
+          case final value?)
         value,
     ];
 
@@ -363,9 +335,7 @@ final class NearbyMosque {
         : null;
   }
 
-  static String? _firstValue(
-    List<Object?> values,
-  ) {
+  static String? _firstValue(List<Object?> values) {
     for (final value in values) {
       final text = _readString(value);
 
@@ -373,6 +343,10 @@ final class NearbyMosque {
     }
 
     return null;
+  }
+
+  static String? _normalizedTag(Object? value) {
+    return _readString(value)?.toLowerCase();
   }
 
   static String? _readString(Object? value) {
@@ -383,6 +357,21 @@ final class NearbyMosque {
     return normalized.isEmpty ? null : normalized;
   }
 
+  /// Overpass element IDs are commonly numeric.
+  static String? _readIdentifier(Object? value) {
+    if (value is int && value > 0) {
+      return value.toString();
+    }
+
+    if (value is String) {
+      final normalized = value.trim();
+
+      return normalized.isEmpty ? null : normalized;
+    }
+
+    return null;
+  }
+
   static Map<String, dynamic>? _readMap(Object? value) {
     if (value is Map<String, dynamic>) {
       return value;
@@ -390,10 +379,7 @@ final class NearbyMosque {
 
     if (value is Map) {
       return value.map(
-        (key, item) => MapEntry(
-          key.toString(),
-          item,
-        ),
+        (key, item) => MapEntry(key.toString(), item),
       );
     }
 
@@ -424,16 +410,5 @@ final class NearbyMosque {
     if (timestamp == null) return null;
 
     return DateTime.tryParse(timestamp);
-  }
-
-  static NearbyMosque _invalidElement() {
-    return const NearbyMosque(
-      id: '',
-      name: '',
-      latitude: double.nan,
-      longitude: double.nan,
-      placeType: MosquePlaceType.unknown,
-      source: '',
-    );
   }
 }
