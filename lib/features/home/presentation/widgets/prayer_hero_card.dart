@@ -442,6 +442,8 @@ class _HeroAtmospherePainter extends CustomPainter {
   }
 }
 
+// ignore: unused_element
+
 class _HeroTopHighlight extends StatelessWidget {
   const _HeroTopHighlight();
 
@@ -463,6 +465,7 @@ class _HeroTopHighlight extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _HeroHeader extends StatelessWidget {
   const _HeroHeader({
     required this.localizations,
@@ -553,6 +556,7 @@ class _HeroHeader extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _PrayerIdentity extends StatelessWidget {
   const _PrayerIdentity({
     required this.prayerLabel,
@@ -673,6 +677,7 @@ class _PrayerIdentity extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _CountdownPanel extends StatelessWidget {
   const _CountdownPanel({
     required this.controller,
@@ -744,6 +749,7 @@ class _CountdownPanel extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _HeroFooter extends StatelessWidget {
   const _HeroFooter({
     required this.localizations,
