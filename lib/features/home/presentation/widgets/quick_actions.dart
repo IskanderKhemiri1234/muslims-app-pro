@@ -4,29 +4,24 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/design_system/mumin_design_tokens.dart';
 import 'glass_container.dart';
 
-/// Responsive quick actions for the Mumin Pro home page.
+/// Mumin Pro — Premium horizontally scrollable quick actions.
 ///
-/// All visible labels are resolved through the central localization
-/// engine. No feature-level language switch or fallback dictionary
-/// is maintained here.
+/// Add future actions by adding one _ActionData entry.
+/// Stable action IDs keep navigation independent from presentation.
 class QuickActions extends StatelessWidget {
   const QuickActions({
     super.key,
     required this.onAction,
   });
 
-  /// Receives a stable action identifier.
-  ///
-  /// Supported identifiers: qibla, quran, adhan, adhkar.
   final ValueChanged<String> onAction;
 
-  static const double _itemHeight = 112;
+  static const double _itemHeight = 124;
+  static const double _itemWidth = 104;
   static const double _spacing = 12;
-  static const double _minimumItemWidth = 72;
-  static const double _maximumItemWidth = 96;
-  static const double _defaultItemWidth = 83;
 
   List<_ActionData> _buildActions(
     MuminLocalizations localizations,
@@ -44,12 +39,14 @@ class QuickActions extends StatelessWidget {
         title: localizations.quran,
         semanticLabel: localizations.quran,
         icon: Icons.menu_book_rounded,
-        color: AppColors.goldLight,
+        color: MuminColors.goldLight,
       ),
       _ActionData(
         id: 'adhan',
-        title: localizations.text('adhan_in_development'),
-        semanticLabel: localizations.text('adhan_in_development'),
+        title: localizations.text('permission_notifications_title'),
+        semanticLabel: localizations.text(
+          'permission_notifications_title',
+        ),
         icon: Icons.notifications_active_rounded,
         color: const Color(0xFF8DB8F1),
       ),
@@ -60,16 +57,21 @@ class QuickActions extends StatelessWidget {
         icon: Icons.auto_awesome_rounded,
         color: const Color(0xFFCB9AE8),
       ),
+      _ActionData(
+        id: 'tasbih',
+        title: localizations.tasbih,
+        semanticLabel: localizations.tasbih,
+        icon: Icons.fingerprint_rounded,
+        color: MuminColors.gold,
+      ),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final locale = Localizations.localeOf(context);
-
     final languageCode =
         MuminLanguageRegistry.normalizeLanguageCode(
-      locale.languageCode,
+      Localizations.localeOf(context).languageCode,
     );
 
     final localizations =
@@ -79,44 +81,27 @@ class QuickActions extends StatelessWidget {
 
     return SizedBox(
       height: _itemHeight,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth;
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        reverse: false,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: actions.length,
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: _spacing),
+        itemBuilder: (context, index) {
+          final action = actions[index];
 
-          final calculatedWidth =
-              availableWidth.isFinite && availableWidth > 0
-                  ? (availableWidth - (_spacing * 3)) / 4
-                  : _defaultItemWidth;
-
-          final itemWidth = calculatedWidth
-              .clamp(
-                _minimumItemWidth,
-                _maximumItemWidth,
-              )
-              .toDouble();
-
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            reverse: false,
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.zero,
-            itemCount: actions.length,
-            separatorBuilder: (context, index) {
-              return const SizedBox(width: _spacing);
-            },
-            itemBuilder: (context, index) {
-              final action = actions[index];
-
-              return SizedBox(
-                width: itemWidth,
-                child: _QuickActionTile(
-                  key: ValueKey<String>(action.id),
-                  action: action,
-                  onTap: () => onAction(action.id),
-                  animationDelay: index * 70,
-                ),
-              );
-            },
+          return SizedBox(
+            width: _itemWidth,
+            child: _QuickActionTile(
+              key: ValueKey<String>(action.id),
+              action: action,
+              animationDelay: index * 55,
+              onTap: () => onAction(action.id),
+            ),
           );
         },
       ),
@@ -136,28 +121,27 @@ class _QuickActionTile extends StatelessWidget {
   final VoidCallback onTap;
   final int animationDelay;
 
-  static const double _borderRadius = 22;
-  static const double _iconContainerSize = 43;
-  static const double _iconSize = 22;
+  static const double _radius = 23;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final foreground = theme.colorScheme.onSurface;
 
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    final animationDuration = reduceMotion
+    final duration = reduceMotion
         ? Duration.zero
-        : Duration(milliseconds: 300 + animationDelay);
+        : Duration(milliseconds: 280 + animationDelay);
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(
-        begin: reduceMotion ? 1 : 0.92,
+        begin: reduceMotion ? 1 : 0.94,
         end: 1,
       ),
-      duration: animationDuration,
+      duration: duration,
       curve: Curves.easeOutCubic,
       builder: (context, scale, child) {
         return Transform.scale(
@@ -172,62 +156,144 @@ class _QuickActionTile extends StatelessWidget {
         child: ExcludeSemantics(
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(_borderRadius),
+            borderRadius: BorderRadius.circular(_radius),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(_borderRadius),
-              splashColor: action.color.withValues(alpha: 0.12),
-              highlightColor: action.color.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(_radius),
+              splashColor: action.color.withValues(alpha: 0.16),
+              highlightColor: action.color.withValues(alpha: 0.08),
               child: Ink(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(_borderRadius),
-                ),
-                child: GlassContainer(
-                  radius: _borderRadius,
-                  enableBlur: false,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 13,
-                    horizontal: 4,
+                  borderRadius: BorderRadius.circular(_radius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? const [
+                            Color(0xFF12382D),
+                            Color(0xFF09251D),
+                          ]
+                        : const [
+                            Color(0xFFFFFEFA),
+                            Color(0xFFF0F4ED),
+                          ],
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: _iconContainerSize,
-                        height: _iconContainerSize,
-                        decoration: BoxDecoration(
-                          color: action.color.withValues(alpha: 0.13),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Icon(
-                          action.icon,
-                          color: action.color,
-                          size: _iconSize,
-                        ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(_radius),
+                    border: Border.all(
+                      color: action.color.withValues(
+                        alpha: isDark ? 0.34 : 0.25,
                       ),
-                      const SizedBox(height: 9),
-                      Flexible(
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 2,
-                            ),
-                            child: Text(
-                              action.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              softWrap: true,
-                              textAlign: TextAlign.center,
-                              textDirection: Directionality.of(context),
-                              style: TextStyle(
-                                color: foreground,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: action.color.withValues(
+                          alpha: isDark ? 0.09 : 0.07,
+                        ),
+                        blurRadius: 13,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: -18,
+                        right: -15,
+                        child: IgnorePointer(
+                          child: Container(
+                            width: 66,
+                            height: 66,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: action.color.withValues(
+                                alpha: 0.055,
                               ),
                             ),
                           ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 9,
+                        left: 9,
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 11,
+                          color: action.color.withValues(
+                            alpha: 0.48,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 12,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 49,
+                              height: 49,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    action.color.withValues(
+                                      alpha: 0.23,
+                                    ),
+                                    action.color.withValues(
+                                      alpha: 0.07,
+                                    ),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: action.color.withValues(
+                                    alpha: 0.48,
+                                  ),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: action.color.withValues(
+                                      alpha: 0.13,
+                                    ),
+                                    blurRadius: 12,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                action.icon,
+                                color: action.color,
+                                size: 25,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Expanded(
+                              child: Center(
+                                child: Text(
+                                  action.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  textDirection:
+                                      Directionality.of(context),
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
