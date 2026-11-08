@@ -171,59 +171,65 @@ class _QuickActionsState extends State<QuickActions>
     );
   }
 
-  @override
-Widget build(BuildContext context) {
-  final localizations = _getLocalizations(context);
-  final actions = _buildActions(localizations);
+    @override
+  Widget build(BuildContext context) {
+    final localizations = _getLocalizations(context);
+    final actions = _buildActions(localizations);
 
-  return SizedBox(
-    height: _itemHeight,
-    child: ClipRect(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragUpdate: (details) {
+    return SizedBox(
+      height: _itemHeight,
+      child: ClipRect(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (details) {
+            setState(() {
+              _manualDragOffset =
+                  (_manualDragOffset + details.delta.dx) %
+                      _cycleWidth;
+            });
+          },
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: AnimatedBuilder(
+              animation: _animationController,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildActionSet(
+                    actions,
+                    duplicate: false,
+                  ),
+                  _buildActionSet(
+                    actions,
+                    duplicate: true,
+                  ),
+                ],
+              ),
+              builder: (context, child) {
+                final automaticOffset =
+                    -_cycleWidth * _animationController.value;
 
-          setState(() {
-            _manualDragOffset =
-                (_manualDragOffset + details.delta.dx) % _cycleWidth;
-          });
-        },
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: AnimatedBuilder(
-            animation: _animationController,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildActionSet(
-                  actions,
-                  duplicate: false,
-                ),
-                _buildActionSet(
-                  actions,
-                  duplicate: true,
-                ),
-              ],
+                final rawOffset =
+                    automaticOffset + _manualDragOffset;
+
+                final wrappedOffset = rawOffset % _cycleWidth;
+
+                final visibleOffset = wrappedOffset > 0
+                    ? wrappedOffset - _cycleWidth
+                    : wrappedOffset;
+
+                return Transform.translate(
+                  offset: Offset(visibleOffset, 0),
+                  child: child,
+                );
+              },
             ),
-            builder: (context, child) {
-              final automaticOffset =
-                  -_cycleWidth * _animationController.value;
-
-              return Transform.translate(
-                offset: Offset(
-                  automaticOffset + _manualDragOffset,
-                  0,
-                ),
-                child: child,
-              );
-            },
           ),
         ),
       ),
-    ),
-  );
-}
-}
+    );
+  }
+  }
 
 class _QuickActionTile extends StatelessWidget {
   const _QuickActionTile({
