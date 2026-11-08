@@ -402,7 +402,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               onAction: _handleQuickAction,
                             ),
                           ),
-                          const SizedBox(height: 28),
+        
                           const SizedBox(height: 30),
                           RepaintBoundary(
   child: PrayerScheduleSection(
