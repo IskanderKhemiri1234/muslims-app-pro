@@ -154,10 +154,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     );
   }
 
-  String _formatDate(DateTime date) {
-    return MuminLocaleFormatters.of(context).formatMediumDate(date);
-  }
-
   Future<void> _retryInitialization() async {
     if (_isRetrying || !mounted) return;
 
