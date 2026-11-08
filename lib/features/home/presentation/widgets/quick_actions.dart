@@ -1,13 +1,13 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/mumin_domain_localizations.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/design_system/mumin_design_tokens.dart';
 
 /// Mumin Pro — Premium horizontally scrollable quick actions.
 ///
-/// Add future actions by adding one _ActionData entry.
 /// Stable action IDs keep navigation independent from presentation.
 class QuickActions extends StatelessWidget {
   const QuickActions({
@@ -40,8 +40,21 @@ class QuickActions extends StatelessWidget {
         color: MuminColors.goldLight,
       ),
       _ActionData(
+        id: 'mosques',
+        title: localizations.domainText(
+          'nearby_mosques_title',
+        ),
+        semanticLabel: localizations.domainText(
+          'nearby_mosques_title',
+        ),
+        icon: Icons.mosque_rounded,
+        color: MuminColors.gold,
+      ),
+      _ActionData(
         id: 'adhan',
-        title: localizations.text('permission_notifications_title'),
+        title: localizations.text(
+          'permission_notifications_title',
+        ),
         semanticLabel: localizations.text(
           'permission_notifications_title',
         ),
