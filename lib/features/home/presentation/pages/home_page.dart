@@ -183,6 +183,28 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       }
     }
   }
+  
+    Future<void> _refreshDashboard() async {
+    if (!mounted) return;
+
+    try {
+      await context.read<PrayerController>().refreshPrayerData();
+
+      if (!mounted) return;
+
+      final message = context.read<PrayerController>().message;
+      if (message != null && message.trim().isNotEmpty) {
+        _showMessage(message);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: dashboard refresh failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (mounted) {
+        _showMessage(_localizations.prayerTimesUnavailable);
+      }
+    }
+    }
 
   Future<void> _updateLocation() async {
     if (!mounted) return;
@@ -334,7 +356,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                       maxWidth: maximumContentWidth,
                     ),
                     child: RefreshIndicator(
-                      onRefresh: _retryInitialization,
+                      onRefresh: _refreshDashboard,
                       color: AppColors.gold,
                       backgroundColor: theme.colorScheme.surface,
                       child: ListView(
