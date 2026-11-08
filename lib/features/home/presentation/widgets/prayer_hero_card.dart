@@ -175,8 +175,8 @@ class _HeroSurface extends StatelessWidget {
               ),
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 16 : 20,
-                  vertical: compact ? 14 : 17,
+                  horizontal: compact ? 14 : 18,
+                  vertical: compact ? 11 : 13,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +209,7 @@ class _HeroSurface extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 11),
+                    const SizedBox(height: 8),
                     Material(
                       color: Colors.white.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(14),
@@ -219,7 +219,7 @@ class _HeroSurface extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 9,
+                            vertical: 7,
                           ),
                           child: Row(
                             children: [
@@ -257,7 +257,7 @@ class _HeroSurface extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -295,7 +295,7 @@ class _HeroSurface extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: compact ? 27 : 31,
+                                    fontSize: compact ? 25 : 28,
                                     height: 1.1,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -304,13 +304,13 @@ class _HeroSurface extends StatelessWidget {
                               if (hasNextPrayer)
                                 Padding(
                                   padding:
-                                      const EdgeInsets.only(top: 5),
+                                      const EdgeInsets.only(top: 3),
                                   child: Text(
                                     formatTime(currentTime),
                                     textDirection: TextDirection.ltr,
                                     style: const TextStyle(
                                       color: AppColors.goldLight,
-                                      fontSize: 19,
+                                      fontSize: 17,
                                       fontWeight: FontWeight.w900,
                                       fontFeatures: [
                                         FontFeature.tabularFigures(),
@@ -323,12 +323,12 @@ class _HeroSurface extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 11),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 5,
-                        vertical: 8,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.085),
