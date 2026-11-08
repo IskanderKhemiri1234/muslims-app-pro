@@ -230,7 +230,7 @@ class _QuickActionsState extends State<QuickActions>
     _isHorizontalDrag = false;
   }
 
-      @override
+  @override
   Widget build(BuildContext context) {
     final localizations = _getLocalizations(context);
     final actions = _buildActions(localizations);
