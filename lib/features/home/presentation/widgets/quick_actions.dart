@@ -161,16 +161,10 @@ class _QuickActionsState extends State<QuickActions>
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var index = 0; index < actions.length; index++) ...[
-            SizedBox(
-              width: _itemWidth,
-              child: _QuickActionTile(
-                key: ValueKey<String>(
-                  '${duplicate ? 'duplicate_' : ''}${actions[index].id}',
-                ),
-                action: actions[index],
-                animationDelay: index * 55,
-                onTap: () => widget.onAction(actions[index].id),
-              ),
+            _buildActionTile(
+              actions[index],
+              index: index,
+              duplicate: duplicate,
             ),
             if (index < actions.length - 1)
               const SizedBox(width: _spacing),
@@ -180,7 +174,25 @@ class _QuickActionsState extends State<QuickActions>
     );
   }
     
-    void _handlePointerDown(PointerDownEvent event) {
+    Widget _buildActionTile(
+    _ActionData action, {
+    required int index,
+    required bool duplicate,
+  }) {
+    return SizedBox(
+      width: _itemWidth,
+      child: _QuickActionTile(
+        key: ValueKey<String>(
+          '${duplicate ? 'duplicate_' : ''}${action.id}',
+        ),
+        action: action,
+        animationDelay: index * 55,
+        onTap: () => widget.onAction(action.id),
+      ),
+    );
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
     if (_dragPointer != null) return;
 
     _dragPointer = event.pointer;
