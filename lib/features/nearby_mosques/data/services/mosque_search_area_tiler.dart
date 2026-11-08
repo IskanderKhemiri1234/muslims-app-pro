@@ -6,14 +6,16 @@ import '../config/nearby_mosque_data_source_config.dart';
 
 /// Mumin Pro — Geographic Search Area Tiler.
 ///
-/// Divides a selected geographic area into bounded rectangular tiles.
-/// Supports areas crossing the international date line.
+/// Keeps small map areas as a single tile and subdivides larger
+/// areas into bounded geographic rectangles.
 final class MosqueSearchAreaTiler {
   const MosqueSearchAreaTiler();
 
-  /// Splits [area] into non-overlapping geographic tiles.
+  /// Approximate maximum tile width and height in degrees.
   ///
-  /// The number of returned tiles never exceeds [maximumTileCount].
+  /// A viewport smaller than this threshold is not subdivided.
+  static const double maximumTileSpanDegrees = 1.0;
+
   List<MosqueSearchArea> split(
     MosqueSearchArea area, {
     int? maximumTileCount,
@@ -49,40 +51,50 @@ final class MosqueSearchAreaTiler {
       );
     }
 
-    final aspectRatio = latitudeSpan / longitudeSpan;
+    var rows = math.max(
+      1,
+      (latitudeSpan / maximumTileSpanDegrees).ceil(),
+    );
 
-    final rows = math.sqrt(
-      tileLimit * aspectRatio,
-    ).round().clamp(1, tileLimit);
+    var columns = math.max(
+      1,
+      (longitudeSpan / maximumTileSpanDegrees).ceil(),
+    );
 
-    final columns = (tileLimit ~/ rows).clamp(1, tileLimit);
+    // Reduce the grid while preserving a reasonable aspect ratio.
+    while (rows * columns > tileLimit) {
+      if (rows >= columns && rows > 1) {
+        rows--;
+      } else if (columns > 1) {
+        columns--;
+      } else {
+        break;
+      }
+    }
 
     final latitudeStep = latitudeSpan / rows;
     final longitudeStep = longitudeSpan / columns;
-
     final tiles = <MosqueSearchArea>[];
-    final unwrappedWest = area.west;
 
     for (var row = 0; row < rows; row++) {
       final south = area.south + row * latitudeStep;
-
       final north = row == rows - 1
           ? area.north
           : area.south + (row + 1) * latitudeStep;
 
       for (var column = 0; column < columns; column++) {
-        final tileWest =
-            unwrappedWest + column * longitudeStep;
+        final unwrappedWest =
+            area.west + column * longitudeStep;
 
-        final tileEast = column == columns - 1
-            ? unwrappedWest + longitudeSpan
-            : tileWest + longitudeStep;
+        final unwrappedEast = column == columns - 1
+            ? area.west + longitudeSpan
+            : unwrappedWest + longitudeStep;
 
         final tile = MosqueSearchArea(
           south: south,
-          west: _normalizeLongitude(tileWest),
+          west: _normalizeLongitude(unwrappedWest),
           north: north,
-          east: _normalizeLongitude(tileEast),
+          east: _normalizeLongitude(unwrappedEast),
         );
 
         if (!tile.isValid) {
@@ -104,10 +116,7 @@ final class MosqueSearchAreaTiler {
     return List<MosqueSearchArea>.unmodifiable(tiles);
   }
 
-  /// Preserves exact boundary values of -180 and 180.
-  ///
-  /// This is important because converting 180 to -180 would
-  /// incorrectly turn a small tile into a date-line crossing area.
+  /// Keeps exact -180 and 180 boundaries unchanged.
   double _normalizeLongitude(double longitude) {
     if (longitude >= -180 && longitude <= 180) {
       return longitude;
