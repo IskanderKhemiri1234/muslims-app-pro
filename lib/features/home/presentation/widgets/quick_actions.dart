@@ -157,7 +157,7 @@ class _QuickActionsState extends State<QuickActions>
         id: 'tasbih',
         title: localizations.tasbih,
         semanticLabel: localizations.tasbih,
-        icon: Icons.auto_awesome_rounded,
+        icon: Icons.fingerprint_rounded,
         color: MuminColors.gold,
       ),
     ];
