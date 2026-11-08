@@ -412,12 +412,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     formatTime: _formatTime,
   ),
 ),
-                          const SizedBox(height: 19),
-                          _LocationAction(
-                            localizations: localizations,
-                            isLoading: snapshot.isLoadingLocation,
-                            onPressed: _updateLocation,
-                          ),
+                        
                           if (snapshot.message != null &&
                               snapshot.message!.trim().isNotEmpty) ...[
                             const SizedBox(height: 13),
@@ -433,6 +428,17 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                   ),
                 );
               },
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 18,
+            child: SafeArea(
+              child: _LocationAction(
+                localizations: localizations,
+                isLoading: snapshot.isLoadingLocation,
+                onPressed: _updateLocation,
+              ),
             ),
           ),
         ],
@@ -835,50 +841,58 @@ class _LocationAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Semantics(
       button: true,
       enabled: !isLoading,
       label: isLoading
           ? localizations.updatingLocation
           : localizations.updateLocation,
-      child: OutlinedButton.icon(
-        onPressed: isLoading ? null : onPressed,
-        icon: isLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.gold,
+      child: Tooltip(
+        message: isLoading
+            ? localizations.updatingLocation
+            : localizations.updateLocation,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: isLoading ? null : onPressed,
+            customBorder: const CircleBorder(),
+            child: Ink(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF071C17)
+                    .withValues(alpha: 0.88),
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.85),
+                  width: 1.4,
                 ),
-              )
-            : const Icon(
-                Icons.my_location_rounded,
-                size: 19,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.gold.withValues(alpha: 0.20),
+                    blurRadius: 13,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-        label: Text(
-          isLoading
-              ? localizations.updatingLocation
-              : localizations.updateLocation,
-          textAlign: TextAlign.center,
-        ),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
-          foregroundColor: colorScheme.primary,
-          side: BorderSide(
-            color: AppColors.gold.withValues(alpha: 0.48),
-            width: 1.1,
-          ),
-          backgroundColor:
-              colorScheme.surface.withValues(alpha: 0.52),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
+              child: Center(
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.gold,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.my_location_rounded,
+                        color: AppColors.gold,
+                        size: 22,
+                      ),
+              ),
+            ),
           ),
         ),
       ),
