@@ -780,7 +780,6 @@ class _HeaderIconButton extends StatelessWidget {
 }
 
 // ignore: unused_element
-
 class _HomeSectionHeading extends StatelessWidget {
   const _HomeSectionHeading({
     required this.title,
