@@ -187,21 +187,8 @@ class _QuranPageState extends State<QuranPage>
 
   String? _loadedDailyDateKey;
 
-  double get _khatmaProgress =>
-      (_completedPages.length / _totalPages)
-          .clamp(0.0, 1.0)
-          .toDouble();
-
-  double get _dailyProgress =>
-      (_todayPages.length / _dailyTarget)
-          .clamp(0.0, 1.0)
-          .toDouble();
-
   bool get _currentPageCompleted =>
       _completedPages.contains(_currentPage);
-
-  bool get _currentPageBookmarked =>
-      _bookmarks.contains(_currentPage);
 
   String get _todayDateKey =>
       QuranReadingProgress.dateKeyFor(DateTime.now());
@@ -447,13 +434,6 @@ class _QuranPageState extends State<QuranPage>
         }
       },
     );
-  }
-
-  void _changePage(int amount) {
-    final page =
-        (_currentPage + amount).clamp(1, _totalPages).toInt();
-
-    _selectPage(page, saveImmediately: true);
   }
 
   Future<void> _markCurrentPageRead() async {
@@ -2432,44 +2412,6 @@ class _ReaderActionButton extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SmallAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _SmallAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: const Color(0xFFD8B66A),
-              size: 21,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10),
-            ),
-          ],
         ),
       ),
     );
