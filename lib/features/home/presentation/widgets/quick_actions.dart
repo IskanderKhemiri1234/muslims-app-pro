@@ -25,7 +25,7 @@ class QuickActions extends StatefulWidget {
 
 class _QuickActionsState extends State<QuickActions>
     with TickerProviderStateMixin {
-  static const double _itemHeight = 82;
+  static const double _itemHeight = 72;
   static const double _itemWidth = 68;
   static const double _spacing = 0;
   static const double _pixelsPerSecond = 22;
@@ -481,8 +481,8 @@ class _AnimatedActionArtwork extends StatelessWidget {
           child: Transform.scale(
             scale: scale,
             child: Container(
-              width: 47,
-              height: 47,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -536,7 +536,7 @@ class _AnimatedActionArtwork extends StatelessWidget {
                   ),
                   Icon(
                     icon,
-                    size: 27,
+                    size: 22,
                     color: Color.lerp(
                       color,
                       MuminColors.goldLight,
