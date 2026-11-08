@@ -15,6 +15,7 @@ import '../../../adhkar/presentation/pages/adhkar_page.dart';
 import '../../../tasbih/presentation/pages/tasbih_page.dart';
 import '../../../prayer_times/domain/services/global_prayer_calculation_service.dart';
 import '../../../qibla/presentation/pages/qibla_page_entry.dart';
+import '../../../nearby_mosques/presentation/pages/nearby_mosques_page.dart';
 import '../../../quran/presentation/pages/quran_page.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/prayer_hero_card.dart';
@@ -212,6 +213,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
     case 'quran':
       _openPage(const QuranPage());
+      return;
+
+          case 'mosques':
+      _openPage(
+        NearbyMosquesPage(
+          languageCode: _localizations.languageCode,
+        ),
+      );
       return;
 
     case 'adhan':
