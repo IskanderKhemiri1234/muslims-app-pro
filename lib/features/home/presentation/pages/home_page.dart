@@ -593,6 +593,9 @@ class _HomeHeader extends StatelessWidget {
   final VoidCallback onLanguageToggle;
   final VoidCallback onThemeToggle;
 
+  String get _languageTooltip =>
+      localizations.text('select_language');
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -647,12 +650,6 @@ class _HomeHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.1,
                 ),
-                                  const SizedBox(width: 6),
-                  _LocationAction(
-                    localizations: localizations,
-                    isLoading: isLoadingLocation,
-                    onPressed: onLocationUpdate,
-                  ),
               ),
               const SizedBox(height: 5),
               Row(
@@ -672,7 +669,19 @@ class _HomeHeader extends StatelessWidget {
                         color: colorScheme.onSurfaceVariant,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                     ),   
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _LocationAction(
+                    localizations: localizations,
+                    isLoading: isLoadingLocation,
+                    onPressed: onLocationUpdate,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: 4),
         _HeaderIconButton(
@@ -711,12 +720,6 @@ class _HomeHeader extends StatelessWidget {
                     color: AppColors.gold.withValues(alpha: 0.42),
                   ),
                 ),
-                                  const SizedBox(width: 6),
-                  _LocationAction(
-                    localizations: localizations,
-                    isLoading: isLoadingLocation,
-                    onPressed: onLocationUpdate,
-                  ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
