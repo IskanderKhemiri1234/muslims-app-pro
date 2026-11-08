@@ -23,9 +23,9 @@ class QuickActions extends StatefulWidget {
 
 class _QuickActionsState extends State<QuickActions>
     with SingleTickerProviderStateMixin {
-  static const double _itemHeight = 116;
-  static const double _itemWidth = 96;
-  static const double _spacing = 12;
+  static const double _itemHeight = 82;
+  static const double _itemWidth = 68;
+  static const double _spacing = 0;
   static const double _pixelsPerSecond = 26;
 
   static const int _actionCount = 6;
@@ -345,7 +345,7 @@ class _QuickActionTile extends StatelessWidget {
   final VoidCallback onTap;
   final int animationDelay;
 
-  static const double _radius = 23;
+  static const double _radius = 14;
 
   @override
   Widget build(BuildContext context) {
@@ -430,8 +430,8 @@ class _QuickActionTile extends StatelessWidget {
                         right: -15,
                         child: IgnorePointer(
                           child: Container(
-                            width: 66,
-                            height: 66,
+                            width: 48,
+                            height: 48,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: action.color.withValues(
@@ -446,7 +446,7 @@ class _QuickActionTile extends StatelessWidget {
                         left: 9,
                         child: Icon(
                           Icons.auto_awesome,
-                          size: 11,
+                          size: 9,
                           color: action.color.withValues(
                             alpha: 0.48,
                           ),
@@ -454,15 +454,15 @@ class _QuickActionTile extends StatelessWidget {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 12,
+                          horizontal: 3,
+                          vertical: 4,
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 36,
+                              height: 36,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(
@@ -495,10 +495,10 @@ class _QuickActionTile extends StatelessWidget {
                               child: Icon(
                                 action.icon,
                                 color: action.color,
-                                size: 22,
+                                size: 20,
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 5),
                             Expanded(
                               child: Center(
                                 child: Text(
@@ -510,7 +510,7 @@ class _QuickActionTile extends StatelessWidget {
                                       Directionality.of(context),
                                   style: TextStyle(
                                     color: foreground,
-                                    fontSize: 10.5,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                     height: 1.2,
                                   ),
