@@ -255,39 +255,56 @@ class PrayerController extends ChangeNotifier
      
     /// Refreshes the existing prayer schedule without requesting GPS
   /// or changing the user's saved location and calculation settings.
+    /// Refreshes the current prayer schedule without requesting GPS
+  /// or changing the saved location or calculation settings.
   Future<void> refreshPrayerData() async {
     if (_disposed) return;
 
-    final initialization = _initializationTask;
-    if (initialization != null) {
-      await initialization;
+    // If a valid schedule already exists, refresh it immediately.
+    // Do not wait for an unrelated initialization task.
+    if (_globalSchedule != null && _discoveredTimezone != null) {
+      try {
+        _calculateSchedule();
+
+        if (_disposed) return;
+
+        clock.value = DateTime.now();
+        message = null;
+
+        if (_isAppActive) {
+          _startClock();
+        }
+
+        _notifySafely();
+        return;
+      } catch (error, stackTrace) {
+        debugPrint('Prayer data refresh failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        rethrow;
+      }
     }
+
+    // Initialization is needed only when no valid schedule exists.
+    await retryInitialization();
 
     if (_disposed) return;
 
     if (_globalSchedule == null || _discoveredTimezone == null) {
-      await retryInitialization();
-      return;
+      throw StateError('Prayer schedule is not available after refresh.');
     }
 
-    try {
-      _calculateSchedule();
-      clock.value = DateTime.now();
-      message = null;
+    _calculateSchedule();
 
-      if (_isAppActive) {
-        _startClock();
-      }
+    if (_disposed) return;
 
-      _notifySafely();
-    } catch (error, stackTrace) {
-      debugPrint('Prayer data refresh failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
+    clock.value = DateTime.now();
+    message = null;
 
-      message = 'Unable to refresh prayer times.';
-      _notifySafely();
-      rethrow;
+    if (_isAppActive) {
+      _startClock();
     }
+
+    _notifySafely();
   }
     
   Future<void> _performInitialization() async {
