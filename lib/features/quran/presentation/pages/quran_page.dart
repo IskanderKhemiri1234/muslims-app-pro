@@ -1919,107 +1919,188 @@ void _openSurahFromNavigation(int page) {
 
   _openFullReader();
 }
-  @override
-  Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness == Brightness.dark;
+  
+@override
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final isArabic = QuranPageLocalization.isArabic(context);
+  final background = isDark
+      ? const Color(0xFF101B16)
+      : const Color(0xFFF5F4ED);
+  final foreground = isDark
+      ? const Color(0xFFE8DFC9)
+      : _deepGreen;
+  final direction = QuranPageLocalization.textDirectionOf(context);
 
-    final background = isDark
-        ? const Color(0xFF101B16)
-        : const Color(0xFFF3F5F0);
-
-    final foreground = isDark
-        ? const Color(0xFFE8DFC9)
-        : _deepGreen;
-
-    return Scaffold(
+  return Directionality(
+    textDirection: direction,
+    child: Scaffold(
       backgroundColor: background,
-      
-appBar: AppBar(
-  backgroundColor: background,
-  foregroundColor: foreground,
-  elevation: 0,
-  centerTitle: true,
-  title: Text(
-    QuranPageLocalization.text(context, 'quran_title'),
-    style: const TextStyle(
-      fontWeight: FontWeight.bold,
-      fontSize: 18,
-    ),
-  ),
-  actions: [
-    IconButton(
-      tooltip: QuranPageLocalization.text(
-        context,
-        'quran_saved_verses',
+      appBar: AppBar(
+        backgroundColor: background,
+        foregroundColor: foreground,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          QuranPageLocalization.text(context, 'quran_surahs_tab'),
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 19,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: QuranPageLocalization.text(
+              context,
+              'quran_saved_verses',
+            ),
+            onPressed: _isLoading ? null : _openVerseBookmarks,
+            icon: const Icon(Icons.bookmark_outline_rounded),
+          ),
+          IconButton(
+            tooltip: QuranPageLocalization.text(
+              context,
+              'quran_bookmarks',
+            ),
+            onPressed: _isLoading ? null : _openBookmarks,
+            icon: const Icon(Icons.bookmarks_outlined),
+          ),
+        ],
       ),
-      onPressed: _isLoading ? null : _openVerseBookmarks,
-      icon: const Icon(Icons.bookmark_outline_rounded),
-    ),
-    IconButton(
-      tooltip: QuranPageLocalization.text(
-        context,
-        'quran_bookmarks',
-      ),
-      onPressed: _isLoading ? null : _openBookmarks,
-      icon: const Icon(Icons.bookmarks_outlined),
-    ),
-  ],
-),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: _gold),
             )
-          : SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Column(       
-children: [
-  QuranSurahNavigationBar(
-    title: QuranPageLocalization.text(
-      context,
-      'quran_surahs_tab',
-    ),
-    items: List<QuranSurahNavigationItem>.generate(
-      _surahs.length,
-      (index) {
-        final surah = _surahs[index];
+          : ListView.separated(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+              itemCount: _surahs.length,
+              separatorBuilder: (_, index) => Divider(
+                height: 1,
+                indent: 72,
+                color: _gold.withValues(alpha: 0.20),
+              ),
+              itemBuilder: (itemContext, index) {
+                final surah = _surahs[index];
+                final localizedName =
+                    QuranPageLocalization.surahName(
+                  context,
+                  index + 1,
+                );
 
-        return QuranSurahNavigationItem(
-          number: index + 1,
-          name: QuranPageLocalization.surahName(
-            context,
-            index + 1,
-          ),
-          startPage: surah.page,
-        );
-      },
-      growable: false,
-    ),
-    currentPage: _currentPage,
-    onSurahSelected: _openSurahFromNavigation,
-  ),
-  _buildHeader(isDark),
-  _buildDailyCard(isDark),
-  _buildReaderPreview(isDark),
-  _buildReaderControls(isDark),
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(17),
+                    onTap: () => _openSurahFromNavigation(
+                      surah.page,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 13,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 43,
+                            height: 43,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _gold.withValues(
+                                alpha: isDark ? 0.13 : 0.17,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: _gold.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                color: _gold,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isArabic
+                                      ? surah.name
+                                      : localizedName,
+                                  textDirection: isArabic
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                if (!isArabic) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    surah.name,
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                      color: foreground.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.end,
+                            children: [
+                              Icon(
+                                Icons.menu_book_rounded,
+                                color: _gold.withValues(alpha: 0.9),
+                                size: 19,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                QuranPageLocalization.text(
+                                  context,
+                                  'quran_juz_page',
+                                  parameters: {
+                                    'page': surah.page,
+                                  },
+                                ),
+                                style: TextStyle(
+                                  color: foreground.withValues(
+                                    alpha: 0.62,
+                                  ),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-    );
-  }
+    ),
+  );
 }
-
 
 enum _QuranReaderTheme {
   day,
