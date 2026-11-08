@@ -1,19 +1,19 @@
 
+import 'dart:math' as math;
+
 import '../../domain/models/mosque_search_area.dart';
 import '../config/nearby_mosque_data_source_config.dart';
 
 /// Mumin Pro — Geographic Search Area Tiler.
 ///
-/// Divides a selected geographic area into smaller non-overlapping
-/// rectangular tiles. Supports areas crossing the international
-/// date line without producing invalid longitude coordinates.
+/// Divides a selected geographic area into bounded rectangular tiles.
+/// Supports areas crossing the international date line.
 final class MosqueSearchAreaTiler {
   const MosqueSearchAreaTiler();
 
-  /// Divides [area] into a bounded number of geographic tiles.
+  /// Splits [area] into non-overlapping geographic tiles.
   ///
-  /// The result never exceeds [maximumTileCount].
-  /// Invalid areas are rejected instead of silently corrected.
+  /// The number of returned tiles never exceeds [maximumTileCount].
   List<MosqueSearchArea> split(
     MosqueSearchArea area, {
     int? maximumTileCount,
@@ -30,7 +30,8 @@ final class MosqueSearchAreaTiler {
         NearbyMosqueDataSourceConfig.maximumTileCount;
 
     if (tileLimit < 1 ||
-        tileLimit > NearbyMosqueDataSourceConfig.maximumTileCount) {
+        tileLimit >
+            NearbyMosqueDataSourceConfig.maximumTileCount) {
       throw ArgumentError.value(
         tileLimit,
         'maximumTileCount',
@@ -42,11 +43,17 @@ final class MosqueSearchAreaTiler {
     final latitudeSpan = area.latitudeSpan;
     final longitudeSpan = area.longitudeSpan;
 
-    final rows = _calculateRows(
-      latitudeSpan,
-      longitudeSpan,
-      tileLimit,
-    );
+    if (latitudeSpan <= 0 || longitudeSpan <= 0) {
+      throw ArgumentError(
+        'The geographic area must have positive dimensions.',
+      );
+    }
+
+    final aspectRatio = latitudeSpan / longitudeSpan;
+
+    final rows = math.sqrt(
+      tileLimit * aspectRatio,
+    ).round().clamp(1, tileLimit);
 
     final columns = (tileLimit ~/ rows).clamp(1, tileLimit);
 
@@ -54,34 +61,37 @@ final class MosqueSearchAreaTiler {
     final longitudeStep = longitudeSpan / columns;
 
     final tiles = <MosqueSearchArea>[];
+    final unwrappedWest = area.west;
 
     for (var row = 0; row < rows; row++) {
       final south = area.south + row * latitudeStep;
+
       final north = row == rows - 1
           ? area.north
           : area.south + (row + 1) * latitudeStep;
 
       for (var column = 0; column < columns; column++) {
-        final unwrappedWest =
-            _unwrappedWest(area) + column * longitudeStep;
+        final tileWest =
+            unwrappedWest + column * longitudeStep;
 
-        final unwrappedEast = column == columns - 1
-            ? _unwrappedWest(area) + longitudeSpan
-            : unwrappedWest + longitudeStep;
-
-        final west = _normalizeLongitude(unwrappedWest);
-        final east = _normalizeLongitude(unwrappedEast);
+        final tileEast = column == columns - 1
+            ? unwrappedWest + longitudeSpan
+            : tileWest + longitudeStep;
 
         final tile = MosqueSearchArea(
           south: south,
-          west: west,
+          west: _normalizeLongitude(tileWest),
           north: north,
-          east: east,
+          east: _normalizeLongitude(tileEast),
         );
 
-        if (tile.isValid) {
-          tiles.add(tile);
+        if (!tile.isValid) {
+          throw StateError(
+            'The generated geographic tile is invalid.',
+          );
         }
+
+        tiles.add(tile);
       }
     }
 
@@ -94,24 +104,15 @@ final class MosqueSearchAreaTiler {
     return List<MosqueSearchArea>.unmodifiable(tiles);
   }
 
-  int _calculateRows(
-    double latitudeSpan,
-    double longitudeSpan,
-    int tileLimit,
-  ) {
-    final aspectRatio = latitudeSpan / longitudeSpan;
-
-    final estimatedRows =
-        (tileLimit * aspectRatio).sqrtRounded();
-
-    return estimatedRows.clamp(1, tileLimit);
-  }
-
-  double _unwrappedWest(MosqueSearchArea area) {
-    return area.west;
-  }
-
+  /// Preserves exact boundary values of -180 and 180.
+  ///
+  /// This is important because converting 180 to -180 would
+  /// incorrectly turn a small tile into a date-line crossing area.
   double _normalizeLongitude(double longitude) {
+    if (longitude >= -180 && longitude <= 180) {
+      return longitude;
+    }
+
     var normalized = (longitude + 180) % 360;
 
     if (normalized < 0) {
@@ -119,23 +120,5 @@ final class MosqueSearchAreaTiler {
     }
 
     return normalized - 180;
-  }
-}
-
-extension on double {
-  int sqrtRounded() {
-    if (!isFinite || this <= 0) return 1;
-
-    var estimate = this;
-    var previous = 0.0;
-
-    for (var iteration = 0;
-        iteration < 30 && estimate != previous;
-        iteration++) {
-      previous = estimate;
-      estimate = (estimate + this / estimate) / 2;
-    }
-
-    return estimate.round().clamp(1, 1000000);
   }
 }
