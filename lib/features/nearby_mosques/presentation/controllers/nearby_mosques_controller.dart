@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/services/nearby_mosque_search_service.dart';
+import '../../domain/models/nearby_mosque.dart';
 import '../../domain/models/mosque_search_area.dart';
 import '../../domain/models/mosque_search_request.dart';
 import '../../domain/models/mosque_search_result.dart';
@@ -31,8 +32,8 @@ final class NearbyMosquesController extends ChangeNotifier {
 
   MosqueSearchResult? get result => _result;
 
-  List get mosques =>
-      _result?.mosques ?? const [];
+  List<NearbyMosque> get mosques =>
+    _result?.mosques ?? const <NearbyMosque>[];
 
   bool get isLoading => _isLoading;
 
@@ -151,13 +152,16 @@ final class NearbyMosquesController extends ChangeNotifier {
   }
 
   void _setError(String message) {
-    if (_isDisposed) return;
+  if (_isDisposed) return;
 
-    _isLoading = false;
-    _errorMessage = message;
+  // Invalidates any older search still running.
+  _searchGeneration++;
 
-    _notifySafely();
-  }
+  _isLoading = false;
+  _errorMessage = message;
+
+  _notifySafely();
+}
 
   bool _isCurrentSearch(int generation) {
     return !_isDisposed &&
