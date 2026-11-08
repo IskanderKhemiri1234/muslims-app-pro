@@ -158,18 +158,17 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
   }
 
   String _placeTypeLabel(NearbyMosque mosque) {
-    switch (mosque.placeType) {
-      case MosquePlaceType.mosque:
-        return _tr('nearby_mosquesunnamed');
-      case MosquePlaceType.prayerRoom:
-        return _tr('nearby_mosques_prayer_room');
-      case MosquePlaceType.musalla:
-        return _tr('nearby_mosques_musalla');
-      case MosquePlaceType.unknown:
-        return _tr('nearby_mosques_location_unavailable');
-    }
+  switch (mosque.placeType) {
+    case MosquePlaceType.mosque:
+      return _tr('nearby_mosques_mosque');
+    case MosquePlaceType.prayerRoom:
+      return _tr('nearby_mosques_prayer_room');
+    case MosquePlaceType.musalla:
+      return _tr('nearby_mosques_musalla');
+    case MosquePlaceType.unknown:
+      return _tr('nearby_mosques_location_unavailable');
   }
-
+}
   String _mosqueTitle(NearbyMosque mosque) {
     final name = mosque.nameForLanguage(_languageCode);
 
@@ -262,7 +261,7 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
                     const SizedBox(height: 12),
                     _detailRow(
                       Icons.location_city_rounded,
-                      _tr('nearby_mosques_location_unavailable'),
+                      _tr('nearby_mosques_city'),
                       mosque.city!,
                       primaryText,
                       secondaryText,
