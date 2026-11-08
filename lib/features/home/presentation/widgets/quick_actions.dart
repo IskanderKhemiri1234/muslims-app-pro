@@ -223,6 +223,7 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
 
 class _QuickActionTile extends StatelessWidget {
   const _QuickActionTile({
