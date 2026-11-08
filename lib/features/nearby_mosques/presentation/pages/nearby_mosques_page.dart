@@ -1,6 +1,4 @@
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -491,99 +489,122 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
     );
   }
 
+  
   Widget _buildMap(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
 
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _initialCenter,
-        initialZoom: _initialZoom,
-        minZoom: 2,
-        maxZoom: 18,
-        onMapReady: () {
-          if (mounted) {
-            setState(() => _mapReady = true);
-          }
-        },
-      ),
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        TileLayer(
-          urlTemplate:
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.iskander.muslimspro',
-          maxZoom: 19,
-        ),
-        MarkerLayer(
-          markers: [
-            for (final mosque
-                in _mosquesController.result?.mosques ??
-                    const <NearbyMosque>[])
-              Marker(
-                point: LatLng(
-                  mosque.latitude,
-                  mosque.longitude,
-                ),
-                width: 44,
-                height: 52,
-                child: GestureDetector(
-                  onTap: () => _showMosqueDetails(mosque),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: MuminColors.deepEmerald,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: MuminColors.gold,
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: 0.25,
-                              ),
-                              blurRadius: 7,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.mosque_rounded,
-                          color: MuminColors.goldLight,
-                          size: 20,
-                        ),
-                      ),
-                      Container(
-                        width: 3,
-                        height: 9,
-                        color: MuminColors.gold,
-                      ),
-                    ],
-                  ),
-                ),
+        AnimatedBuilder(
+          animation: _mosquesController,
+          builder: (context, _) {
+            final mosques =
+                _mosquesController.result?.mosques ??
+                    const <NearbyMosque>[];
+
+            return FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _initialCenter,
+                initialZoom: _initialZoom,
+                minZoom: 2,
+                maxZoom: 18,
+                onMapReady: () {
+                  if (mounted && !_mapReady) {
+                    setState(() => _mapReady = true);
+                  }
+                },
               ),
-          ],
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.iskander.muslimspro',
+                  maxZoom: 19,
+                ),
+                MarkerLayer(
+                  markers: [
+                    for (final mosque in mosques)
+                      Marker(
+                        point: LatLng(
+                          mosque.latitude,
+                          mosque.longitude,
+                        ),
+                        width: 44,
+                        height: 52,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _showMosqueDetails(mosque),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: MuminColors.deepEmerald,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: MuminColors.gold,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.25,
+                                      ),
+                                      blurRadius: 7,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.mosque_rounded,
+                                  color: MuminColors.goldLight,
+                                  size: 20,
+                                ),
+                              ),
+                              Container(
+                                width: 3,
+                                height: 9,
+                                color: MuminColors.gold,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                RichAttributionWidget(
+                  alignment: Alignment.bottomLeft,
+                  attributions: const [
+                    TextSourceAttribution(
+                      '© OpenStreetMap contributors',
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        RichAttributionWidget(
-          alignment: Alignment.bottomLeft,
-          attributions: const [
-            TextSourceAttribution(
-              '© OpenStreetMap contributors',
+        if (isDark)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: Color(0x14000000),
+              ),
             ),
-          ],
-        ),
-        Positioned(
-          right: 12,
+          ),
+        PositionedDirectional(
+          end: 12,
           top: 12,
           child: Column(
             children: [
               _mapControl(
                 icon: Icons.add_rounded,
                 onTap: () {
+                  if (!_mapReady) return;
                   final camera = _mapController.camera;
                   _mapController.move(
                     camera.center,
@@ -595,6 +616,7 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
               _mapControl(
                 icon: Icons.remove_rounded,
                 onTap: () {
+                  if (!_mapReady) return;
                   final camera = _mapController.camera;
                   _mapController.move(
                     camera.center,
@@ -605,12 +627,6 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
             ],
           ),
         ),
-        if (isDark)
-          IgnorePointer(
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.08),
-            ),
-          ),
       ],
     );
   }
@@ -832,15 +848,17 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
                           style: TextStyle(color: secondary),
                         ),
                         onTap: () {
-                          Navigator.of(context).maybePop();
-                          _mapController.move(
-                            LatLng(
-                              mosque.latitude,
-                              mosque.longitude,
-                            ),
-                            16,
-                          );
-                          _showMosqueDetails(mosque);
+                         setState(() {
+                         _showResultsList = false;
+                        });
+                         _mapController.move(
+                         LatLng(
+                         mosque.latitude,
+                         mosque.longitude,
+                         ),
+                         16,
+                         );
+                         _showMosqueDetails(mosque);
                         },
                       );
                     },
