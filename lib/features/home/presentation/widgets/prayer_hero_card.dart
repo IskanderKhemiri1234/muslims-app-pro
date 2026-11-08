@@ -443,7 +443,6 @@ class _HeroAtmospherePainter extends CustomPainter {
 }
 
 // ignore: unused_element
-
 class _HeroTopHighlight extends StatelessWidget {
   const _HeroTopHighlight();
 
