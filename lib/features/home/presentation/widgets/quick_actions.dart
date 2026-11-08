@@ -38,7 +38,7 @@ class _QuickActionsState extends State<QuickActions>
 
   bool _motionDisabled = false;
   double _manualDragOffset = 0;
-    int? _dragPointer;
+  int? _dragPointer;
   double? _dragStartX;
   double? _dragStartY;
   double? _lastDragX;
@@ -230,7 +230,7 @@ class _QuickActionsState extends State<QuickActions>
     _isHorizontalDrag = false;
   }
 
-    @override
+      @override
   Widget build(BuildContext context) {
     final localizations = _getLocalizations(context);
     final actions = _buildActions(localizations);
@@ -238,16 +238,12 @@ class _QuickActionsState extends State<QuickActions>
     return SizedBox(
       height: _itemHeight,
       child: ClipRect(
-                child: Listener(
+        child: Listener(
           behavior: HitTestBehavior.opaque,
           onPointerDown: _handlePointerDown,
           onPointerMove: _handlePointerMove,
           onPointerUp: _handlePointerEnd,
           onPointerCancel: _handlePointerEnd,
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            });
-          },
           child: Align(
             alignment: AlignmentDirectional.centerStart,
             child: AnimatedBuilder(
@@ -289,7 +285,7 @@ class _QuickActionsState extends State<QuickActions>
       ),
     );
   }
-  }
+}
 
 class _QuickActionTile extends StatelessWidget {
   const _QuickActionTile({
