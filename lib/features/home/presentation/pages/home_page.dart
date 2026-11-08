@@ -371,11 +371,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           34,
                         ),
                         children: [
-                          _HomeHeader(
+                                                    _HomeHeader(
                             localizations: localizations,
                             city: snapshot.city,
                             date: _formatDate(_currentDate),
                             isDark: widget.isDark,
+                            isLoadingLocation:
+                                snapshot.isLoadingLocation,
+                            onLocationUpdate: _updateLocation,
                             onLanguageToggle: widget.onLanguageToggle,
                             onThemeToggle: widget.onThemeToggle,
                           ),
@@ -582,6 +585,25 @@ class _AmbientGlow extends StatelessWidget {
 
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
+      const _HomeHeader({
+    required this.localizations,
+    required this.city,
+    required this.date,
+    required this.isDark,
+    required this.isLoadingLocation,
+    required this.onLocationUpdate,
+    required this.onLanguageToggle,
+    required this.onThemeToggle,
+  });
+
+  final MuminLocalizations localizations;
+  final String city;
+  final String date;
+  final bool isDark;
+  final bool isLoadingLocation;
+  final VoidCallback onLocationUpdate;
+  final VoidCallback onLanguageToggle;
+  final VoidCallback onThemeToggle;
     required this.localizations,
     required this.city,
     required this.date,
@@ -654,6 +676,12 @@ class _HomeHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.1,
                 ),
+                                  const SizedBox(width: 6),
+                  _LocationAction(
+                    localizations: localizations,
+                    isLoading: isLoadingLocation,
+                    onPressed: onLocationUpdate,
+                  ),
               ),
               const SizedBox(height: 5),
               Row(
@@ -858,8 +886,8 @@ class _LocationAction extends StatelessWidget {
             onTap: isLoading ? null : onPressed,
             customBorder: const CircleBorder(),
             child: Ink(
-              width: 46,
-              height: 46,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFF071C17)
@@ -879,8 +907,8 @@ class _LocationAction extends StatelessWidget {
               child: Center(
                 child: isLoading
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: AppColors.gold,
@@ -889,7 +917,7 @@ class _LocationAction extends StatelessWidget {
                     : const Icon(
                         Icons.my_location_rounded,
                         color: AppColors.gold,
-                        size: 22,
+                        size: 18,
                       ),
               ),
             ),
