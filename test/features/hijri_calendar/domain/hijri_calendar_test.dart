@@ -39,10 +39,10 @@ void main() {
       expect(evening, morning);
     });
 
-    test('rejects an invalid Gregorian date', () {
+    test('rejects Gregorian year zero', () {
       expect(
         () => HijriDateCalculator.fromGregorian(
-          DateTime(2024, 2, 30),
+          DateTime(0, 1, 1),
         ),
         throwsArgumentError,
       );
