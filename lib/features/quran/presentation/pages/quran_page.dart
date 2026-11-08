@@ -304,7 +304,6 @@ class _QuranPageState extends State<QuranPage>
             progress.lastReadPage.clamp(1, _totalPages).toInt();
 
         _completedPages = _validPages(progress.completedPages);
-        _todayPages = _validPages(progress.dailyPages);
 
         _completedKhatmas = progress.completedKhatmas < 0
             ? 0
@@ -347,7 +346,6 @@ class _QuranPageState extends State<QuranPage>
         if (!mounted) return;
 
         setState(() {
-          _todayPages = _validPages(progress.dailyPages);
           _loadedDailyDateKey = progress.dailyDateKey;
         });
       });
@@ -460,7 +458,6 @@ class _QuranPageState extends State<QuranPage>
 
           setState(() {
             _completedPages = completed;
-            _todayPages = today;
             _completedKhatmas = latest.completedKhatmas;
             _loadedDailyDateKey = latest.dailyDateKey;
           });
@@ -496,7 +493,6 @@ class _QuranPageState extends State<QuranPage>
 
         setState(() {
           _completedPages = completed;
-          _todayPages = today;
           _completedKhatmas = resultingKhatmas;
           _loadedDailyDateKey = updated.dailyDateKey;
         });
@@ -554,7 +550,6 @@ class _QuranPageState extends State<QuranPage>
 
         setState(() {
           _completedPages = completed;
-          _todayPages = today;
           _loadedDailyDateKey = updated.dailyDateKey;
         });
       });
