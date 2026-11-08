@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/design_system/mumin_design_tokens.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
+import '../../../../core/localization/mumin_hijri_localizations.dart';
+import '../../../hijri_calendar/domain/services/hijri_date_calculator.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../../prayer_times/presentation/widgets/countdown_widget.dart';
@@ -15,16 +17,20 @@ import 'glass_container.dart';
 /// All language metadata and direction decisions are resolved
 /// through the centralized localization architecture.
 class PrayerHeroCard extends StatelessWidget {
-  const PrayerHeroCard({
+   const PrayerHeroCard({
     super.key,
     required this.controller,
     required this.prayerName,
     required this.formatTime,
+    required this.date,
+    required this.onHijriTap,
   });
 
   final PrayerController controller;
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
+  final DateTime date;
+  final VoidCallback onHijriTap; 
 
   MuminLocalizations _resolveLocalizations(BuildContext context) {
     final localeCode =
@@ -60,7 +66,7 @@ class PrayerHeroCard extends StatelessWidget {
         child: AnimatedBuilder(
           animation: controller,
           builder: (context, child) {
-            return _HeroSurface(
+                        return _HeroSurface(
               nextPrayer: controller.nextPrayer,
               nextTime: controller.nextPrayerTime,
               controller: controller,
@@ -68,6 +74,8 @@ class PrayerHeroCard extends StatelessWidget {
               prayerName: prayerName,
               formatTime: formatTime,
               reduceMotion: reduceMotion,
+              date: date,
+              onHijriTap: onHijriTap,
             );
           },
         ),
@@ -85,6 +93,8 @@ class _HeroSurface extends StatelessWidget {
     required this.prayerName,
     required this.formatTime,
     required this.reduceMotion,
+    required this.date,
+    required this.onHijriTap,
   });
 
   final Prayer? nextPrayer;
@@ -94,9 +104,8 @@ class _HeroSurface extends StatelessWidget {
   final String Function(Prayer) prayerName;
   final String Function(DateTime) formatTime;
   final bool reduceMotion;
-
-  String get _unavailableLabel =>
-      localizations.text('unavailable');
+  final DateTime date;
+  final VoidCallback onHijriTap;
 
   @override
   Widget build(BuildContext context) {
@@ -108,111 +117,240 @@ class _HeroSurface extends StatelessWidget {
 
     final prayerLabel = hasNextPrayer
         ? prayerName(currentPrayer)
-        : _unavailableLabel;
+        : localizations.text('unavailable');
 
-    final animationKey =
-        '${currentPrayer?.name ?? 'unavailable'}_'
-        '${currentTime?.millisecondsSinceEpoch ?? 'none'}';
+    final hijriDate = HijriDateCalculator.fromGregorian(
+      DateTime(date.year, date.month, date.day),
+    );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 350;
-        final horizontalPadding = compact ? 16.0 : 23.0;
-        final verticalPadding = compact ? 19.0 : 24.0;
+    final hijriMonth = MuminHijriLocalizations.monthName(
+      localizations,
+      hijriDate.month,
+    );
 
-        return Semantics(
-          container: true,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF126C55),
-                    Color(0xFF084B3B),
-                    Color(0xFF06372E),
-                    Color(0xFF041F1B),
-                  ],
-                  stops: [0, 0.32, 0.72, 1],
-                ),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.42),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF075B46)
-                        .withValues(alpha: 0.24),
-                    blurRadius: 30,
-                    spreadRadius: -5,
-                    offset: const Offset(0, 15),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 18,
-                    offset: const Offset(0, 9),
-                  ),
-                ],
+    final hijriSuffix =
+        localizations.languageCode == 'ar' ? 'هـ' : 'AH';
+
+    final hijriLabel =
+        '${hijriDate.day} $hijriMonth '
+        '${hijriDate.year} $hijriSuffix';
+
+    final compact =
+        MediaQuery.sizeOf(context).width < 380;
+
+    return Semantics(
+      container: true,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF126C55),
+                Color(0xFF084B3B),
+                Color(0xFF06372E),
+              ],
+            ),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.42),
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF075B46)
+                    .withValues(alpha: 0.22),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
-              child: Stack(
-                children: [
-                  const Positioned.fill(
-                    child: IgnorePointer(
-                      child: _HeroAtmosphere(),
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
-                      vertical: verticalPadding,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          child: Stack(
+            children: [
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: _HeroAtmosphere(),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 16 : 20,
+                  vertical: compact ? 14 : 17,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        _HeroHeader(
-                          localizations: localizations,
+                        const Icon(
+                          Icons.nights_stay_rounded,
+                          color: AppColors.goldLight,
+                          size: 20,
                         ),
-                        SizedBox(height: compact ? 23 : 31),
-                        _PrayerIdentity(
-                          prayerLabel: prayerLabel,
-                          animationKey: animationKey,
-                          hasNextPrayer: hasNextPrayer,
-                          currentTime: currentTime,
-                          formatTime: formatTime,
-                          localizations: localizations,
-                          reduceMotion: reduceMotion,
-                          compact: compact,
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            localizations.nextPrayer,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
-                        SizedBox(height: compact ? 21 : 28),
-                        _CountdownPanel(
-                          controller: controller,
-                          localizations: localizations,
-                          compact: compact,
-                        ),
-                        SizedBox(height: compact ? 15 : 19),
-                        _HeroFooter(
-                          localizations: localizations,
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: AppColors.goldLight,
+                          size: 16,
                         ),
                       ],
                     ),
-                  ),
-                  const PositionedDirectional(
-                    top: 0,
-                    start: 0,
-                    end: 0,
-                    child: IgnorePointer(
-                      child: _HeroTopHighlight(),
+                    const SizedBox(height: 11),
+                    Material(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        onTap: onHijriTap,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 9,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_month_rounded,
+                                color: AppColors.goldLight,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  hijriLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textDirection:
+                                      localizations.isRightToLeft
+                                          ? TextDirection.rtl
+                                          : TextDirection.ltr,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                localizations.isRightToLeft
+                                    ? Icons.chevron_left_rounded
+                                    : Icons.chevron_right_rounded,
+                                color: AppColors.goldLight,
+                                size: 19,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                localizations.text(
+                                  'next_prayer_eyebrow',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.goldLight
+                                      .withValues(alpha: 0.88),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              AnimatedSwitcher(
+                                duration: reduceMotion
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 300),
+                                child: Text(
+                                  prayerLabel,
+                                  key: ValueKey<String>(
+                                    currentPrayer?.name ??
+                                        'unavailable',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: compact ? 27 : 31,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              if (hasNextPrayer)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(top: 5),
+                                  child: Text(
+                                    formatTime(currentTime),
+                                    textDirection: TextDirection.ltr,
+                                    style: const TextStyle(
+                                      color: AppColors.goldLight,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w900,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 11),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.085),
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.13),
+                        ),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: CountdownWidget(
+                          controller: controller,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
