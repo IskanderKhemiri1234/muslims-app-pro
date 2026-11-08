@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/localization/mumin_domain_localizations.dart';
@@ -6,10 +5,11 @@ import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/design_system/mumin_design_tokens.dart';
 
-/// Mumin Pro — Premium horizontally scrollable quick actions.
+/// Mumin Pro — Continuous animated quick actions marquee.
 ///
-/// Stable action IDs keep navigation independent from presentation.
-class QuickActions extends StatelessWidget {
+/// All action tiles move together in one seamless horizontal loop.
+/// Navigation IDs remain independent from the visual presentation.
+class QuickActions extends StatefulWidget {
   const QuickActions({
     super.key,
     required this.onAction,
@@ -17,9 +17,72 @@ class QuickActions extends StatelessWidget {
 
   final ValueChanged<String> onAction;
 
+  @override
+  State<QuickActions> createState() => _QuickActionsState();
+}
+
+class _QuickActionsState extends State<QuickActions>
+    with SingleTickerProviderStateMixin {
   static const double _itemHeight = 124;
   static const double _itemWidth = 104;
   static const double _spacing = 12;
+  static const double _pixelsPerSecond = 26;
+
+  static const int _actionCount = 6;
+
+  static const double _cycleWidth =
+      (_itemWidth * _actionCount) +
+      (_spacing * (_actionCount - 1));
+
+  late final AnimationController _animationController;
+
+  bool _motionDisabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final durationMilliseconds =
+        (_cycleWidth / _pixelsPerSecond * 1000).round();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: durationMilliseconds),
+    )..repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final disableMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    if (_motionDisabled == disableMotion) return;
+
+    _motionDisabled = disableMotion;
+
+    if (disableMotion) {
+      _animationController.stop();
+    } else {
+      _animationController.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  MuminLocalizations _getLocalizations(BuildContext context) {
+    final languageCode =
+        MuminLanguageRegistry.normalizeLanguageCode(
+      Localizations.localeOf(context).languageCode,
+    );
+
+    return MuminLocalizations.fromCode(languageCode);
+  }
 
   List<_ActionData> _buildActions(
     MuminLocalizations localizations,
@@ -78,43 +141,71 @@ class QuickActions extends StatelessWidget {
     ];
   }
 
+  Widget _buildActionSet(
+    List<_ActionData> actions, {
+    required bool duplicate,
+  }) {
+    return SizedBox(
+      width: _cycleWidth,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var index = 0; index < actions.length; index++) ...[
+            SizedBox(
+              width: _itemWidth,
+              child: _QuickActionTile(
+                key: ValueKey<String>(
+                  '${duplicate ? 'duplicate_' : ''}${actions[index].id}',
+                ),
+                action: actions[index],
+                animationDelay: index * 55,
+                onTap: () => widget.onAction(actions[index].id),
+              ),
+            ),
+            if (index < actions.length - 1)
+              const SizedBox(width: _spacing),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final languageCode =
-        MuminLanguageRegistry.normalizeLanguageCode(
-      Localizations.localeOf(context).languageCode,
-    );
-
-    final localizations =
-        MuminLocalizations.fromCode(languageCode);
-
+    final localizations = _getLocalizations(context);
     final actions = _buildActions(localizations);
 
     return SizedBox(
       height: _itemHeight,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        reverse: false,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: actions.length,
-        separatorBuilder: (_, __) =>
-            const SizedBox(width: _spacing),
-        itemBuilder: (context, index) {
-          final action = actions[index];
-
-          return SizedBox(
-            width: _itemWidth,
-            child: _QuickActionTile(
-              key: ValueKey<String>(action.id),
-              action: action,
-              animationDelay: index * 55,
-              onTap: () => onAction(action.id),
+      child: ClipRect(
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: AnimatedBuilder(
+            animation: _animationController,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildActionSet(
+                  actions,
+                  duplicate: false,
+                ),
+                _buildActionSet(
+                  actions,
+                  duplicate: true,
+                ),
+              ],
             ),
-          );
-        },
+            builder: (context, child) {
+              final offset =
+                  -_cycleWidth * _animationController.value;
+
+              return Transform.translate(
+                offset: Offset(offset, 0),
+                child: child,
+              );
+            },
+          ),
+        ),
       ),
     );
   }
