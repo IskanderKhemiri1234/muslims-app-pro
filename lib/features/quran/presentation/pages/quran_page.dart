@@ -1716,9 +1716,10 @@ Widget _buildMushafPage({
   required double width,
   required double height,
 }) {
-  // Render the Madina page at its natural portrait ratio,
-  // then fit the complete page into the available viewport.
-  final pageHeight = (width * 1.4142).clamp(100.0, 4000.0);
+  // Render the Madina page directly at the full available viewport size.
+  // This avoids scaling a shorter page after rendering and uses the complete
+  // screen height for the Mushaf page layout.
+  final pageHeight = height.clamp(1.0, 4000.0);
   final fontSize = (width / 19).clamp(17.0, 25.0);
 
   return SizedBox.expand(
