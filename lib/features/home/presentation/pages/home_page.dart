@@ -433,17 +433,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
               },
             ),
           ),
-          Positioned(
-            top: 8,
-            right: 18,
-            child: SafeArea(
-              child: _LocationAction(
-                localizations: localizations,
-                isLoading: snapshot.isLoadingLocation,
-                onPressed: _updateLocation,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -585,7 +574,6 @@ class _AmbientGlow extends StatelessWidget {
 
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
-      const _HomeHeader({
     required this.localizations,
     required this.city,
     required this.date,
@@ -604,23 +592,6 @@ class _HomeHeader extends StatelessWidget {
   final VoidCallback onLocationUpdate;
   final VoidCallback onLanguageToggle;
   final VoidCallback onThemeToggle;
-    required this.localizations,
-    required this.city,
-    required this.date,
-    required this.isDark,
-    required this.onLanguageToggle,
-    required this.onThemeToggle,
-  });
-
-  final MuminLocalizations localizations;
-  final String city;
-  final String date;
-  final bool isDark;
-  final VoidCallback onLanguageToggle;
-  final VoidCallback onThemeToggle;
-
-  String get _languageTooltip =>
-      localizations.text('select_language');
 
   @override
   Widget build(BuildContext context) {
@@ -701,13 +672,7 @@ class _HomeHeader extends StatelessWidget {
                         color: colorScheme.onSurfaceVariant,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                     ),   
         ),
         const SizedBox(width: 4),
         _HeaderIconButton(
@@ -746,6 +711,12 @@ class _HomeHeader extends StatelessWidget {
                     color: AppColors.gold.withValues(alpha: 0.42),
                   ),
                 ),
+                                  const SizedBox(width: 6),
+                  _LocationAction(
+                    localizations: localizations,
+                    isLoading: isLoadingLocation,
+                    onPressed: onLocationUpdate,
+                  ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
