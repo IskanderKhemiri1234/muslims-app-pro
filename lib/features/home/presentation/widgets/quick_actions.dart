@@ -23,8 +23,8 @@ class QuickActions extends StatefulWidget {
 
 class _QuickActionsState extends State<QuickActions>
     with SingleTickerProviderStateMixin {
-  static const double _itemHeight = 124;
-  static const double _itemWidth = 104;
+  static const double _itemHeight = 116;
+  static const double _itemWidth = 96;
   static const double _spacing = 12;
   static const double _pixelsPerSecond = 26;
 
@@ -339,8 +339,8 @@ class _QuickActionTile extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              width: 49,
-                              height: 49,
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(
@@ -373,7 +373,7 @@ class _QuickActionTile extends StatelessWidget {
                               child: Icon(
                                 action.icon,
                                 color: action.color,
-                                size: 25,
+                                size: 22,
                               ),
                             ),
                             const SizedBox(height: 10),
