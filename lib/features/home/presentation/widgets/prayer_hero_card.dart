@@ -109,246 +109,250 @@ class _HeroSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentPrayer = nextPrayer;
-    final currentTime = nextTime;
-
-    final hasNextPrayer =
-        currentPrayer != null && currentTime != null;
-
-    final prayerLabel = hasNextPrayer
-        ? prayerName(currentPrayer)
+    final prayer = nextPrayer;
+    final prayerTime = nextTime;
+    final hasPrayer = prayer != null && prayerTime != null;
+    final prayerLabel = hasPrayer
+        ? prayerName(prayer)
         : localizations.text('unavailable');
 
     final hijriDate = HijriDateCalculator.fromGregorian(
       DateTime(date.year, date.month, date.day),
     );
-
     final hijriMonth = MuminHijriLocalizations.monthName(
       localizations,
       hijriDate.month,
     );
-
     final hijriSuffix =
         localizations.languageCode == 'ar' ? 'هـ' : 'AH';
-
     final hijriLabel =
-        '${hijriDate.day} $hijriMonth '
-        '${hijriDate.year} $hijriSuffix';
+        '${hijriMonth} ${hijriDate.day}, ${hijriDate.year} $hijriSuffix';
 
-    final compact =
-        MediaQuery.sizeOf(context).width < 380;
+    final isRtl = localizations.isRightToLeft;
+    final foreground = Colors.white;
 
-    return Semantics(
-      container: true,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF126C55),
-                Color(0xFF084B3B),
-                Color(0xFF06372E),
-              ],
-            ),
-            border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.42),
-            ),
-            borderRadius: BorderRadius.circular(11),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF075B46)
-                    .withValues(alpha: 0.22),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF07966F),
+              Color(0xFF087B5C),
+              Color(0xFF064A3B),
             ],
           ),
-          child: Stack(
-            children: [
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: _HeroAtmosphere(),
-                ),
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: 0.52),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00A878).withValues(alpha: 0.19),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: _HeroAtmosphere(),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+            ),
+            PositionedDirectional(
+              end: 10,
+              top: 24,
+              bottom: 36,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.22,
+                  child: SizedBox(
+                    width: 124,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        const Icon(
-                          Icons.nights_stay_rounded,
-                          color: AppColors.goldLight,
-                          size: 17,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            localizations.nextPrayer,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const Icon(
-                          Icons.auto_awesome_rounded,
-                          color: AppColors.goldLight,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Material(
-                      color: Colors.white.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(11),
-                      child: InkWell(
-                        onTap: onHijriTap,
-                        borderRadius: BorderRadius.circular(11),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_month_rounded,
-                                color: AppColors.goldLight,
-                                size: 17,
-                              ),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Text(
-                                  hijriLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textDirection:
-                                      localizations.isRightToLeft
-                                          ? TextDirection.rtl
-                                          : TextDirection.ltr,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              Icon(
-                                localizations.isRightToLeft
-                                    ? Icons.chevron_left_rounded
-                                    : Icons.chevron_right_rounded,
-                                color: AppColors.goldLight,
-                                size: 19,
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Icon(
+                            Icons.mosque_rounded,
+                            size: 106,
+                            color: AppColors.goldLight,
+                            shadows: [
+                              Shadow(
+                                color: AppColors.gold.withValues(alpha: 0.8),
+                                blurRadius: 18,
                               ),
                             ],
                           ),
                         ),
+                        const Positioned(
+                          top: 0,
+                          right: 24,
+                          child: Icon(
+                            Icons.nightlight_round,
+                            size: 31,
+                            color: AppColors.goldLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                17,
+                13,
+                17,
+                10,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onHijriTap,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                hijriLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textDirection: isRtl
+                                    ? TextDirection.rtl
+                                    : TextDirection.ltr,
+                                style: const TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.86),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.open_in_new_rounded,
+                              color: Colors.white,
+                              size: 17,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
+                  ),
+                  const SizedBox(height: 7),
+                  Expanded(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
+                          flex: 6,
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                localizations.text(
-                                  'next_prayer_eyebrow',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: AppColors.goldLight
-                                      .withValues(alpha: 0.88),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              AnimatedSwitcher(
-                                duration: reduceMotion
-                                    ? Duration.zero
-                                    : const Duration(milliseconds: 300),
-                                child: Text(
-                                  prayerLabel,
-                                  key: ValueKey<String>(
-                                    currentPrayer?.name ??
-                                        'unavailable',
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: compact ? 22 : 24,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              if (hasNextPrayer)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: 3),
-                                  child: Text(
-                                    formatTime(currentTime),
-                                    textDirection: TextDirection.ltr,
-                                    style: const TextStyle(
-                                      color: AppColors.goldLight,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                      fontFeatures: [
-                                        FontFeature.tabularFigures(),
-                                      ],
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      prayerLabel,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(width: 7),
+                                  Icon(
+                                    prayer == Prayer.fajr
+                                        ? Icons.wb_twilight_rounded
+                                        : prayer == Prayer.maghrib
+                                            ? Icons.wb_twilight_rounded
+                                            : prayer == Prayer.isha
+                                                ? Icons.nights_stay_rounded
+                                                : Icons.wb_sunny_rounded,
+                                    color: AppColors.goldLight,
+                                    size: 23,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 1),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  hasPrayer
+                                      ? formatTime(prayerTime)
+                                      : '--:--',
+                                  textDirection: TextDirection.ltr,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 39,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                                 ),
+                              ),
                             ],
                           ),
                         ),
+                        const SizedBox(width: 5),
+                        const Expanded(
+                          flex: 4,
+                          child: SizedBox.expand(),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 5),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 3,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.085),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.13),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.19),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          localizations.text('time_remaining'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: foreground.withValues(alpha: 0.88),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      child: FittedBox(
+                      const SizedBox(width: 8),
+                      FittedBox(
                         fit: BoxFit.scaleDown,
                         child: CountdownWidget(
                           controller: controller,
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
