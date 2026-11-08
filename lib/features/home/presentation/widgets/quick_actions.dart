@@ -245,16 +245,6 @@ class _QuickActionsState extends State<QuickActions>
     }
   }
 
-  void _handlePointerEnd(PointerEvent event) {
-    if (event.pointer != _dragPointer) return;
-
-    _dragPointer = null;
-    _dragStartX = null;
-    _dragStartY = null;
-    _lastDragX = null;
-    _isHorizontalDrag = false;
-  }
-
   @override
   Widget build(BuildContext context) {
     final localizations = _getLocalizations(context);
