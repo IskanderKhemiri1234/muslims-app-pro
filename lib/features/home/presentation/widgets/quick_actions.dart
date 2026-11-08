@@ -44,6 +44,7 @@ class _QuickActionsState extends State<QuickActions>
   double? _dragStartY;
   double? _lastDragX;
   bool _isHorizontalDrag = false;
+  bool _suppressNextTap = false;
 
   @override
   void initState() {
@@ -187,14 +188,20 @@ class _QuickActionsState extends State<QuickActions>
         ),
         action: action,
         animationDelay: index * 55,
-        onTap: () => widget.onAction(action.id),
+        onTap: () => _handleActionTap(action.id),
       ),
     );
+  }
+
+  void _handleActionTap(String actionId) {
+    if (_suppressNextTap) return;
+    widget.onAction(actionId);
   }
 
   void _handlePointerDown(PointerDownEvent event) {
     if (_dragPointer != null) return;
 
+    _suppressNextTap = false;
     _dragPointer = event.pointer;
     _dragStartX = event.position.dx;
     _dragStartY = event.position.dy;
@@ -226,6 +233,7 @@ class _QuickActionsState extends State<QuickActions>
       }
 
       _isHorizontalDrag = true;
+      _suppressNextTap = true;
     }
 
     final delta = event.position.dx - lastX;
@@ -250,11 +258,12 @@ class _QuickActionsState extends State<QuickActions>
 
         // Resume after the tap gesture has been resolved.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _motionDisabled || _dragPointer != null) {
-        return;
-      }
+      if (!mounted) return;
 
-            setState(() {
+      _suppressNextTap = false;
+      if (_motionDisabled || _dragPointer != null) return;
+
+      setState(() {
         _manualDragOffset =
             (_manualDragOffset -
                     (_cycleWidth * _animationController.value)) %
