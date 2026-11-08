@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/design_system/mumin_design_tokens.dart';
-import 'glass_container.dart';
 
 /// Mumin Pro — Premium horizontally scrollable quick actions.
 ///
