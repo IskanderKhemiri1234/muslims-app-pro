@@ -17,10 +17,13 @@ abstract final class MuminNearbyMosquesCatalog {
       'nearby_mosques_error': 'تعذر تحميل المساجد. حاول مرة أخرى.',
       'nearby_mosques_partial': 'بعض أجزاء المنطقة لم يكتمل البحث فيها',
       'nearby_mosques_retry': 'إعادة المحاولة',
+      'nearby_mosques_mosque': 'مسجد',
+      'nearby_mosques_unnamed': 'مسجد دون اسم مسجل',
       'nearby_mosquesunnamed': 'مسجد دون اسم مسجل',
       'nearby_mosques_prayer_room': 'غرفة صلاة',
       'nearby_mosques_musalla': 'مصلى',
       'nearby_mosques_address': 'العنوان',
+      'nearby_mosques_city': 'المدينة',
       'nearby_mosques_distance': 'المسافة',
       'nearby_mosques_source_notice':
           'البيانات من OpenStreetMap. قد لا تكون جميع المساجد مسجلة.',
@@ -43,10 +46,13 @@ abstract final class MuminNearbyMosquesCatalog {
       'nearby_mosques_error': 'Could not load mosques. Try again.',
       'nearby_mosques_partial': 'Some parts of this area could not be searched',
       'nearby_mosques_retry': 'Retry',
+      'nearby_mosques_mosque': 'Mosque',
+      'nearby_mosques_unnamed': 'Unnamed mosque',
       'nearby_mosquesunnamed': 'Unnamed mosque',
       'nearby_mosques_prayer_room': 'Prayer room',
       'nearby_mosques_musalla': 'Musalla',
       'nearby_mosques_address': 'Address',
+      'nearby_mosques_city': 'City',
       'nearby_mosques_distance': 'Distance',
       'nearby_mosques_source_notice':
           'Data from OpenStreetMap. Not every mosque may be registered.',
@@ -69,10 +75,13 @@ abstract final class MuminNearbyMosquesCatalog {
       'nearby_mosques_error': 'Impossible de charger les mosquées. Réessayez.',
       'nearby_mosques_partial': 'Certaines parties de la zone n’ont pas pu être explorées',
       'nearby_mosques_retry': 'Réessayer',
+      'nearby_mosques_mosque': 'Mosquée',
+      'nearby_mosques_unnamed': 'Mosquée sans nom enregistré',
       'nearby_mosquesunnamed': 'Mosquée sans nom enregistré',
       'nearby_mosques_prayer_room': 'Salle de prière',
       'nearby_mosques_musalla': 'Musalla',
       'nearby_mosques_address': 'Adresse',
+      'nearby_mosques_city': 'Ville',
       'nearby_mosques_distance': 'Distance',
       'nearby_mosques_source_notice':
           'Données OpenStreetMap. Toutes les mosquées ne sont pas nécessairement enregistrées.',
@@ -97,10 +106,13 @@ abstract final class MuminNearbyMosquesCatalog {
     'nearby_mosques_error',
     'nearby_mosques_partial',
     'nearby_mosques_retry',
+    'nearby_mosques_mosque',
+    'nearby_mosques_unnamed',
     'nearby_mosquesunnamed',
     'nearby_mosques_prayer_room',
     'nearby_mosques_musalla',
     'nearby_mosques_address',
+    'nearby_mosques_city',
     'nearby_mosques_distance',
     'nearby_mosques_source_notice',
     'nearby_mosques_privacy_notice',
@@ -111,12 +123,18 @@ abstract final class MuminNearbyMosquesCatalog {
   };
 
   static Map<String, String> forLanguage(String languageCode) {
-    final code = languageCode.trim().toLowerCase().split(RegExp('[-_]')).first;
+    final code = languageCode
+        .trim()
+        .toLowerCase()
+        .split(RegExp('[-_]'))
+        .first;
+
     return _catalogs[code] ?? _catalogs['ar']!;
   }
 
   static bool isCompleteFor(String languageCode) {
     final catalog = forLanguage(languageCode);
+
     return requiredKeys.every(
       (key) => catalog[key]?.trim().isNotEmpty == true,
     );
