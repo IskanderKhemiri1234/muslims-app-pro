@@ -412,7 +412,16 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             ),
                           ),
         
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 15),
+                          RepaintBoundary(
+                            child: _MuminQuranShowcase(
+                              title: localizations.appName,
+                              subtitle: localizations.quran,
+                              actionLabel: localizations.quran,
+                              onTap: () => _handleQuickAction('quran'),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           RepaintBoundary(
   child: PrayerScheduleSection(
     schedule: snapshot.schedule!,
@@ -440,6 +449,218 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MuminQuranShowcase extends StatelessWidget {
+  const _MuminQuranShowcase({
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          height: 166,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: const LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: [
+                Color(0xFF0B4A39),
+                Color(0xFF063126),
+                Color(0xFF071F1A),
+              ],
+            ),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.48),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00845F).withValues(alpha: 0.16),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              PositionedDirectional(
+                end: -12,
+                top: -24,
+                child: Icon(
+                  Icons.mosque_rounded,
+                  size: 174,
+                  color: AppColors.goldLight.withValues(alpha: 0.075),
+                ),
+              ),
+              PositionedDirectional(
+                end: 18,
+                bottom: -18,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 104,
+                  color: AppColors.gold.withValues(alpha: 0.08),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  18,
+                  15,
+                  16,
+                  15,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.goldLight,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 13,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF15966D),
+                                  Color(0xFF075B46),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: AppColors.goldLight.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  actionLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Directionality.of(context) ==
+                                          TextDirection.rtl
+                                      ? Icons.arrow_back_rounded
+                                      : Icons.arrow_forward_rounded,
+                                  color: AppColors.goldLight,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 4,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 104,
+                            height: 104,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  AppColors.gold.withValues(alpha: 0.28),
+                                  AppColors.gold.withValues(alpha: 0.015),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: -0.12,
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              size: 82,
+                              color: AppColors.goldLight,
+                              shadows: [
+                                Shadow(
+                                  color: AppColors.gold.withValues(
+                                    alpha: 0.72,
+                                  ),
+                                  blurRadius: 22,
+                                ),
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 9,
+                                  offset: const Offset(0, 7),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Positioned(
+                            top: 7,
+                            right: 13,
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 15,
+                              color: AppColors.goldLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
