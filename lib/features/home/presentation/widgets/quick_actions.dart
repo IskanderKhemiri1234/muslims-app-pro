@@ -37,6 +37,7 @@ class _QuickActionsState extends State<QuickActions>
   late final AnimationController _animationController;
 
   bool _motionDisabled = false;
+  double _manualDragOffset = 0;
 
   @override
   void initState() {
@@ -171,13 +172,23 @@ class _QuickActionsState extends State<QuickActions>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final localizations = _getLocalizations(context);
-    final actions = _buildActions(localizations);
+Widget build(BuildContext context) {
+  final localizations = _getLocalizations(context);
+  final actions = _buildActions(localizations);
 
-    return SizedBox(
-      height: _itemHeight,
-      child: ClipRect(
+  return SizedBox(
+    height: _itemHeight,
+    child: ClipRect(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (details) {
+          if (_motionDisabled) return;
+
+          setState(() {
+            _manualDragOffset =
+                (_manualDragOffset + details.delta.dx) % _cycleWidth;
+          });
+        },
         child: Align(
           alignment: AlignmentDirectional.centerStart,
           child: AnimatedBuilder(
@@ -196,19 +207,22 @@ class _QuickActionsState extends State<QuickActions>
               ],
             ),
             builder: (context, child) {
-              final offset =
+              final automaticOffset =
                   -_cycleWidth * _animationController.value;
 
               return Transform.translate(
-                offset: Offset(offset, 0),
+                offset: Offset(
+                  automaticOffset + _manualDragOffset,
+                  0,
+                ),
                 child: child,
               );
             },
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _QuickActionTile extends StatelessWidget {
