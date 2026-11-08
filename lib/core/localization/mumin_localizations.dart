@@ -330,7 +330,39 @@ final class MuminLocalizations {
       'quran_original_text_notice':
           'النص القرآني العربي الأصلي محفوظ كما هو',
 
-      // General interface.
+        // Adhkar and Tasbih.
+'adhkar_header_title': 'اذكر الله واطمئن',
+'adhkar_header_description': 'اختر ذكراً وابدأ العدّ. سيُحفظ تقدمك على جهازك.',
+'adhkar_choose_dhikr': 'اختر الذكر',
+'adhkar_istighfar_title': 'الاستغفار',
+'adhkar_subhanallah_title': 'سبحان الله وبحمده',
+'adhkar_tahlil_title': 'كلمة التوحيد',
+'adhkar_daily': 'خلال اليوم',
+'adhkar_morning_evening': 'صباحاً ومساءً',
+'adhkar_target': 'العدد',
+'adhkar_tap_to_count': 'اضغط للتسبيح والعدّ',
+'adhkar_completed': 'اكتمل العدد، تقبّل الله منك',
+'adhkar_remaining': 'المتبقي',
+'adhkar_reset': 'إعادة ضبط العدّاد',
+'adhkar_reset_title': 'إعادة ضبط العدّاد',
+'adhkar_reset_message': 'هل تريد تصفير عدّاد هذا الذكر؟',
+'adhkar_source': 'المصدر والتوثيق',
+'reset': 'إعادة الضبط',
+
+'tasbih_header_title': 'مسبحتك الرقمية',
+'tasbih_header_description': 'اختر هدف العدّ واضغط على الدائرة لتسجيل كل تسبيحة.',
+'tasbih_choose_target': 'اختر هدف العدّ',
+'tasbih_current_count': 'العدد الحالي',
+'tasbih_tap_to_count': 'اضغط لزيادة العدّاد',
+'tasbih_tap_instruction': 'المس الدائرة الكبيرة لإضافة تسبيحة',
+'tasbih_completed': 'اكتمل هدف العدّ',
+'tasbih_remaining': 'المتبقي',
+'tasbih_undo': 'تراجع',
+'tasbih_reset_title': 'إعادة ضبط المسبحة',
+'tasbih_reset_message': 'هل تريد تصفير العدّاد الحالي؟',
+'tasbih_personal_target_note': 'الأعداد المعروضة أهداف شخصية للعدّ، ويمكنك اختيار ما يناسبك. لا تمثل هذه الأهداف تحديداً شرعياً لعدد الذكر.',
+      
+        // General interface.
       'cancel': 'إلغاء',
       'confirm': 'تأكيد',
       'save': 'حفظ',
@@ -598,7 +630,39 @@ final class MuminLocalizations {
       'quran_original_text_notice':
           'The original Arabic Quran text is preserved unchanged',
 
-      // General interface.
+        // Adhkar and Tasbih.
+'adhkar_header_title': 'Remember Allah and find peace',
+'adhkar_header_description': 'Choose a dhikr and start counting. Your progress is saved on your device.',
+'adhkar_choose_dhikr': 'Choose a dhikr',
+'adhkar_istighfar_title': 'Seeking forgiveness',
+'adhkar_subhanallah_title': 'Glory be to Allah and praise Him',
+'adhkar_tahlil_title': 'Declaration of faith',
+'adhkar_daily': 'Throughout the day',
+'adhkar_morning_evening': 'Morning and evening',
+'adhkar_target': 'Target',
+'adhkar_tap_to_count': 'Tap to count',
+'adhkar_completed': 'Target completed. May Allah accept it from you.',
+'adhkar_remaining': 'Remaining',
+'adhkar_reset': 'Reset counter',
+'adhkar_reset_title': 'Reset counter',
+'adhkar_reset_message': 'Do you want to reset this dhikr counter?',
+'adhkar_source': 'Source and reference',
+'reset': 'Reset',
+
+'tasbih_header_title': 'Your digital tasbih',
+'tasbih_header_description': 'Choose a counting target and tap the circle to record each remembrance.',
+'tasbih_choose_target': 'Choose a counting target',
+'tasbih_current_count': 'Current count',
+'tasbih_tap_to_count': 'Tap to increase the counter',
+'tasbih_tap_instruction': 'Tap the large circle to add a remembrance',
+'tasbih_completed': 'Counting target completed',
+'tasbih_remaining': 'Remaining',
+'tasbih_undo': 'Undo',
+'tasbih_reset_title': 'Reset tasbih',
+'tasbih_reset_message': 'Do you want to reset the current counter?',
+'tasbih_personal_target_note': 'These numbers are personal counting goals. Choose what suits you. They do not establish a religiously prescribed number for remembrance.',
+      
+        // General interface.
       'cancel': 'Cancel',
       'confirm': 'Confirm',
       'save': 'Save',
@@ -877,7 +941,39 @@ final class MuminLocalizations {
       'quran_original_text_notice':
           'Le texte arabe original du Coran est conservé sans modification',
 
-      // General interface.
+        // Adhkar and Tasbih.
+'adhkar_header_title': 'Évoquez Allah et trouvez la sérénité',
+'adhkar_header_description': 'Choisissez une invocation et commencez à compter. Votre progression est enregistrée sur votre appareil.',
+'adhkar_choose_dhikr': 'Choisir une invocation',
+'adhkar_istighfar_title': 'Demande de pardon',
+'adhkar_subhanallah_title': 'Gloire et louange à Allah',
+'adhkar_tahlil_title': 'Déclaration de foi',
+'adhkar_daily': 'Tout au long de la journée',
+'adhkar_morning_evening': 'Matin et soir',
+'adhkar_target': 'Objectif',
+'adhkar_tap_to_count': 'Appuyez pour compter',
+'adhkar_completed': 'Objectif atteint. Qu’Allah l’accepte.',
+'adhkar_remaining': 'Restant',
+'adhkar_reset': 'Réinitialiser le compteur',
+'adhkar_reset_title': 'Réinitialiser le compteur',
+'adhkar_reset_message': 'Voulez-vous remettre ce compteur à zéro ?',
+'adhkar_source': 'Source et référence',
+'reset': 'Réinitialiser',
+
+'tasbih_header_title': 'Votre tasbih numérique',
+'tasbih_header_description': 'Choisissez un objectif et appuyez sur le cercle pour compter chaque évocation.',
+'tasbih_choose_target': 'Choisir un objectif',
+'tasbih_current_count': 'Nombre actuel',
+'tasbih_tap_to_count': 'Appuyez pour augmenter le compteur',
+'tasbih_tap_instruction': 'Touchez le grand cercle pour ajouter une évocation',
+'tasbih_completed': 'Objectif atteint',
+'tasbih_remaining': 'Restant',
+'tasbih_undo': 'Annuler',
+'tasbih_reset_title': 'Réinitialiser le tasbih',
+'tasbih_reset_message': 'Voulez-vous remettre le compteur actuel à zéro ?',
+'tasbih_personal_target_note': 'Ces nombres sont des objectifs personnels de comptage. Choisissez celui qui vous convient. Ils ne constituent pas un nombre religieusement prescrit.',
+      
+        // General interface.
       'cancel': 'Annuler',
       'confirm': 'Confirmer',
       'save': 'Enregistrer',
