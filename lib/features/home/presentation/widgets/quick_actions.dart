@@ -83,8 +83,10 @@ class _QuickActionsState extends State<QuickActions>
 
     if (disableMotion) {
       _animationController.stop();
+      _artworkController.stop();
     } else {
       _animationController.repeat();
+      _artworkController.repeat();
     }
   }
 
