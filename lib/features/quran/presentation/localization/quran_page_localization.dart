@@ -127,7 +127,28 @@ abstract final class QuranPageLocalization {
 
     return textForLanguage(languageCode, key);
   }
+  
+  /// Formats the current Mushaf page position in the active language.
+  static String pagePosition(
+    BuildContext context, {
+    required int page,
+    required int total,
+  }) {
+    final languageCode = languageCodeOf(context);
 
+    final pageLabel = textForLanguage(
+      languageCode,
+      'quran_page',
+    );
+
+    final ofLabel = textForLanguage(
+      languageCode,
+      'quran_of',
+    );
+
+    return '$pageLabel $page $ofLabel $total';
+  }
+ 
   /// Returns the canonical surah name for the selected language.
   static String surahName(
     BuildContext context,
