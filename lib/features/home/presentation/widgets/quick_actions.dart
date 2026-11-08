@@ -182,7 +182,6 @@ Widget build(BuildContext context) {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onHorizontalDragUpdate: (details) {
-          if (_motionDisabled) return;
 
           setState(() {
             _manualDragOffset =
