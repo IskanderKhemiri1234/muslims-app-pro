@@ -236,13 +236,17 @@ class _QuickActionsState extends State<QuickActions>
     _lastDragX = null;
     _isHorizontalDrag = false;
 
-    // Resume from the exact animation position.
-    if (mounted && !_motionDisabled) {
+        // Resume after the tap gesture has been resolved.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _motionDisabled || _dragPointer != null) {
+        return;
+      }
+
       _animationController.repeat(
         period: _animationDuration,
         from: _animationController.value,
       );
-    }
+    });
   }
 
   @override
