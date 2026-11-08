@@ -34,7 +34,6 @@ class QuranPage extends StatefulWidget {
 class _QuranPageState extends State<QuranPage>
     with WidgetsBindingObserver {
   static const int _totalPages = 604;
-  static const int _dailyTarget = 5;
 
   static const String _verseBookmarksKey =
       'mumin_pro_quran_verse_bookmarks_v1';
@@ -173,7 +172,6 @@ class _QuranPageState extends State<QuranPage>
   int _completedKhatmas = 0;
 
   Set<int> _completedPages = <int>{};
-  Set<int> _todayPages = <int>{};
   Set<int> _bookmarks = <int>{};
 
   List<Map<String, dynamic>> _verseBookmarks = [];
