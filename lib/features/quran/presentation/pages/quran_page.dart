@@ -2162,7 +2162,7 @@ class _QuranFullScreenReaderState
   Offset? _pointerDownPosition;
   double? _sliderPreviewPage;
 
-  bool _showControls = true;
+  bool _showControls = false;
   bool _isThemeLoaded = false;
 
   @override
@@ -2533,70 +2533,125 @@ Widget _buildMushafPage({
   }
 
   Widget _buildTopBar() {
-    return Container(
-      color: _background,
-      padding: const EdgeInsets.fromLTRB(7, 2, 7, 2),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: QuranPageLocalization.text(
-              context,
-              'quran_back',
-            ),
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-            ),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  QuranPageLocalization.text(
-                    context,
-                    'quran_reader_title',
-                  ),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-                Text(
-                  QuranPageLocalization.pagePosition(
-                    context,
-                    page: _currentPage,
-                    total: _totalPages,
-                  ),
-                  style: TextStyle(
-                    color: _secondaryTextColor,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: QuranPageLocalization.text(
-              context,
-              'quran_hide_controls',
-            ),
-            onPressed: () {
-              setState(() {
-                _showControls = false;
-              });
-            },
-            icon: const Icon(
-              Icons.visibility_off_rounded,
-              color: _gold,
-            ),
-          ),
-        ],
+  return Container(
+    margin: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+    padding: const EdgeInsets.symmetric(
+      horizontal: 5,
+      vertical: 2,
+    ),
+    decoration: BoxDecoration(
+      color: _background.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: _gold.withValues(alpha: 0.42),
       ),
-    );
-  }
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.16),
+          blurRadius: 14,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        IconButton(
+          tooltip: QuranPageLocalization.text(
+            context,
+            'quran_back',
+          ),
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: Colors.white,
+          ),
+        ),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                QuranPageLocalization.text(
+                  context,
+                  'quran_reader_title',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                QuranPageLocalization.pagePosition(
+                  context,
+                  page: _currentPage,
+                  total: _totalPages,
+                ),
+                style: TextStyle(
+                  color: _secondaryTextColor,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: QuranPageLocalization.text(
+            context,
+            'quran_index_title',
+          ),
+          onPressed: widget.onOpenIndex,
+          icon: const Icon(
+            Icons.toc_rounded,
+            color: _gold,
+          ),
+        ),
+        IconButton(
+          tooltip: QuranPageLocalization.text(
+            context,
+            'quran_bookmarks_short',
+          ),
+          onPressed: widget.onOpenPageBookmarks,
+          icon: const Icon(
+            Icons.bookmarks_outlined,
+            color: _gold,
+          ),
+        ),
+        IconButton(
+          tooltip: QuranPageLocalization.text(
+            context,
+            'quran_go_to_short',
+          ),
+          onPressed: _openGoToPage,
+          icon: const Icon(
+            Icons.search_rounded,
+            color: _gold,
+          ),
+        ),
+        IconButton(
+          tooltip: QuranPageLocalization.text(
+            context,
+            'quran_hide_controls',
+          ),
+          onPressed: () {
+            showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => _buildBottomControls(),
+            );
+          },
+          icon: const Icon(
+            Icons.tune_rounded,
+            color: _gold,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildBottomControls() {
     if (!_showControls) {
@@ -2798,33 +2853,43 @@ Widget _buildMushafPage({
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (!_isThemeLoaded) {
-      return Scaffold(
-        backgroundColor: _background,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: _gold,
-          ),
-        ),
-      );
-    }
-
+Widget build(BuildContext context) {
+  if (!_isThemeLoaded) {
     return Scaffold(
       backgroundColor: _background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_showControls) _buildTopBar(),
-            Expanded(
-              child: _buildMushafViewer(),
-            ),
-            _buildBottomControls(),
-          ],
+      body: Center(
+        child: CircularProgressIndicator(
+          color: _gold,
         ),
       ),
     );
   }
+
+  return Scaffold(
+    backgroundColor: _background,
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: _buildMushafViewer(),
+        ),
+        if (_showControls)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: 1,
+                child: _buildTopBar(),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _MushafOrnamentPainter extends CustomPainter {
