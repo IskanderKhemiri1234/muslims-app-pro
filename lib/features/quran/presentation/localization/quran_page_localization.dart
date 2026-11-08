@@ -6,15 +6,18 @@ import '../../../../core/localization/mumin_domain_catalog_registry.dart';
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 
-/// Central localization access for every Quran presentation component.
+/// Central localization adapter for Quran presentation.
 ///
-/// Quranic verses and canonical Arabic Quran data are never translated
-/// or modified by this adapter.
+/// This class translates interface messages only.
+/// It never translates or modifies Quranic verses or canonical
+/// Arabic Quran data.
 abstract final class QuranPageLocalization {
   static final RegExp _pageReadPattern =
       RegExp(r'^تم تسجيل قراءة الصفحة (\d+)$');
 
-  /// Returns the active application language code.
+  static final RegExp _ayahSavedPattern =
+      RegExp(r'^تم حفظ الآية (\d+) من سورة (.+)$');
+
   static String languageCodeOf(BuildContext context) {
     return Provider.of<MuminLanguageController>(
       context,
@@ -22,7 +25,6 @@ abstract final class QuranPageLocalization {
     ).languageCode;
   }
 
-  /// Resolves a Quran interface string in the active application language.
   static String text(
     BuildContext context,
     String key, {
@@ -35,7 +37,6 @@ abstract final class QuranPageLocalization {
     );
   }
 
-  /// Resolves a Quran interface string using an explicit language code.
   static String textForLanguage(
     String languageCode,
     String key, {
@@ -49,11 +50,9 @@ abstract final class QuranPageLocalization {
         key;
   }
 
-  /// Localizes legacy Quran feedback messages without changing
-  /// the reading, bookmark, or progress operations that produce them.
+  /// Converts legacy Arabic feedback identifiers into catalog messages.
   ///
-  /// The source strings are used only as compatibility identifiers.
-  /// Displayed text always comes from the central Quran catalogs.
+  /// Dynamic values are preserved and passed as interpolation parameters.
   static String feedback(
     BuildContext context,
     String sourceMessage,
@@ -61,14 +60,27 @@ abstract final class QuranPageLocalization {
     final languageCode = languageCodeOf(context);
     final message = sourceMessage.trim();
 
-    final pageReadMatch = _pageReadPattern.firstMatch(message);
+    final pageMatch = _pageReadPattern.firstMatch(message);
 
-    if (pageReadMatch != null) {
+    if (pageMatch != null) {
       return textForLanguage(
         languageCode,
         'quran_page_marked_read',
         parameters: <String, Object?>{
-          'page': pageReadMatch.group(1)!,
+          'page': pageMatch.group(1)!,
+        },
+      );
+    }
+
+    final ayahMatch = _ayahSavedPattern.firstMatch(message);
+
+    if (ayahMatch != null) {
+      return textForLanguage(
+        languageCode,
+        'quran_ayah_saved',
+        parameters: <String, Object?>{
+          'ayah': ayahMatch.group(1)!,
+          'surah': ayahMatch.group(2)!.trim(),
         },
       );
     }
@@ -109,18 +121,14 @@ abstract final class QuranPageLocalization {
     final key = messageKeys[message];
 
     if (key == null) {
-      // Do not silently replace an unknown message with an unrelated
-      // translation. Keep it visible so it can be catalogued correctly.
+      // Unknown messages remain visible until explicitly catalogued.
       return message;
     }
 
     return textForLanguage(languageCode, key);
   }
 
-  /// Returns the canonical display name of a surah.
-  ///
-  /// Arabic uses the canonical Arabic name.
-  /// English and French use the registered transliteration.
+  /// Returns the canonical surah name for the selected language.
   static String surahName(
     BuildContext context,
     int surahNumber,
@@ -131,14 +139,12 @@ abstract final class QuranPageLocalization {
     );
   }
 
-  /// Returns all 114 surah names in the active application language.
   static List<String> surahNames(BuildContext context) {
     return MuminDomainCatalogRegistry.surahNames(
       languageCode: languageCodeOf(context),
     );
   }
 
-  /// Returns the correct text direction for the active language.
   static TextDirection textDirectionOf(BuildContext context) {
     return MuminLanguageRegistry.isRightToLeft(
       languageCodeOf(context),
@@ -147,34 +153,14 @@ abstract final class QuranPageLocalization {
         : TextDirection.ltr;
   }
 
-  /// Indicates whether the active language is Arabic.
   static bool isArabic(BuildContext context) {
     return languageCodeOf(context) == 'ar';
   }
 
-  /// Formats a Quran interface page position.
-  static String pagePosition(
-    BuildContext context, {
-    required int page,
-    int total = 604,
-  }) {
-    return text(
-      context,
-      'quran_page_position',
-      parameters: <String, Object?>{
-        'page': page,
-        'total': total,
-      },
-    );
-  }
-
-  /// Reports whether the Quran surah metadata is structurally valid.
   static bool get hasValidSurahCatalog {
     return MuminDomainCatalogRegistry.surahCatalogIntegrity;
   }
 
-  /// Reports whether the Quran interface catalogs are complete
-  /// for all three launch languages.
   static bool get hasCompleteLaunchCatalog {
     final integrity = MuminDomainCatalogRegistry.launchIntegrity;
 
