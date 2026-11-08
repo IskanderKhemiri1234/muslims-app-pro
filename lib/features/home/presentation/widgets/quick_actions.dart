@@ -38,6 +38,11 @@ class _QuickActionsState extends State<QuickActions>
 
   bool _motionDisabled = false;
   double _manualDragOffset = 0;
+    int? _dragPointer;
+  double? _dragStartX;
+  double? _dragStartY;
+  double? _lastDragX;
+  bool _isHorizontalDrag = false;
 
   @override
   void initState() {
@@ -170,6 +175,60 @@ class _QuickActionsState extends State<QuickActions>
       ),
     );
   }
+    
+  void _handlePointerDown(PointerDownEvent event) {
+    if (_dragPointer != null) return;
+
+    _dragPointer = event.pointer;
+    _dragStartX = event.position.dx;
+    _dragStartY = event.position.dy;
+    _lastDragX = event.position.dx;
+    _isHorizontalDrag = false;
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (event.pointer != _dragPointer) return;
+
+    final startX = _dragStartX;
+    final startY = _dragStartY;
+    final lastX = _lastDragX;
+
+    if (startX == null || startY == null || lastX == null) {
+      return;
+    }
+
+    final totalDx = event.position.dx - startX;
+    final totalDy = event.position.dy - startY;
+
+    if (!_isHorizontalDrag) {
+      if (totalDx.abs() < 6 ||
+          totalDx.abs() <= totalDy.abs() * 1.15) {
+        return;
+      }
+
+      _isHorizontalDrag = true;
+    }
+
+    final delta = event.position.dx - lastX;
+    _lastDragX = event.position.dx;
+
+    if (delta == 0) return;
+
+    setState(() {
+      _manualDragOffset =
+          (_manualDragOffset + delta) % _cycleWidth;
+    });
+  }
+
+  void _handlePointerEnd(PointerEvent event) {
+    if (event.pointer != _dragPointer) return;
+
+    _dragPointer = null;
+    _dragStartX = null;
+    _dragStartY = null;
+    _lastDragX = null;
+    _isHorizontalDrag = false;
+  }
 
     @override
   Widget build(BuildContext context) {
@@ -179,13 +238,14 @@ class _QuickActionsState extends State<QuickActions>
     return SizedBox(
       height: _itemHeight,
       child: ClipRect(
-        child: GestureDetector(
+                child: Listener(
           behavior: HitTestBehavior.opaque,
-          onHorizontalDragUpdate: (details) {
-            setState(() {
-              _manualDragOffset =
-                  (_manualDragOffset + details.delta.dx) %
-                      _cycleWidth;
+          onPointerDown: _handlePointerDown,
+          onPointerMove: _handlePointerMove,
+          onPointerUp: _handlePointerEnd,
+          onPointerCancel: _handlePointerEnd,
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
             });
           },
           child: Align(
