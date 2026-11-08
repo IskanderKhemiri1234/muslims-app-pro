@@ -20,6 +20,8 @@ import '../widgets/glass_container.dart';
 import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
+import '../../../hijri_calendar/presentation/pages/hijri_calendar_page.dart';
+import '../../../hijri_calendar/presentation/widgets/hijri_calendar_home_card.dart';
 
 /// Main dashboard of Mumin Pro.
 ///
@@ -348,7 +350,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             onThemeToggle: widget.onThemeToggle,
                           ),
                           const SizedBox(height: 25),
-                          RepaintBoundary(
+                                                    RepaintBoundary(
                             child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
@@ -356,7 +358,20 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               formatTime: _formatTime,
                             ),
                           ),
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 18),
+                          RepaintBoundary(
+                            child: HijriCalendarHomeCard(
+                              localizations: localizations,
+                              onTap: () {
+                                _openPage(
+                                  HijriCalendarPage(
+                                    localizations: localizations,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 28),
                           _HomeSectionHeading(
                             title: localizations.quickAccess,
                             subtitle: localizations.dailyEssentials,
