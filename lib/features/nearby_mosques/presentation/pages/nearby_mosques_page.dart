@@ -576,7 +576,7 @@ class _NearbyMosquesPageState extends State<NearbyMosquesPage> {
                   ],
                 ),
                 RichAttributionWidget(
-                  alignment: Alignment.bottomLeft,
+                  alignment: AttributionAlignment.bottomLeft,
                   attributions: const [
                     TextSourceAttribution(
                       '© OpenStreetMap contributors',
