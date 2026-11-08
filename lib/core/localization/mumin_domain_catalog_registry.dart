@@ -1,4 +1,5 @@
 
+import 'catalogs/mumin_nearby_mosques_catalog.dart';
 import 'catalogs/mumin_prayer_settings_catalog.dart';
 import 'catalogs/mumin_qibla_catalog.dart';
 import 'catalogs/mumin_quran_catalog.dart';
@@ -17,6 +18,7 @@ abstract final class MuminDomainCatalogRegistry {
   static const String _qiblaPrefix = 'qibla_';
   static const String _prayerSettingsPrefix = 'prayer_settings_';
   static const String _calculationPrefix = 'calculation_';
+  static const String _nearbyMosquesPrefix = 'nearby_mosques';
 
   static String normalizeLanguageCode(String? languageCode) {
     return MuminLanguageRegistry.normalizeLanguageCode(languageCode);
@@ -37,6 +39,10 @@ abstract final class MuminDomainCatalogRegistry {
       return MuminQiblaCatalog.requiredKeys.contains(normalized);
     }
 
+    if (normalized.startsWith(_nearbyMosquesPrefix)) {
+      return MuminNearbyMosquesCatalog.requiredKeys.contains(normalized);
+    }
+
     if (normalized.startsWith(_prayerSettingsPrefix) ||
         normalized.startsWith(_calculationPrefix)) {
       return MuminPrayerSettingsCatalog.keys.contains(normalized);
@@ -46,12 +52,6 @@ abstract final class MuminDomainCatalogRegistry {
   }
 
   /// Resolves a registered domain key for the selected language.
-  ///
-  /// Quran keys require an explicit translation in the selected language.
-  /// They never silently fall back to Arabic.
-  ///
-  /// Other registered domains retain the existing Arabic fallback.
-  /// Returns null when the key is unknown or has no usable value.
   static String? resolve(
     String? languageCode,
     String key, {
@@ -72,8 +72,7 @@ abstract final class MuminDomainCatalogRegistry {
     final String? resolvedValue;
 
     if (normalizedKey.startsWith(_quranPrefix)) {
-      // Strict mode: Arabic is not an acceptable substitute
-      // for a missing English or French Quran interface translation.
+      // Quran interface translations require an explicit language entry.
       resolvedValue = selectedCatalog?[normalizedKey];
     } else {
       final fallbackCatalog = _catalogFor(
@@ -102,8 +101,6 @@ abstract final class MuminDomainCatalogRegistry {
   }
 
   /// Resolves the canonical name of a Quran surah.
-  ///
-  /// Surah metadata is separate from interface translation catalogs.
   static String surahName(
     int surahNumber, {
     String? languageCode,
@@ -123,14 +120,9 @@ abstract final class MuminDomainCatalogRegistry {
     );
   }
 
-  /// Checks the integrity of the canonical surah metadata.
   static bool get surahCatalogIntegrity =>
       MuminQuranSurahCatalog.hasValidData;
 
-  /// Combines the two Quran interface catalogs into one domain.
-  ///
-  /// The reader catalog adds interface keys without replacing
-  /// existing Quran catalog entries.
   static Map<String, String>? _catalogFor(
     String languageCode,
     String key,
@@ -144,6 +136,10 @@ abstract final class MuminDomainCatalogRegistry {
 
     if (key.startsWith(_qiblaPrefix)) {
       return MuminQiblaCatalog.forLanguage(languageCode);
+    }
+
+    if (key.startsWith(_nearbyMosquesPrefix)) {
+      return MuminNearbyMosquesCatalog.forLanguage(languageCode);
     }
 
     if (key.startsWith(_prayerSettingsPrefix) ||
@@ -160,6 +156,7 @@ abstract final class MuminDomainCatalogRegistry {
       ...MuminQuranCatalog.requiredKeys,
       ...MuminQuranReaderCatalog.requiredKeys,
       ...MuminQiblaCatalog.requiredKeys,
+      ...MuminNearbyMosquesCatalog.requiredKeys,
       ...MuminPrayerSettingsCatalog.keys,
     });
   }
@@ -179,7 +176,6 @@ abstract final class MuminDomainCatalogRegistry {
     return catalog?[normalizedKey]?.trim().isNotEmpty == true;
   }
 
-  /// Checks whether every registered key is translated.
   static bool isCompleteFor(String? languageCode) {
     final language = normalizeLanguageCode(languageCode);
 
@@ -188,7 +184,6 @@ abstract final class MuminDomainCatalogRegistry {
     );
   }
 
-  /// Returns missing keys for one launch language.
   static List<String> missingKeysFor(String? languageCode) {
     final language = normalizeLanguageCode(languageCode);
 
@@ -199,12 +194,11 @@ abstract final class MuminDomainCatalogRegistry {
     );
   }
 
-  /// Translation coverage for every registered launch language.
   static Map<String, double> get coverage {
     final keys = allKeys;
 
     if (keys.isEmpty) {
-      return const <String, double>{
+      return const {
         'ar': 1,
         'en': 1,
         'fr': 1,
@@ -223,7 +217,6 @@ abstract final class MuminDomainCatalogRegistry {
     });
   }
 
-  /// Per-language integrity report for launch diagnostics.
   static Map<String, bool> get launchIntegrity {
     return Map<String, bool>.unmodifiable({
       for (final language
