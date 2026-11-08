@@ -22,7 +22,6 @@ import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
 import '../../../hijri_calendar/presentation/pages/hijri_calendar_page.dart';
-import '../../../hijri_calendar/presentation/widgets/hijri_calendar_home_card.dart';
 
 /// Main dashboard of Mumin Pro.
 ///
@@ -380,20 +379,15 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             onLanguageToggle: widget.onLanguageToggle,
                             onThemeToggle: widget.onThemeToggle,
                           ),
-                          const SizedBox(height: 25),
-                                                    RepaintBoundary(
+                          const SizedBox(height: 16),
+                          RepaintBoundary(
                             child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
                               prayerName: _prayerName,
                               formatTime: _formatTime,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          RepaintBoundary(
-                            child: HijriCalendarHomeCard(
-                              localizations: localizations,
-                              onTap: () {
+                              date: _currentDate,
+                              onHijriTap: () {
                                 _openPage(
                                   HijriCalendarPage(
                                     localizations: localizations,
@@ -402,17 +396,13 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               },
                             ),
                           ),
-                          const SizedBox(height: 28),
-                          _HomeSectionHeading(
-                            title: localizations.quickAccess,
-                            subtitle: localizations.dailyEssentials,
-                          ),
                           const SizedBox(height: 14),
                           RepaintBoundary(
                             child: QuickActions(
                               onAction: _handleQuickAction,
                             ),
                           ),
+                          const SizedBox(height: 28),
                           const SizedBox(height: 30),
                           RepaintBoundary(
   child: PrayerScheduleSection(
