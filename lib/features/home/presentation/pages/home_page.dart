@@ -658,10 +658,40 @@ class _HomeHeader extends StatelessWidget {
               const SizedBox(height: 5),
               Row(
                 children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                    size: 13,
-                    color: AppColors.gold,
+                  Tooltip(
+                    message: isLoadingLocation
+                        ? localizations.updatingLocation
+                        : localizations.updateLocation,
+                    child: IconButton(
+                      onPressed: isLoadingLocation
+                          ? null
+                          : onLocationUpdate,
+                      tooltip: isLoadingLocation
+                          ? localizations.updatingLocation
+                          : localizations.updateLocation,
+                      iconSize: 25,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      splashRadius: 23,
+                      visualDensity: VisualDensity.compact,
+                      icon: isLoadingLocation
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: AppColors.gold,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.location_on_rounded,
+                              color: AppColors.gold,
+                              size: 25,
+                            ),
+                    ),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -676,12 +706,7 @@ class _HomeHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  _LocationAction(
-                    localizations: localizations,
-                    isLoading: isLoadingLocation,
-                    onPressed: onLocationUpdate,
-                  ),
+
                 ],
               ),
             ],
@@ -830,55 +855,6 @@ class _HomeSectionHeading extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _LocationAction extends StatelessWidget {
-  const _LocationAction({
-    required this.localizations,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  final MuminLocalizations localizations;
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final tooltip = isLoading
-        ? localizations.updatingLocation
-        : localizations.updateLocation;
-
-    return Tooltip(
-      message: tooltip,
-      child: IconButton(
-        onPressed: isLoading ? null : onPressed,
-        tooltip: tooltip,
-        iconSize: 28,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: 44,
-          minHeight: 44,
-        ),
-        splashRadius: 23,
-        visualDensity: VisualDensity.compact,
-        icon: isLoading
-            ? const SizedBox(
-                width: 21,
-                height: 21,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: AppColors.gold,
-                ),
-              )
-            : const Icon(
-                Icons.my_location_rounded,
-                color: AppColors.gold,
-                size: 28,
-              ),
-      ),
     );
   }
 }
