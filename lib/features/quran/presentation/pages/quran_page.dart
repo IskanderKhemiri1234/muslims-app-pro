@@ -2362,45 +2362,46 @@ class _QuranFullScreenReaderState
     }
   }
 
-  Widget _buildMushafPage({
-    required int page,
-    required double width,
-    required double height,
-  }) {
-    final fontSize = (width / 19).clamp(17.0, 25.0);
+  
+Widget _buildMushafPage({
+  required int page,
+  required double width,
+  required double height,
+}) {
+  final fontSize = (width / 19).clamp(17.0, 25.0);
 
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: ColoredBox(
-          color: _pageBackground,
-          child: QuranMadinaFlutter(
-            key: ValueKey<String>(
-              'mumin_mushaf_page_$page',
-            ),
-            page: page,
-            height: (height - 16).clamp(100.0, 2000.0),
-            bundled: true,
-            headless: true,
-            fontSize: fontSize,
-            textColor: _cssColor(_textColor),
-            backgroundColor: _cssColor(_pageBackground),
-            ayaActions: [
-              QuranAyaAction(
-                id: 'save_ayah',
-                title: QuranPageLocalization.text(
-                  context,
-                  'quran_save_ayah_action',
-                ),
-              ),
-            ],
-            onAyaAction: widget.onVerseAction,
+  return SizedBox(
+    width: double.infinity,
+    height: height,
+    child: ColoredBox(
+      color: _pageBackground,
+      child: RepaintBoundary(
+        child: QuranMadinaFlutter(
+          key: ValueKey<String>(
+            'mumin_mushaf_page_$page',
           ),
+          page: page,
+          height: height.clamp(100.0, 2000.0),
+          bundled: true,
+          headless: true,
+          fontSize: fontSize,
+          textColor: _cssColor(_textColor),
+          backgroundColor: _cssColor(_pageBackground),
+          ayaActions: [
+            QuranAyaAction(
+              id: 'save_ayah',
+              title: QuranPageLocalization.text(
+                context,
+                'quran_save_ayah_action',
+              ),
+            ),
+          ],
+          onAyaAction: widget.onVerseAction,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMushafViewer() {
     return LayoutBuilder(
