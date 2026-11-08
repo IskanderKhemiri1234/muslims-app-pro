@@ -434,8 +434,8 @@ abstract final class MuminQuranCatalog {
     final selected = forLanguage(languageCode);
     final fallback = _catalogs[defaultLanguageCode]!;
 
-    var value = selected[normalizedKey] ?? fallback[normalizedKey];
-    if (value == null) return normalizedKey;
+    var value =
+    selected[normalizedKey] ?? fallback[normalizedKey] ?? normalizedKey;
 
     for (final entry in parameters.entries) {
       value = value.replaceAll(
@@ -473,7 +473,7 @@ abstract final class MuminQuranCatalog {
     });
   }
 
-  static List<String> get missingKeysFor(String languageCode) {
+  static List<String> missingKeysFor(String languageCode) {
     final normalized = _normalizeLanguageCode(languageCode);
     final catalog = _catalogs[normalized]!;
     return List<String>.unmodifiable(
