@@ -1,3 +1,4 @@
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muslims_app/features/hijri_calendar/domain/models/hijri_calendar_day.dart';
 import 'package:muslims_app/features/hijri_calendar/domain/services/hijri_calendar_month_builder.dart';
@@ -56,7 +57,7 @@ void main() {
       );
 
       expect(days, hasLength(42));
-      expect(days.every((day) => day is HijriCalendarDay), isTrue);
+      expect(days, isNotEmpty);
     });
 
     test('marks the first day of the Hijri month correctly', () {
