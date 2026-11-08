@@ -2888,8 +2888,9 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
 
-class _MushafOrnamentPainter extends CustomPainter {
+  class _MushafOrnamentPainter extends CustomPainter {
   const _MushafOrnamentPainter({
     required this.color,
   });
