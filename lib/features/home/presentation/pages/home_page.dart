@@ -220,45 +220,49 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     }
   }
 
-  void _openPage(Widget page) {
+    void _openPage(Widget page) {
+    if (!mounted) return;
+
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => page),
+      MaterialPageRoute<void>(
+        builder: (routeContext) => page,
+      ),
     );
   }
 
   void _handleQuickAction(String action) {
-  switch (action) {
-    case 'qibla':
-      _openPage(const QiblaPageEntry());
-      return;
+    switch (action) {
+      case 'qibla':
+        _openPage(const QiblaPageEntry());
+        break;
 
-    case 'quran':
-      _openPage(const QuranPage());
-      return;
+      case 'quran':
+        _openPage(const QuranPage());
+        break;
 
-          case 'mosques':
-      _openPage(
-        NearbyMosquesPage(
-          languageCode: _localizations.languageCode,
-        ),
-      );
-      return;
+      case 'mosques':
+        _openPage(
+          NearbyMosquesPage(
+            languageCode: _localizations.languageCode,
+          ),
+        );
+        break;
 
-    case 'adhan':
-      _openPage(const AdhanPage());
-      return;
+      case 'adhan':
+        _openPage(const AdhanPage());
+        break;
 
-    case 'adhkar':
-      _openPage(const AdhkarPage());
-      return;
+      case 'adhkar':
+        _openPage(const AdhkarPage());
+        break;
 
-    case 'tasbih':
-      _openPage(const TasbihPage());
-      return;
+      case 'tasbih':
+        _openPage(const TasbihPage());
+        break;
 
-    default:
-      _showMessage(_localizations.comingSoon);
-  }
+      default:
+        _showMessage(_localizations.comingSoon);
+    }
   }
 
   void _showMessage(String message) {
