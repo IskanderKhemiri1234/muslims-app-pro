@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/mumin_design_tokens.dart';
@@ -33,7 +32,6 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
   @override
   void initState() {
     super.initState();
-
     _today = _dateOnly(DateTime.now());
     _anchorDate = _today;
     _selectedDate = _today;
@@ -92,11 +90,13 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
   }
 
   String get _selectedDateLabel {
-    final date = HijriDateCalculator.fromGregorian(
-      _selectedDate,
+    final date = HijriDateCalculator.fromGregorian(_selectedDate);
+    final monthName = MuminHijriLocalizations.monthName(
+      widget.localizations,
+      date.month,
     );
 
-    return '${date.day} ${MuminHijriLocalizations.monthName(widget.localizations, date.month)} ${date.year} AH';
+    return '${date.day} $monthName ${date.year} AH';
   }
 
   void _changeMonth(int offset) {
@@ -136,6 +136,8 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
     final surface = MuminColors.surface(brightness);
     final border = MuminColors.border(brightness);
     final hijri = _visibleHijriDate;
+
+    final todayHijri = HijriDateCalculator.fromGregorian(_today);
 
     return Directionality(
       textDirection: widget.localizations.isRightToLeft
@@ -178,19 +180,15 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
                   hijri.month,
                 ),
                 year: hijri.year,
-                todayLabel:
-                    MuminHijriLocalizations.todayLabel(
+                todayLabel: MuminHijriLocalizations.todayLabel(
                   widget.localizations,
                 ),
-                todayDate: HijriDateCalculator.fromGregorian(_today),
-                todayMonthName:
-                    MuminHijriLocalizations.monthName(
+                todayDate: todayHijri,
+                todayMonthName: MuminHijriLocalizations.monthName(
                   widget.localizations,
-                  HijriDateCalculator.fromGregorian(_today).month,
+                  todayHijri.month,
                 ),
-                todayYear:
-                    HijriDateCalculator.fromGregorian(_today).year,
-                isDark: isDark,
+                todayYear: todayHijri.year,
               ),
               const SizedBox(height: 20),
               Container(
@@ -276,7 +274,6 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
                         ),
                         days: _calendarDays,
                         onSelect: _selectDay,
-                        isDark: isDark,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -341,8 +338,7 @@ class _HijriCalendarPageState extends State<HijriCalendarPage> {
                     const SizedBox(width: 13),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             _isArabic
@@ -431,7 +427,6 @@ class _HijriMonthHero extends StatelessWidget {
     required this.todayDate,
     required this.todayMonthName,
     required this.todayYear,
-    required this.isDark,
   });
 
   final String monthName;
@@ -440,7 +435,6 @@ class _HijriMonthHero extends StatelessWidget {
   final HijriDate todayDate;
   final String todayMonthName;
   final int todayYear;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -524,12 +518,10 @@ class _CalendarGrid extends StatelessWidget {
     super.key,
     required this.days,
     required this.onSelect,
-    required this.isDark,
   });
 
   final List<HijriCalendarDay> days;
   final ValueChanged<HijriCalendarDay> onSelect;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
