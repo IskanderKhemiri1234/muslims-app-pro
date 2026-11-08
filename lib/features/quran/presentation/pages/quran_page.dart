@@ -2101,6 +2101,7 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
 
 enum _QuranReaderTheme {
   day,
