@@ -252,7 +252,44 @@ class PrayerController extends ChangeNotifier
       }
     });
   }
+     
+    /// Refreshes the existing prayer schedule without requesting GPS
+  /// or changing the user's saved location and calculation settings.
+  Future<void> refreshPrayerData() async {
+    if (_disposed) return;
 
+    final initialization = _initializationTask;
+    if (initialization != null) {
+      await initialization;
+    }
+
+    if (_disposed) return;
+
+    if (_globalSchedule == null || _discoveredTimezone == null) {
+      await retryInitialization();
+      return;
+    }
+
+    try {
+      _calculateSchedule();
+      clock.value = DateTime.now();
+      message = null;
+
+      if (_isAppActive) {
+        _startClock();
+      }
+
+      _notifySafely();
+    } catch (error, stackTrace) {
+      debugPrint('Prayer data refresh failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      message = 'Unable to refresh prayer times.';
+      _notifySafely();
+      rethrow;
+    }
+  }
+    
   Future<void> _performInitialization() async {
     try {
       isInitialized = false;
