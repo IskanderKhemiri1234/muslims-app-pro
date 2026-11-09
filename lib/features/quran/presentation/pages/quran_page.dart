@@ -1823,46 +1823,38 @@ Widget _buildMushafPage({
   required double width,
   required double height,
 }) {
-  // Render the Madina page directly at the full available viewport size.
-  // This avoids scaling a shorter page after rendering and uses the complete
-  // screen height for the Mushaf page layout.
+  // Give the WebView its real viewport constraints. FittedBox must not wrap
+  // this platform view: scaling a WebView can make the Mushaf appear as a
+  // small partial page instead of occupying the reader screen.
   final pageHeight = height.clamp(1.0, 4000.0);
   final fontSize = (width / 19).clamp(17.0, 25.0);
 
   return SizedBox.expand(
     child: ClipRect(
-      child: FittedBox(
-        fit: BoxFit.fill,
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: width,
-          height: pageHeight,
-          child: ColoredBox(
-            color: _pageBackground,
-            child: RepaintBoundary(
-              child: QuranMadinaFlutter(
-                key: ValueKey<String>(
-                  'mumin_mushaf_page_$page',
-                ),
-                page: page,
-                height: pageHeight,
-                bundled: true,
-                headless: true,
-                fontSize: fontSize,
-                textColor: _cssColor(_textColor),
-                backgroundColor: _cssColor(_pageBackground),
-                ayaActions: [
-                  QuranAyaAction(
-                    id: 'save_ayah',
-                    title: QuranPageLocalization.text(
-                      context,
-                      'quran_save_ayah_action',
-                    ),
-                  ),
-                ],
-                onAyaAction: widget.onVerseAction,
-              ),
+      child: ColoredBox(
+        color: _pageBackground,
+        child: RepaintBoundary(
+          child: QuranMadinaFlutter(
+            key: ValueKey<String>(
+              'mumin_mushaf_page_$page',
             ),
+            page: page,
+            height: pageHeight,
+            bundled: true,
+            headless: true,
+            fontSize: fontSize,
+            textColor: _cssColor(_textColor),
+            backgroundColor: _cssColor(_pageBackground),
+            ayaActions: [
+              QuranAyaAction(
+                id: 'save_ayah',
+                title: QuranPageLocalization.text(
+                  context,
+                  'quran_save_ayah_action',
+                ),
+              ),
+            ],
+            onAyaAction: widget.onVerseAction,
           ),
         ),
       ),
