@@ -224,18 +224,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     final languageCode = _languageController.languageCode;
 
-    await _notificationService.reschedule(
-      controller: _prayerController,
-      prayerName: (prayer) => _resolvePrayerName(
-        prayer,
-        languageCode,
-      ),
-      notificationBody: _notificationBody(languageCode),
-      preferExact: preferExact,
-    );
-
-    if (_disposed) return;
-
     final notificationsEnabled =
         await _notificationService.areNotificationsEnabled();
 
@@ -273,6 +261,18 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
         signature == _lastSuccessfulScheduleSignature) {
       return;
     }
+
+    await _notificationService.reschedule(
+      controller: _prayerController,
+      prayerName: (prayer) => _resolvePrayerName(
+        prayer,
+        languageCode,
+      ),
+      notificationBody: _notificationBody(languageCode),
+      preferExact: preferExact,
+    );
+
+    if (_disposed) return;
 
     if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
