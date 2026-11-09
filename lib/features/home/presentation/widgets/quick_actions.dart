@@ -209,6 +209,17 @@ class _QuickActionsState extends State<QuickActions>
     _animationController.stop(canceled: false);
   }
 
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!_isUserDragging) {
+      _animationController.stop(canceled: false);
+    }
+  }
+
+  void _handlePointerEnd(PointerEvent event) {
+    if (_isUserDragging || !mounted || _motionDisabled) return;
+    _animationController.repeat(period: _animationDuration);
+  }
+
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
     if (!mounted || !_isUserDragging) return;
 
@@ -246,51 +257,57 @@ class _QuickActionsState extends State<QuickActions>
     return SizedBox(
       height: _itemHeight,
       child: ClipRect(
-        child: GestureDetector(
+        child: Listener(
           behavior: HitTestBehavior.translucent,
-          onHorizontalDragStart: _handleHorizontalDragStart,
-          onHorizontalDragUpdate: _handleHorizontalDragUpdate,
-          onHorizontalDragEnd: _handleHorizontalDragEnd,
-          onHorizontalDragCancel: () {
-            _handleHorizontalDragEnd(
-              DragEndDetails(),
-            );
-          },
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: AnimatedBuilder(
-              animation: _animationController,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildActionSet(
-                    actions,
-                    duplicate: false,
-                  ),
-                  _buildActionSet(
-                    actions,
-                    duplicate: true,
-                  ),
-                ],
+          onPointerDown: _handlePointerDown,
+          onPointerUp: _handlePointerEnd,
+          onPointerCancel: _handlePointerEnd,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: _handleHorizontalDragStart,
+            onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+            onHorizontalDragEnd: _handleHorizontalDragEnd,
+            onHorizontalDragCancel: () {
+              _handleHorizontalDragEnd(
+                DragEndDetails(),
+              );
+            },
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: AnimatedBuilder(
+                animation: _animationController,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildActionSet(
+                      actions,
+                      duplicate: false,
+                    ),
+                    _buildActionSet(
+                      actions,
+                      duplicate: true,
+                    ),
+                  ],
+                ),
+                builder: (context, child) {
+                  final automaticOffset =
+                      -_cycleWidth * _animationController.value;
+
+                  final rawOffset =
+                      automaticOffset + _manualDragOffset;
+
+                  final wrappedOffset = rawOffset % _cycleWidth;
+
+                  final visibleOffset = wrappedOffset > 0
+                      ? wrappedOffset - _cycleWidth
+                      : wrappedOffset;
+
+                  return Transform.translate(
+                    offset: Offset(visibleOffset, 0),
+                    child: child,
+                  );
+                },
               ),
-              builder: (context, child) {
-                final automaticOffset =
-                    -_cycleWidth * _animationController.value;
-
-                final rawOffset =
-                    automaticOffset + _manualDragOffset;
-
-                final wrappedOffset = rawOffset % _cycleWidth;
-
-                final visibleOffset = wrappedOffset > 0
-                    ? wrappedOffset - _cycleWidth
-                    : wrappedOffset;
-
-                return Transform.translate(
-                  offset: Offset(visibleOffset, 0),
-                  child: child,
-                );
-              },
             ),
           ),
         ),
