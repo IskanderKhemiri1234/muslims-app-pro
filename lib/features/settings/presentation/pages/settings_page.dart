@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/updates/mumin_app_update_service.dart';
 
@@ -211,12 +210,10 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
       );
 
       if (shouldDownload == true && mounted) {
-        final opened = await launchUrl(
-          update.apkUri,
-          mode: LaunchMode.externalApplication,
-        );
-
-        if (!opened && mounted) {
+        try {
+          await MuminAppUpdateService().downloadAndInstall(update);
+        } catch (_) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -249,7 +246,9 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
     return _SettingsTile(
       icon: Icons.system_update_alt_rounded,
       title: widget.localizations.text('app_updates'),
-      subtitle: widget.localizations.text('update_channel_setup_required'),
+      subtitle: widget.localizations.text(
+        _isChecking ? 'update_checking' : 'update_channel_setup_required',
+      ),
       trailing: _isChecking
           ? const SizedBox(
               width: 20,
