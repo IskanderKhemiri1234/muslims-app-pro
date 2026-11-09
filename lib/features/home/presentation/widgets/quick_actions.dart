@@ -65,7 +65,7 @@ class QuickActions extends StatelessWidget {
     final actions = _buildActions(localizations);
 
     return SizedBox(
-      height: 106,
+      height: 116,
       child: Row(
         children: [
           for (final action in actions)
@@ -116,8 +116,8 @@ class _QuickActionTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 62,
-                    height: 62,
+                    width: 70,
+                    height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -182,7 +182,7 @@ class _QuickActionTile extends StatelessWidget {
                         ),
                         Icon(
                           action.icon,
-                          size: 27,
+                          size: 31,
                           color: Color.lerp(
                             action.color,
                             MuminColors.goldLight,
@@ -198,7 +198,7 @@ class _QuickActionTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 7),
                   Text(
                     action.title,
                     maxLines: 1,
@@ -207,7 +207,7 @@ class _QuickActionTile extends StatelessWidget {
                     textDirection: Directionality.of(context),
                     style: TextStyle(
                       color: foreground,
-                      fontSize: 11.8,
+                      fontSize: 12.2,
                       fontWeight: FontWeight.w700,
                       height: 1.12,
                     ),
