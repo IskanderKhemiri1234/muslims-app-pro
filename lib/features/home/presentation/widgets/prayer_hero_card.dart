@@ -171,9 +171,33 @@ class _HeroSurface extends StatelessWidget {
               child: IgnorePointer(
                 child: SizedBox(
                   width: 190,
-                  child: CustomPaint(
-                    painter: const _HeroMosquePainter(),
-                    child: const SizedBox.expand(),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CustomPaint(
+                        painter: const _HeroMosquePainter(),
+                        child: const SizedBox.expand(),
+                      ),
+                      Image.asset(
+                        'assets/images/home/mumin_reference_mosque.webp',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.centerRight,
+                        filterQuality: FilterQuality.high,
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Color(0xFF087B5C),
+                              Color(0x00087B5C),
+                            ],
+                            stops: [0.0, 0.58],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
