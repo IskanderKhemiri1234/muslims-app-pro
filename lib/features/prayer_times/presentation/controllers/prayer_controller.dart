@@ -97,6 +97,9 @@ class PrayerController extends ChangeNotifier
   String placeName = '';
   String region = 'Casablanca-Settat';
   String country = 'Morocco';
+  bool _hasUserLocation = false;
+
+  bool get hasUserLocation => _hasUserLocation;
 
   CalculationMethod method =
       CalculationMethod.muslim_world_league;
@@ -330,26 +333,6 @@ class PrayerController extends ChangeNotifier
 
       if (_disposed) return;
 
-      final resolvedPlace = await _reverseGeocodingService.resolve(
-        latitude: latitude,
-        longitude: longitude,
-        languageCode:
-            WidgetsBinding.instance.platformDispatcher.locale.languageCode,
-      );
-
-      if (_disposed) return;
-
-      if (resolvedPlace != null) {
-        placeName = resolvedPlace.placeName ??
-            resolvedPlace.formattedAddress ??
-            '';
-        city = resolvedPlace.city ??
-            resolvedPlace.region ??
-            city;
-        region = resolvedPlace.region ?? region;
-        country = resolvedPlace.country ?? country;
-      }
-
       _applyRulesProfileIfNoSavedSettings();
 
       _calculateSchedule();
@@ -418,6 +401,7 @@ class PrayerController extends ChangeNotifier
         latitude = savedLatitude;
         longitude = savedLongitude;
         city = 'Saved location';
+        _hasUserLocation = true;
       }
 
       final savedMethod = prefs.getString(_methodKey);
@@ -878,6 +862,38 @@ class PrayerController extends ChangeNotifier
   // LOCATION
   // ---------------------------------------------------------------------------
 
+  Future<void> refreshPlaceName({required String languageCode}) async {
+    if (_disposed || !_hasUserLocation) return;
+
+    final resolvedPlace = await _reverseGeocodingService.resolve(
+      latitude: latitude,
+      longitude: longitude,
+      languageCode: languageCode,
+    );
+
+    if (_disposed || resolvedPlace == null) return;
+
+    final nextPlaceName =
+        resolvedPlace.placeName ?? resolvedPlace.formattedAddress ?? '';
+    final nextCity =
+        resolvedPlace.city ?? resolvedPlace.region ?? city;
+    final nextRegion = resolvedPlace.region ?? region;
+    final nextCountry = resolvedPlace.country ?? country;
+
+    if (placeName == nextPlaceName &&
+        city == nextCity &&
+        region == nextRegion &&
+        country == nextCountry) {
+      return;
+    }
+
+    placeName = nextPlaceName;
+    city = nextCity;
+    region = nextRegion;
+    country = nextCountry;
+    _notifySafely();
+  }
+
   Future<void> updateLocation({String languageCode = 'en'}) async {
     if (_disposed || isLoadingLocation) return;
 
@@ -902,6 +918,7 @@ class PrayerController extends ChangeNotifier
     final oldPlaceName = placeName;
     final oldRegion = region;
     final oldCountry = country;
+    final oldHasUserLocation = _hasUserLocation;
     final oldTimezone = _discoveredTimezone;
     final oldAccuracyAssessment = _locationAccuracyAssessment;
 
@@ -944,6 +961,7 @@ class PrayerController extends ChangeNotifier
       country = '';
 
       locationChanged = true;
+      _hasUserLocation = true;
 
       final resolvedPlace = await _reverseGeocodingService.resolve(
         latitude: newLatitude,
@@ -1006,6 +1024,7 @@ class PrayerController extends ChangeNotifier
           placeName: oldPlaceName,
           region: oldRegion,
           country: oldCountry,
+          hasUserLocation: oldHasUserLocation,
           timezone: oldTimezone,
           accuracyAssessment: oldAccuracyAssessment,
         );
@@ -1046,6 +1065,7 @@ class PrayerController extends ChangeNotifier
     required String placeName,
     required String region,
     required String country,
+    required bool hasUserLocation,
     required DiscoveredTimezone? timezone,
     required LocationAccuracyAssessment? accuracyAssessment,
   }) {
@@ -1055,6 +1075,7 @@ class PrayerController extends ChangeNotifier
     this.placeName = placeName;
     this.region = region;
     this.country = country;
+    _hasUserLocation = hasUserLocation;
     _discoveredTimezone = timezone;
     _locationAccuracyAssessment = accuracyAssessment;
   }
