@@ -1280,8 +1280,6 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       height: 62,
       padding: const EdgeInsetsDirectional.fromSTEB(9, 6, 7, 6),
