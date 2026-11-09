@@ -573,7 +573,6 @@ class _QuranShowcasePainter extends CustomPainter {
     final softGold = Paint()
       ..color = AppColors.gold.withValues(alpha: 0.15)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-    final book = Paint()..color = const Color(0xFF063A2D);
     final page = Paint()..color = const Color(0xFFF0D99E);
     final stand = Paint()..color = const Color(0xFF8D642D);
 
