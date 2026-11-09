@@ -488,7 +488,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           const SizedBox(height: 10),
                           RepaintBoundary(
                             child: SizedBox(
-                              height: 232,
+                              height: 210,
                               child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
@@ -688,7 +688,7 @@ class _MuminQuranShowcase extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(25),
         child: Ink(
-          height: 188,
+          height: 218,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(25),
             gradient: const LinearGradient(
@@ -713,6 +713,19 @@ class _MuminQuranShowcase extends StatelessWidget {
           ),
           child: Stack(
             children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.72,
+                    child: Image.asset(
+                      'assets/images/home/mumin_reference_mosque.webp',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.centerRight,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                ),
+              ),
               const Positioned.fill(
                 child: IgnorePointer(
                   child: CustomPaint(
@@ -1264,7 +1277,7 @@ class _HomeBottomNavigation extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 66,
+          height: 76,
           child: Row(
             children: [
               for (var index = 0; index < items.length; index++)
