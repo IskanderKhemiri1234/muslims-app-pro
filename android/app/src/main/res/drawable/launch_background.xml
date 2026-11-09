@@ -1,38 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- Mumin Pro Emerald Background -->
     <item>
         <shape android:shape="rectangle">
             <solid android:color="#071C17" />
         </shape>
     </item>
 
-    <!-- Centered Golden Islamic Identity -->
     <item
         android:width="144dp"
         android:height="144dp"
         android:gravity="center">
-
-        <vector
-            android:width="144dp"
-            android:height="144dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-
-            <path
-                android:fillColor="#D9B45B"
-                android:pathData="M54,22 A32,32 0,1 0,54 86 A32,32 0,1 0,54 22 Z" />
-
-            <path
-                android:fillColor="#071C17"
-                android:pathData="M69,16 A30,30 0,1 0,69 76 A30,30 0,1 0,69 16 Z" />
-
-            <path
-                android:fillColor="#D9B45B"
-                android:pathData="M78,67 L82,76 L92,78 L82,81 L78,90 L75,81 L65,78 L75,76 Z" />
-
-        </vector>
+        <bitmap
+            android:src="@drawable/mumin_pro_brand"
+            android:gravity="center"
+            android:filter="true" />
     </item>
-
 </layer-list>

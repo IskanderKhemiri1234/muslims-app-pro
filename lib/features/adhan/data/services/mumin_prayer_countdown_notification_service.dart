@@ -102,6 +102,7 @@ class MuminPrayerCountdownNotificationService {
           <String, Object>{
             'prayer': prayer.name,
             'name': translatedName,
+            'englishName': _englishPrayerName(prayer),
             'timeMillis': prayerTime.millisecondsSinceEpoch,
           },
         );
@@ -128,6 +129,23 @@ class MuminPrayerCountdownNotificationService {
         'timezone': timezone.name,
       },
     );
+  }
+
+  String _englishPrayerName(Prayer prayer) {
+    switch (prayer) {
+      case Prayer.fajr:
+        return 'Fajr';
+      case Prayer.dhuhr:
+        return 'Dhuhr';
+      case Prayer.asr:
+        return 'Asr';
+      case Prayer.maghrib:
+        return 'Maghrib';
+      case Prayer.isha:
+        return 'Isha';
+      default:
+        return prayer.name;
+    }
   }
 
   /// Removes the persistent countdown notification and its alarm.
