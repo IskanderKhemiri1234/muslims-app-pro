@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/services/timezone_discovery_service.dart';
+import '../../../../core/services/mumin_reverse_geocoding_service.dart';
 import '../../data/datasources/location_datasource.dart';
 import '../../domain/services/global_prayer_calculation_service.dart';
 import '../../domain/services/prayer_calculation_service.dart';
@@ -33,6 +34,7 @@ class PrayerController extends ChangeNotifier
     GlobalPrayerCalculationService? globalCalculationService,
     PrayerCalculationService? calculationService,
     PrayerRulesService? rulesService,
+    MuminReverseGeocodingService? reverseGeocodingService,
   })  : _locationSource = locationSource ?? LocationDataSource(),
         _timezoneService =
             timezoneService ?? TimezoneDiscoveryService(),
@@ -46,7 +48,9 @@ class PrayerController extends ChangeNotifier
               fallbackMethod:
                   CalculationMethod.muslim_world_league,
               fallbackMadhab: Madhab.shafi,
-            ) {
+            ),
+        _reverseGeocodingService = reverseGeocodingService ??
+            MuminReverseGeocodingService() {
     WidgetsBinding.instance.addObserver(this);
 
     clock.value = DateTime.now();
@@ -66,6 +70,7 @@ class PrayerController extends ChangeNotifier
 
   final PrayerCalculationService _calculationService;
   final PrayerRulesService _rulesService;
+  final MuminReverseGeocodingService _reverseGeocodingService;
 
   // ---------------------------------------------------------------------------
   // PERSISTENCE
@@ -89,6 +94,9 @@ class PrayerController extends ChangeNotifier
   double longitude = -7.5898;
 
   String city = 'Casablanca';
+  String placeName = '';
+  String region = 'Casablanca-Settat';
+  String country = 'Morocco';
 
   CalculationMethod method =
       CalculationMethod.muslim_world_league;
@@ -321,6 +329,26 @@ class PrayerController extends ChangeNotifier
       await _discoverTimezone();
 
       if (_disposed) return;
+
+      final resolvedPlace = await _reverseGeocodingService.resolve(
+        latitude: latitude,
+        longitude: longitude,
+        languageCode:
+            WidgetsBinding.instance.platformDispatcher.locale.languageCode,
+      );
+
+      if (_disposed) return;
+
+      if (resolvedPlace != null) {
+        placeName = resolvedPlace.placeName ??
+            resolvedPlace.formattedAddress ??
+            '';
+        city = resolvedPlace.city ??
+            resolvedPlace.region ??
+            city;
+        region = resolvedPlace.region ?? region;
+        country = resolvedPlace.country ?? country;
+      }
 
       _applyRulesProfileIfNoSavedSettings();
 
@@ -850,7 +878,7 @@ class PrayerController extends ChangeNotifier
   // LOCATION
   // ---------------------------------------------------------------------------
 
-  Future<void> updateLocation() async {
+  Future<void> updateLocation({String languageCode = 'en'}) async {
     if (_disposed || isLoadingLocation) return;
 
     // Do not race the initial settings/timezone calculation.
@@ -871,6 +899,9 @@ class PrayerController extends ChangeNotifier
     final oldLatitude = latitude;
     final oldLongitude = longitude;
     final oldCity = city;
+    final oldPlaceName = placeName;
+    final oldRegion = region;
+    final oldCountry = country;
     final oldTimezone = _discoveredTimezone;
     final oldAccuracyAssessment = _locationAccuracyAssessment;
 
@@ -908,8 +939,30 @@ class PrayerController extends ChangeNotifier
       latitude = newLatitude;
       longitude = newLongitude;
       city = 'Current location';
+      placeName = '';
+      region = '';
+      country = '';
 
       locationChanged = true;
+
+      final resolvedPlace = await _reverseGeocodingService.resolve(
+        latitude: newLatitude,
+        longitude: newLongitude,
+        languageCode: languageCode,
+      );
+
+      if (_disposed) return;
+
+      if (resolvedPlace != null) {
+        placeName = resolvedPlace.placeName ??
+            resolvedPlace.formattedAddress ??
+            '';
+        city = resolvedPlace.city ??
+            resolvedPlace.region ??
+            'Current location';
+        region = resolvedPlace.region ?? '';
+        country = resolvedPlace.country ?? '';
+      }
 
       await _discoverTimezone();
 
@@ -950,6 +1003,9 @@ class PrayerController extends ChangeNotifier
           latitude: oldLatitude,
           longitude: oldLongitude,
           city: oldCity,
+          placeName: oldPlaceName,
+          region: oldRegion,
+          country: oldCountry,
           timezone: oldTimezone,
           accuracyAssessment: oldAccuracyAssessment,
         );
@@ -987,12 +1043,18 @@ class PrayerController extends ChangeNotifier
     required double latitude,
     required double longitude,
     required String city,
+    required String placeName,
+    required String region,
+    required String country,
     required DiscoveredTimezone? timezone,
     required LocationAccuracyAssessment? accuracyAssessment,
   }) {
     this.latitude = latitude;
     this.longitude = longitude;
     this.city = city;
+    this.placeName = placeName;
+    this.region = region;
+    this.country = country;
     _discoveredTimezone = timezone;
     _locationAccuracyAssessment = accuracyAssessment;
   }
