@@ -1253,8 +1253,8 @@ class _HomeBottomNavigation extends StatelessWidget {
       (label: localizations.text('home_tab'), icon: Icons.home_rounded),
       (label: localizations.text('prayer_tab'), icon: Icons.mosque_rounded),
       (label: localizations.text('discover_tab'), icon: Icons.explore_rounded),
-      (label: localizations.text('messages_tab'), icon: Icons.chat_bubble_outline_rounded),
-      (label: localizations.text('profile_tab'), icon: Icons.person_outline_rounded),
+      (label: localizations.quran, icon: Icons.menu_book_rounded),
+      (label: localizations.settings, icon: Icons.person_rounded),
     ];
 
     return DecoratedBox(
