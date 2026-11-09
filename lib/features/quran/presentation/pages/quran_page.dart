@@ -326,7 +326,7 @@ class _QuranPageState extends State<QuranPage>
         _isLoading = false;
       });
 
-      _showMessage('تعذر تحميل بيانات القراءة المحفوظة');
+      _showMessage(QuranPageLocalization.text(context, 'quran_saved_reading_data_error'));
     }
   }
 
@@ -350,7 +350,7 @@ class _QuranPageState extends State<QuranPage>
         });
       });
     } catch (_) {
-      _showMessage('تعذر تحديث الورد اليومي');
+      _showMessage(QuranPageLocalization.text(context, 'quran_daily_reading_update_error'));
     }
   }
 
@@ -392,7 +392,7 @@ class _QuranPageState extends State<QuranPage>
         await _progressRepository.saveProgress(updated);
       });
     } catch (_) {
-      _showMessage('تعذر حفظ موضع القراءة');
+      _showMessage(QuranPageLocalization.text(context, 'quran_reading_position_save_error'));
     }
   }
 
@@ -508,10 +508,10 @@ class _QuranPageState extends State<QuranPage>
       if (khatmaFinished) {
         await _showKhatmaDialog(resultingKhatmas);
       } else {
-        _showMessage('تم تسجيل قراءة الصفحة $pageToMark');
+        _showMessage(QuranPageLocalization.text(context, 'quran_page_marked_read', parameters: <String, Object?>{'page': pageToMark}));
       }
     } catch (_) {
-      _showMessage('تعذر حفظ تقدم القراءة. حاول مرة أخرى.');
+      _showMessage(QuranPageLocalization.text(context, 'quran_page_mark_read_error'));
     } finally {
       if (mounted) {
         setState(() {
@@ -560,10 +560,10 @@ class _QuranPageState extends State<QuranPage>
       });
 
       if (mounted) {
-        _showMessage('تم إلغاء تسجيل قراءة الصفحة');
+        _showMessage(QuranPageLocalization.text(context, 'quran_page_read_mark_removed'));
       }
     } catch (_) {
-      _showMessage('تعذر تحديث سجل القراءة');
+      _showMessage(QuranPageLocalization.text(context, 'quran_reading_record_update_error'));
     } finally {
       if (mounted) {
         setState(() {
@@ -636,7 +636,7 @@ class _QuranPageState extends State<QuranPage>
     if (selection.sura < 1 ||
         selection.sura > 114 ||
         selection.aya < 1) {
-      _showMessage('بيانات الآية غير صالحة');
+      _showMessage(QuranPageLocalization.text(context, 'quran_invalid_ayah_data'));
       return;
     }
 
@@ -666,7 +666,7 @@ class _QuranPageState extends State<QuranPage>
 
         if (alreadySaved) {
           if (mounted) {
-            _showMessage('هذه الآية محفوظة بالفعل');
+            _showMessage(QuranPageLocalization.text(context, 'quran_ayah_already_saved'));
           }
           return;
         }
@@ -703,7 +703,7 @@ class _QuranPageState extends State<QuranPage>
         );
       });
     } catch (_) {
-      _showMessage('تعذر حفظ الآية');
+      _showMessage(QuranPageLocalization.text(context, 'quran_ayah_save_error'));
     }
   }
 
@@ -746,10 +746,10 @@ class _QuranPageState extends State<QuranPage>
       });
 
       if (mounted) {
-        _showMessage('تم حذف علامة الآية');
+        _showMessage(QuranPageLocalization.text(context, 'quran_ayah_bookmark_removed'));
       }
     } catch (_) {
-      _showMessage('تعذر حذف علامة الآية');
+      _showMessage(QuranPageLocalization.text(context, 'quran_ayah_bookmark_remove_error'));
     }
   }
 
@@ -896,12 +896,12 @@ class _QuranPageState extends State<QuranPage>
 
         _showMessage(
           _bookmarks.contains(page)
-              ? 'تم حفظ الصفحة في العلامات المرجعية'
-              : 'تم حذف العلامة المرجعية',
+              ? QuranPageLocalization.text(context, 'quran_page_bookmark_saved')
+              : QuranPageLocalization.text(context, 'quran_page_bookmark_removed'),
         );
       });
     } catch (_) {
-      _showMessage('تعذر حفظ العلامة المرجعية');
+      _showMessage(QuranPageLocalization.text(context, 'quran_page_bookmark_save_error'));
     }
   }
 
@@ -924,7 +924,7 @@ class _QuranPageState extends State<QuranPage>
         });
       });
     } catch (_) {
-      _showMessage('تعذر حذف العلامة المرجعية');
+      _showMessage(QuranPageLocalization.text(context, 'quran_page_bookmark_remove_error'));
     }
   }
 
