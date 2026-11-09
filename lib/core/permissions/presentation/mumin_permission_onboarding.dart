@@ -269,15 +269,19 @@ class _MuminPermissionOnboardingState
           notificationsEnabled,
         );
 
-        if (notificationsEnabled && mounted) {
-          await context
-              .read<MuminAdhanNotificationCoordinator>()
-              .refresh(force: true);
-        } else if (mounted) {
+        if (mounted) {
           await context
               .read<MuminAdhanNotificationCoordinator>()
               .refresh(force: true);
         }
+      } else {
+        // Persist Skip as an explicit choice so future upgrades never
+        // mistake it for a missing preference and enable notifications.
+        await preferences.setBool(
+          MuminAdhanNotificationCoordinator
+              .countdownEnabledPreferenceKey,
+          false,
+        );
       }
 
       final saved = await preferences.setBool(
