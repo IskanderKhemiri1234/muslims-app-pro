@@ -157,17 +157,7 @@ class _SettingsUpdateTile extends StatefulWidget {
 
 class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
   bool _isChecking = false;
-  String _statusKey = 'update_checking';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _checkForUpdates(showFeedback: false);
-      }
-    });
-  }
+  String _statusKey = 'update_channel_setup_required';
 
   Future<void> _checkForUpdates({bool showFeedback = true}) async {
     if (_isChecking) return;
