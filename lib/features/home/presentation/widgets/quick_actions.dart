@@ -261,8 +261,8 @@ class _QuickActionTile extends StatelessWidget {
   }
 }
 
-/// Keeps the supplied artwork strictly inside the circular icon and rotates
-/// only the artwork; the circular frame, border, glow and sparkle stay fixed.
+/// Moves the artwork gently backward and returns it to neutral.
+/// The circular frame, border, glow and sparkle remain perfectly still.
 class _RotatingIconArtwork extends StatefulWidget {
   const _RotatingIconArtwork({
     required this.assetPath,
@@ -279,14 +279,25 @@ class _RotatingIconArtwork extends StatefulWidget {
 class _RotatingIconArtworkState extends State<_RotatingIconArtwork>
     with SingleTickerProviderStateMixin {
   late final AnimationController _rotationController;
+  late final Animation<double> _rotationTurns;
 
   @override
   void initState() {
     super.initState();
     _rotationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 32),
-    )..repeat();
+      duration: const Duration(milliseconds: 2800),
+    );
+    _rotationTurns = Tween<double>(
+      begin: 0,
+      end: -0.035,
+    ).animate(
+      CurvedAnimation(
+        parent: _rotationController,
+        curve: Curves.easeInOutSine,
+      ),
+    );
+    _rotationController.repeat(reverse: true);
   }
 
   @override
@@ -302,7 +313,7 @@ class _RotatingIconArtworkState extends State<_RotatingIconArtwork>
         clipBehavior: Clip.antiAlias,
         child: Center(
           child: RotationTransition(
-            turns: _rotationController,
+            turns: _rotationTurns,
             child: Transform.scale(
               scale: 1.12,
               child: Image.asset(
