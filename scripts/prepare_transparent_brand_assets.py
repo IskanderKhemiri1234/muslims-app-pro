@@ -8,7 +8,6 @@ for each source image, then writes real RGBA PNG assets for Flutter and Android.
 from __future__ import annotations
 
 from pathlib import Path
-from collections import Counter
 from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
