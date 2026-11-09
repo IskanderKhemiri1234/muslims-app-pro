@@ -1,4 +1,3 @@
-
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -32,16 +31,41 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+            def storePasswordValue = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            def keyAliasValue = System.getenv('ANDROID_KEY_ALIAS')
+            def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
+
+            if (!keystorePath || !storePasswordValue || !keyAliasValue || !keyPasswordValue) {
+                throw new GradleException(
+                    'Release signing is not configured. Provide ANDROID_KEYSTORE_PATH, ' +
+                    'ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD.'
+                )
+            }
+
+            def keystoreFile = file(keystorePath)
+            if (!keystoreFile.isFile()) {
+                throw new GradleException(
+                    "Release keystore file does not exist: ${keystorePath}"
+                )
+            }
+
+            storeFile keystoreFile
+            storePassword storePasswordValue
+            keyAlias keyAliasValue
+            keyPassword keyPasswordValue
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
         }
 
         release {
-            // Temporary signing configuration for local development.
-            // Replace with a dedicated release keystore before publishing.
-            signingConfig signingConfigs.debug
-
+            signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
         }
