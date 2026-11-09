@@ -378,18 +378,23 @@ class _QuickActionsState extends State<QuickActions>
             alignment: AlignmentDirectional.centerStart,
             child: AnimatedBuilder(
               animation: _animationController,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildActionSet(
-                    actions,
-                    duplicate: false,
-                  ),
-                  _buildActionSet(
-                    actions,
-                    duplicate: true,
-                  ),
-                ],
+              child: OverflowBox(
+                alignment: AlignmentDirectional.centerStart,
+                minWidth: _cycleWidth * 2,
+                maxWidth: _cycleWidth * 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildActionSet(
+                      actions,
+                      duplicate: false,
+                    ),
+                    _buildActionSet(
+                      actions,
+                      duplicate: true,
+                    ),
+                  ],
+                ),
               ),
               builder: (context, child) {
                 final automaticOffset =
