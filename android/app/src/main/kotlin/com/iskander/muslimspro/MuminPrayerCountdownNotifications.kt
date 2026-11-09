@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.widget.RemoteViews
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -192,7 +193,7 @@ object MuminPrayerCountdownNotifications {
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(context, CHANNEL_ID)
         } else {
             @Suppress("DEPRECATION")
@@ -221,7 +222,56 @@ object MuminPrayerCountdownNotifications {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 setChronometerCountDown(true)
             }
-        }.build()
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val compactView = RemoteViews(
+                context.packageName,
+                R.layout.mumin_prayer_countdown_collapsed
+            ).apply {
+                setTextViewText(R.id.mumin_countdown_title, title)
+                setTextViewText(R.id.mumin_countdown_prayer, prayerName)
+                setChronometer(
+                    R.id.mumin_countdown_timer,
+                    targetTime,
+                    null,
+                    true
+                )
+                setChronometerCountDown(
+                    R.id.mumin_countdown_timer,
+                    true
+                )
+            }
+
+            val expandedView = RemoteViews(
+                context.packageName,
+                R.layout.mumin_prayer_countdown_expanded
+            ).apply {
+                setTextViewText(R.id.mumin_countdown_title, title)
+                setTextViewText(R.id.mumin_countdown_prayer, prayerName)
+                setTextViewText(
+                    R.id.mumin_countdown_label,
+                    description
+                )
+                setChronometer(
+                    R.id.mumin_countdown_timer,
+                    targetTime,
+                    null,
+                    true
+                )
+                setChronometerCountDown(
+                    R.id.mumin_countdown_timer,
+                    true
+                )
+            }
+
+            builder
+                .setStyle(Notification.DecoratedCustomViewStyle())
+                .setCustomContentView(compactView)
+                .setCustomBigContentView(expandedView)
+        }
+
+        val notification = builder.build()
 
         manager.notify(NOTIFICATION_ID, notification)
     }
