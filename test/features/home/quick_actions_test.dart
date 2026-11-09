@@ -54,7 +54,7 @@ void main() {
     },
   );
 
-  testWidgets('image artwork is clipped to and rotates inside icon frames', (tester) async {
+  testWidgets('image artwork stays clipped inside icon frames', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -73,6 +73,30 @@ void main() {
       ),
       findsNWidgets(5),
     );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('artwork rotates backward gently and returns to neutral', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QuickActions(onAction: (_) {}),
+        ),
+      ),
+    );
+
+    final artworkRotation = tester.widget<RotationTransition>(
+      find.byType(RotationTransition).first,
+    );
+    await tester.pump(const Duration(milliseconds: 1400));
+    expect(artworkRotation.turns.value, lessThan(0));
+
+    await tester.pump(const Duration(milliseconds: 1400));
+    expect(artworkRotation.turns.value.abs(), lessThan(0.001));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
