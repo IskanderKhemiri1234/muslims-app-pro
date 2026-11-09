@@ -347,11 +347,11 @@ class _MuminAppState extends State<MuminApp>
       return;
     }
 
-    _lastUpdateCheckAt = now;
     _isCheckingForUpdates = true;
 
     try {
       final update = await MuminAppUpdateService().checkForUpdate();
+      _lastUpdateCheckAt = DateTime.now();
       if (!mounted || !update.isUpdateAvailable) return;
 
       final navigator = _navigatorKey.currentState;
