@@ -229,20 +229,12 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     if (_disposed) return;
 
-    // Upgrade recovery: earlier releases completed permission onboarding
-    // before the countdown preference existed. Restore the persistent
-    // countdown for those already-onboarded users when Android notifications
-    // are available. An explicit saved false remains an opt-out.
+    // Default the persistent countdown on once Android notifications are
+    // available. A saved false is always respected as an explicit opt-out.
     final hasSavedCountdownChoice =
         preferences.containsKey(countdownEnabledPreferenceKey);
-    final onboardingCompleted = preferences.getBool(
-          'mumin_permission_onboarding_completed_v1',
-        ) ??
-        false;
 
-    if (!hasSavedCountdownChoice &&
-        onboardingCompleted &&
-        notificationsEnabled) {
+    if (!hasSavedCountdownChoice && notificationsEnabled) {
       countdownEnabled = true;
       await preferences.setBool(
         countdownEnabledPreferenceKey,
