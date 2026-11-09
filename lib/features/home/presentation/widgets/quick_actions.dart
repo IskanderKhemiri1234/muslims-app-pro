@@ -207,17 +207,12 @@ class _QuickActionTile extends StatelessWidget {
                         ),
                       ),
                       if (action.assetPath != null)
-                        Padding(
-                          padding: const EdgeInsets.all(5),
-                          child: Image.asset(
-                            action.assetPath!,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Icon(
-                              action.icon,
-                              size: iconSize * 0.47,
-                              color: MuminColors.goldLight,
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: _RotatingIconArtwork(
+                              assetPath: action.assetPath!,
+                              fallback: action.icon,
                             ),
                           ),
                         )
@@ -258,6 +253,70 @@ class _QuickActionTile extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeps the supplied artwork strictly inside the circular icon and rotates
+/// only the artwork; the circular frame, border, glow and sparkle stay fixed.
+class _RotatingIconArtwork extends StatefulWidget {
+  const _RotatingIconArtwork({
+    required this.assetPath,
+    required this.fallback,
+  });
+
+  final String assetPath;
+  final IconData fallback;
+
+  @override
+  State<_RotatingIconArtwork> createState() => _RotatingIconArtworkState();
+}
+
+class _RotatingIconArtworkState extends State<_RotatingIconArtwork>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 32),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: ClipOval(
+        clipBehavior: Clip.antiAlias,
+        child: Center(
+          child: RotationTransition(
+            turns: _rotationController,
+            child: Transform.scale(
+              scale: 1.12,
+              child: Image.asset(
+                widget.assetPath,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  widget.fallback,
+                  size: 30,
+                  color: MuminColors.goldLight,
+                ),
+              ),
             ),
           ),
         ),
