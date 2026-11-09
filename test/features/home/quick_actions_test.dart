@@ -53,4 +53,21 @@ void main() {
       await tester.pump();
     },
   );
+
+  testWidgets('image artwork is clipped to and rotates inside icon frames', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QuickActions(onAction: (_) {}),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(ClipOval), findsNWidgets(5));
+    expect(find.byType(RotationTransition), findsNWidgets(5));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 }
