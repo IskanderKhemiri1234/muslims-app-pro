@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../data/services/mumin_adhan_notification_service.dart';
+import '../../data/services/mumin_adhan_notification_coordinator.dart';
 
 class AdhanNotificationSettingsPage extends StatefulWidget {
   const AdhanNotificationSettingsPage({super.key});
@@ -20,6 +21,8 @@ class _AdhanNotificationSettingsPageState
     extends State<AdhanNotificationSettingsPage> {
   static const String _exactPreferenceKey =
       'mumin_adhan_exact_preference';
+  static const String _countdownPreferenceKey =
+      MuminAdhanNotificationCoordinator.countdownEnabledPreferenceKey;
 
   late final MuminAdhanNotificationService _service;
   late final PrayerController _prayerController;
@@ -29,6 +32,7 @@ class _AdhanNotificationSettingsPageState
   bool _loading = true;
   bool _saving = false;
   bool _preferExact = false;
+  bool _countdownEnabled = false;
 
   String? _errorMessage;
 
@@ -73,6 +77,8 @@ class _AdhanNotificationSettingsPageState
 
         _preferExact =
             preferences.getBool(_exactPreferenceKey) ?? false;
+        _countdownEnabled =
+            preferences.getBool(_countdownPreferenceKey) ?? false;
 
         _loading = false;
       });
@@ -158,6 +164,76 @@ class _AdhanNotificationSettingsPageState
           'تعذر تحديث التنبيه. تحقق من الأذونات والموقع.',
           'Could not update the alert. Check permissions and location.',
           'Impossible de modifier l’alerte. Vérifiez les autorisations et la localisation.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleCountdown(bool enabled) async {
+    if (_saving) return;
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (enabled) {
+        final permission = await _service.requestNotificationPermission();
+        if (!permission || !await _service.areNotificationsEnabled()) {
+          throw StateError(
+            _t(
+              'إذن الإشعارات غير مفعّل. اسمح لتطبيق Mumin Pro بإرسال الإشعارات من إعدادات Android.',
+              'Notifications are not enabled. Allow Mumin Pro notifications in Android settings.',
+              'Les notifications ne sont pas activées. Autorisez Mumin Pro dans les paramètres Android.',
+            ),
+          );
+        }
+      }
+
+      final preferences = await SharedPreferences.getInstance();
+      final saved = await preferences.setBool(
+        _countdownPreferenceKey,
+        enabled,
+      );
+      if (!saved) {
+        throw StateError('Could not save the persistent countdown setting.');
+      }
+
+      await context
+          .read<MuminAdhanNotificationCoordinator>()
+          .refresh(force: true);
+
+      if (!mounted) return;
+      setState(() {
+        _countdownEnabled = enabled;
+        _saving = false;
+      });
+
+      _showMessage(
+        enabled
+            ? _t(
+                'تم تفعيل شريط الوقت المتبقي للصلاة.',
+                'Persistent prayer countdown enabled.',
+                'Compte à rebours permanent des prières activé.',
+              )
+            : _t(
+                'تم إيقاف شريط الوقت المتبقي للصلاة.',
+                'Persistent prayer countdown disabled.',
+                'Compte à rebours permanent des prières désactivé.',
+              ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = error.toString();
+      });
+      _showMessage(
+        _t(
+          'تعذر تفعيل شريط الصلاة. تحقق من إذن الإشعارات.',
+          'Could not update the prayer countdown. Check notification permission.',
+          'Impossible de modifier le compte à rebours. Vérifiez l’autorisation des notifications.',
         ),
       );
     }
@@ -424,6 +500,38 @@ class _AdhanNotificationSettingsPageState
                   ),
 
                   const SizedBox(height: 24),
+
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    tileColor: theme.colorScheme.surface,
+                    secondary: const Icon(
+                      Icons.timer_outlined,
+                      color: Color(0xFFD8B66A),
+                    ),
+                    title: Text(
+                      _t(
+                        'شريط الصلاة الدائم',
+                        'Persistent prayer countdown',
+                        'Compte à rebours permanent',
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      _t(
+                        'يعرض شعار Mumin Pro واسم الصلاة القادمة والوقت المتبقي في لوحة الإشعارات.',
+                        'Shows the Mumin Pro logo, next prayer name and remaining time in notifications.',
+                        'Affiche le logo Mumin Pro, la prochaine prière et le temps restant dans les notifications.',
+                      ),
+                    ),
+                    value: _countdownEnabled,
+                    onChanged: _saving ? null : _toggleCountdown,
+                    activeThumbColor: const Color(0xFFD8B66A),
+                  ),
+
+                  const SizedBox(height: 20),
 
                   Text(
                     _t(
