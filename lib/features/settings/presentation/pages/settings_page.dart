@@ -4,6 +4,7 @@ import '../../../../core/updates/mumin_app_update_service.dart';
 
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../adhan/presentation/pages/adhan_notification_settings_page.dart';
 
 /// Central settings hub for Mumin Pro.
 class SettingsPage extends StatelessWidget {
@@ -120,6 +121,33 @@ class SettingsPage extends StatelessWidget {
                 color: AppColors.gold,
               ),
               onTap: onLanguageTap,
+            ),
+            const SizedBox(height: 24),
+            _SettingsSectionTitle(
+              title: localizations.isArabic ? 'الإشعارات' : 'Notifications',
+            ),
+            const SizedBox(height: 10),
+            _SettingsTile(
+              icon: Icons.notifications_active_rounded,
+              title: localizations.isArabic ? 'إشعارات الصلاة' :
+                  localizations.isFrench ? 'Notifications de prière' : 'Prayer notifications',
+              subtitle: localizations.isArabic
+                  ? 'إدارة تنبيهات الصلاة والعدّ التنازلي الدائم'
+                  : localizations.isFrench
+                      ? 'Gérer les alertes et le compte à rebours permanent'
+                      : 'Manage prayer alerts and the persistent countdown',
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.gold,
+              ),
+              onTap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        const AdhanNotificationSettingsPage(),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 24),
             _SettingsSectionTitle(
