@@ -33,7 +33,7 @@ class _QuickActionsState extends State<QuickActions>
   static const double _spacing = 0;
   static const double _pixelsPerSecond = 22;
 
-  static const int _actionCount = 6;
+  static const int _actionCount = 5;
 
   static const double _cycleWidth =
       (_itemWidth * _actionCount) +
