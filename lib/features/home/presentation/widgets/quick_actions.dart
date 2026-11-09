@@ -42,12 +42,7 @@ class _QuickActionsState extends State<QuickActions>
 
   bool _motionDisabled = false;
   double _manualDragOffset = 0;
-  int? _dragPointer;
-  double? _dragStartX;
-  double? _dragStartY;
-  double? _lastDragX;
-  bool _isHorizontalDrag = false;
-  bool _suppressNextTap = false;
+  bool _isUserDragging = false;
 
   @override
   void initState() {
@@ -206,52 +201,19 @@ class _QuickActionsState extends State<QuickActions>
   }
 
   void _handleActionTap(String actionId) {
-    if (_suppressNextTap) return;
     widget.onAction(actionId);
   }
 
-  void _handlePointerDown(PointerDownEvent event) {
-    if (_dragPointer != null) return;
-
-    _suppressNextTap = false;
-    _dragPointer = event.pointer;
-    _dragStartX = event.position.dx;
-    _dragStartY = event.position.dy;
-    _lastDragX = event.position.dx;
-    _isHorizontalDrag = false;
-
-    // Freeze the marquee while the user touches it.
+  void _handleHorizontalDragStart(DragStartDetails details) {
+    _isUserDragging = true;
     _animationController.stop(canceled: false);
   }
 
-  void _handlePointerMove(PointerMoveEvent event) {
-    if (event.pointer != _dragPointer) return;
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!mounted || !_isUserDragging) return;
 
-    final startX = _dragStartX;
-    final startY = _dragStartY;
-    final lastX = _lastDragX;
-
-    if (startX == null || startY == null || lastX == null) {
-      return;
-    }
-
-    final totalDx = event.position.dx - startX;
-    final totalDy = event.position.dy - startY;
-
-    if (!_isHorizontalDrag) {
-      if (totalDx.abs() < 6 ||
-          totalDx.abs() <= totalDy.abs() * 1.15) {
-        return;
-      }
-
-      _isHorizontalDrag = true;
-      _suppressNextTap = true;
-    }
-
-    final delta = event.position.dx - lastX;
-    _lastDragX = event.position.dx;
-
-    if (delta == 0 || !mounted) return;
+    final delta = details.delta.dx;
+    if (delta == 0) return;
 
     setState(() {
       _manualDragOffset =
@@ -259,33 +221,21 @@ class _QuickActionsState extends State<QuickActions>
     });
   }
 
-  void _handlePointerEnd(PointerEvent event) {
-    if (event.pointer != _dragPointer) return;
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    _isUserDragging = false;
 
-    _dragPointer = null;
-    _dragStartX = null;
-    _dragStartY = null;
-    _lastDragX = null;
-    _isHorizontalDrag = false;
+    if (!mounted || _motionDisabled) return;
 
-        // Resume after the tap gesture has been resolved.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      _suppressNextTap = false;
-      if (_motionDisabled || _dragPointer != null) return;
-
-      setState(() {
-        _manualDragOffset =
-            (_manualDragOffset -
-                    (_cycleWidth * _animationController.value)) %
-                _cycleWidth;
-      });
-
-      _animationController.repeat(
-        period: _animationDuration,
-      );
+    setState(() {
+      _manualDragOffset =
+          (_manualDragOffset -
+                  (_cycleWidth * _animationController.value)) %
+              _cycleWidth;
     });
+
+    _animationController.repeat(
+      period: _animationDuration,
+    );
   }
 
   @override
@@ -296,12 +246,16 @@ class _QuickActionsState extends State<QuickActions>
     return SizedBox(
       height: _itemHeight,
       child: ClipRect(
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: _handlePointerDown,
-          onPointerMove: _handlePointerMove,
-          onPointerUp: _handlePointerEnd,
-          onPointerCancel: _handlePointerEnd,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: _handleHorizontalDragStart,
+          onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+          onHorizontalDragEnd: _handleHorizontalDragEnd,
+          onHorizontalDragCancel: () {
+            _handleHorizontalDragEnd(
+              DragEndDetails(),
+            );
+          },
           child: Align(
             alignment: AlignmentDirectional.centerStart,
             child: AnimatedBuilder(
