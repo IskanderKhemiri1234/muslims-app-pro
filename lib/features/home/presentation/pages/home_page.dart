@@ -184,12 +184,19 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     Future<void> _refreshDashboard() async {
     if (!mounted) return;
 
+    final startedAt = DateTime.now();
+
     try {
-      await context.read<PrayerController>().refreshPrayerData();
+      final controller = context.read<PrayerController>();
+      await controller.refreshPrayerData();
 
       if (!mounted) return;
 
-      final message = context.read<PrayerController>().message;
+      setState(() {
+        _currentDate = DateTime.now();
+      });
+
+      final message = controller.message;
       if (message != null && message.trim().isNotEmpty) {
         _showMessage(message);
       }
@@ -200,8 +207,16 @@ class _PrayerHomePageState extends State<PrayerHomePage>
       if (mounted) {
         _showMessage(_localizations.prayerTimesUnavailable);
       }
+    } finally {
+      // Keep the pull-to-refresh transition perceptible even when the
+      // local prayer schedule recalculates almost instantly.
+      final elapsed = DateTime.now().difference(startedAt);
+      const minimumIndicatorTime = Duration(milliseconds: 650);
+      if (elapsed < minimumIndicatorTime) {
+        await Future<void>.delayed(minimumIndicatorTime - elapsed);
+      }
     }
-    }
+  }
 
   Future<void> _updateLocation() async {
     if (!mounted) return;
@@ -371,8 +386,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                     ),
                     child: RefreshIndicator(
                       onRefresh: _refreshDashboard,
+                      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                      displacement: 64,
+                      edgeOffset: 0,
+                      strokeWidth: 2.6,
                       color: AppColors.gold,
                       backgroundColor: theme.colorScheme.surface,
+                      notificationPredicate: (notification) =>
+                          notification.depth == 0,
                       child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(
                           parent: BouncingScrollPhysics(),
