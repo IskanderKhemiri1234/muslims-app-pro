@@ -139,9 +139,9 @@ class _HeroSurface extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF075D43),
-              Color(0xFF064B38),
-              Color(0xFF052D23),
+              Color(0xFF061C17),
+              Color(0xFF08251D),
+              Color(0xFF03130F),
             ],
           ),
           border: Border.all(
@@ -164,37 +164,45 @@ class _HeroSurface extends StatelessWidget {
                 child: _HeroAtmosphere(),
               ),
             ),
-            PositionedDirectional(
-              end: 0,
-              top: 0,
-              bottom: 0,
+            Positioned.fill(
               child: IgnorePointer(
-                child: SizedBox(
-                  width: 220,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        'assets/images/home/mumin_reference_mosque.webp',
-                        fit: BoxFit.cover,
-                        alignment: Alignment.centerRight,
-                        filterQuality: FilterQuality.high,
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Color(0xFF087B5C),
-                              Color(0x00087B5C),
-                            ],
-                            stops: [0.0, 0.58],
-                          ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/images/home/mumin_reference_mosque.webp',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                    ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: AlignmentDirectional.centerStart,
+                          end: AlignmentDirectional.centerEnd,
+                          colors: [
+                            Color(0xC9061C16),
+                            Color(0x76061C16),
+                            Color(0x2603130F),
+                          ],
+                          stops: [0.0, 0.56, 1.0],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x18000000),
+                            Color(0x00000000),
+                            Color(0x52020D0A),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
