@@ -54,7 +54,7 @@ void main() {
     },
   );
 
-  testWidgets('image artwork is clipped to and rotates inside icon frames', (tester) async {
+  testWidgets('image artwork stays clipped inside icon frames', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
