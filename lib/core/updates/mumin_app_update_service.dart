@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 class MuminAppUpdateInfo {
   const MuminAppUpdateInfo({
@@ -96,6 +98,58 @@ class MuminAppUpdateService {
       isUpdateAvailable:
           _compareVersions(latestVersion, currentVersion) > 0,
     );
+  }
+
+  /// Downloads the verified latest-release APK to the app cache and
+  /// opens Android's package installer for an explicit user-approved update.
+  Future<void> downloadAndInstall(MuminAppUpdateInfo update) async {
+    final client = http.Client();
+    File? apkFile;
+
+    try {
+      final request = http.Request('GET', update.apkUri);
+      final streamedResponse = await client.send(request)
+          .timeout(const Duration(seconds: 60));
+
+      if (streamedResponse.statusCode != 200) {
+        throw StateError(
+          'APK download failed with HTTP ${streamedResponse.statusCode}.',
+        );
+      }
+
+      final temporaryDirectory = await getTemporaryDirectory();
+      final updateDirectory = Directory(
+        '${temporaryDirectory.path}/mumin_updates',
+      );
+      await updateDirectory.create(recursive: true);
+
+      final safeVersion = update.latestVersion.replaceAll(
+        RegExp(r'[^0-9A-Za-z._-]'),
+        '_',
+      );
+      apkFile = File(
+        '${updateDirectory.path}/mumin-pro-$safeVersion.apk',
+      );
+
+      final sink = apkFile.openWrite();
+      try {
+        await streamedResponse.stream.pipe(sink);
+      } catch (_) {
+        await sink.close();
+        rethrow;
+      }
+
+      if (!await apkFile.exists() || await apkFile.length() == 0) {
+        throw const FormatException('Downloaded APK is empty.');
+      }
+
+      await _appInfoChannel.invokeMethod<void>(
+        'installApk',
+        <String, Object>{'filePath': apkFile.path},
+      );
+    } finally {
+      client.close();
+    }
   }
 
   int _compareVersions(String first, String second) {
