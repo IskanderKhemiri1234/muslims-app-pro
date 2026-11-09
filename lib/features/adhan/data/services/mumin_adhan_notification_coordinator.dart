@@ -219,8 +219,36 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     final preferExact =
         preferences.getBool(exactPreferenceKey) ?? false;
 
-    final countdownEnabled =
+    var countdownEnabled =
         preferences.getBool(countdownEnabledPreferenceKey) ?? false;
+
+    final languageCode = _languageController.languageCode;
+
+    final notificationsEnabled =
+        await _notificationService.areNotificationsEnabled();
+
+    if (_disposed) return;
+
+    // Upgrade recovery: earlier releases completed permission onboarding
+    // before the countdown preference existed. Restore the persistent
+    // countdown for those already-onboarded users when Android notifications
+    // are available. An explicit saved false remains an opt-out.
+    final hasSavedCountdownChoice =
+        preferences.containsKey(countdownEnabledPreferenceKey);
+    final onboardingCompleted = preferences.getBool(
+          'mumin_permission_onboarding_completed_v1',
+        ) ??
+        false;
+
+    if (!hasSavedCountdownChoice &&
+        onboardingCompleted &&
+        notificationsEnabled) {
+      countdownEnabled = true;
+      await preferences.setBool(
+        countdownEnabledPreferenceKey,
+        true,
+      );
+    }
 
     final signature = <Object?>[
       _buildFingerprint(),
@@ -234,8 +262,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
       return;
     }
 
-    final languageCode = _languageController.languageCode;
-
     await _notificationService.reschedule(
       controller: _prayerController,
       prayerName: (prayer) => _resolvePrayerName(
@@ -245,11 +271,6 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
       notificationBody: _notificationBody(languageCode),
       preferExact: preferExact,
     );
-
-    if (_disposed) return;
-
-    final notificationsEnabled =
-        await _notificationService.areNotificationsEnabled();
 
     if (_disposed) return;
 
