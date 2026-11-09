@@ -1113,11 +1113,21 @@ class _HomeBottomNavigation extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF061C16).withValues(alpha: 0.98),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF0D3D2F),
+            Color(0xFF061C16),
+          ],
+        ),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(22),
+        ),
         border: Border(
           top: BorderSide(
-            color: AppColors.gold.withValues(alpha: 0.34),
-            width: 0.8,
+            color: AppColors.gold.withValues(alpha: 0.68),
+            width: 1.1,
           ),
         ),
         boxShadow: [
@@ -1189,9 +1199,19 @@ class _HomeBottomNavigationItem extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppColors.gold.withValues(alpha: 0.12),
+                          AppColors.gold.withValues(alpha: 0.19),
+                          AppColors.gold.withValues(alpha: 0.015),
                           Colors.transparent,
                         ],
+                        stops: const [0, 0.42, 1],
+                      )
+                    : null,
+                border: selected
+                    ? Border(
+                        top: BorderSide(
+                          color: AppColors.goldLight.withValues(alpha: 0.92),
+                          width: 2,
+                        ),
                       )
                     : null,
               ),
@@ -1262,8 +1282,43 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      height: 50,
+    return Container(
+      height: 62,
+      padding: const EdgeInsetsDirectional.fromSTEB(9, 6, 7, 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomEnd,
+          colors: isDark
+              ? const [
+                  Color(0xFF124638),
+                  Color(0xFF082C22),
+                  Color(0xFF061F18),
+                ]
+              : const [
+                  Color(0xFF176149),
+                  Color(0xFF0D4937),
+                  Color(0xFF083426),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.66),
+          width: 1.15,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00170F).withValues(alpha: 0.20),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+          BoxShadow(
+            color: AppColors.gold.withValues(alpha: 0.08),
+            blurRadius: 8,
+            spreadRadius: 0.5,
+          ),
+        ],
+      ),
       child: Row(
         children: [
           _LocationRefreshButton(
@@ -1273,15 +1328,15 @@ class _HomeHeader extends StatelessWidget {
             isLoading: isLoadingLocation,
             onPressed: onLocationUpdate,
           ),
-          const SizedBox(width: 7),
+          const SizedBox(width: 9),
           Expanded(
             child: _LocationNameSwitcher(
               city: city,
               placeName: placeName,
               region: region,
               country: country,
-              color: colorScheme.onSurface,
-              secondaryColor: colorScheme.onSurfaceVariant,
+              color: Colors.white,
+              secondaryColor: const Color(0xFFD6E6DC),
             ),
           ),
           const SizedBox(width: 7),
@@ -1294,7 +1349,7 @@ class _HomeHeader extends StatelessWidget {
                 : Icons.dark_mode_rounded,
             onPressed: onThemeToggle,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           _HeaderIconButton(
             tooltip: localizations.text('settings'),
             icon: Icons.settings_rounded,
