@@ -1,4 +1,3 @@
-
 name: Muslims Pro - Android CI
 
 on:
@@ -58,6 +57,23 @@ jobs:
           test -f android/app/build.gradle
           test -f android/settings.gradle
           test -f android/app/src/main/AndroidManifest.xml
+
+      - name: Prepare release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing."
+            exit 1
+          fi
+
+          KEYSTORE_PATH="$RUNNER_TEMP/mumin-pro-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: flutter pub get
@@ -135,7 +151,16 @@ jobs:
         run: flutter test
 
       - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: flutter build apk --release
+
+      - name: Remove temporary release keystore
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/mumin-pro-release.jks"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
