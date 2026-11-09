@@ -219,20 +219,8 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     final preferExact =
         preferences.getBool(exactPreferenceKey) ?? false;
 
-    final countdownEnabled =
+    var countdownEnabled =
         preferences.getBool(countdownEnabledPreferenceKey) ?? false;
-
-    final signature = <Object?>[
-      _buildFingerprint(),
-      enabledPrayers.map((prayer) => prayer.name).toList()..sort(),
-      preferExact,
-      countdownEnabled,
-    ].join('|');
-
-    if (!force &&
-        signature == _lastSuccessfulScheduleSignature) {
-      return;
-    }
 
     final languageCode = _languageController.languageCode;
 
@@ -252,6 +240,39 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
         await _notificationService.areNotificationsEnabled();
 
     if (_disposed) return;
+
+    // Upgrade recovery: earlier releases completed permission onboarding
+    // before the countdown preference existed. Restore the persistent
+    // countdown for those already-onboarded users when Android notifications
+    // are available. An explicit saved false remains an opt-out.
+    final hasSavedCountdownChoice =
+        preferences.containsKey(countdownEnabledPreferenceKey);
+    final onboardingCompleted = preferences.getBool(
+          'mumin_permission_onboarding_completed_v1',
+        ) ??
+        false;
+
+    if (!hasSavedCountdownChoice &&
+        onboardingCompleted &&
+        notificationsEnabled) {
+      countdownEnabled = true;
+      await preferences.setBool(
+        countdownEnabledPreferenceKey,
+        true,
+      );
+    }
+
+    final signature = <Object?>[
+      _buildFingerprint(),
+      enabledPrayers.map((prayer) => prayer.name).toList()..sort(),
+      preferExact,
+      countdownEnabled,
+    ].join('|');
+
+    if (!force &&
+        signature == _lastSuccessfulScheduleSignature) {
+      return;
+    }
 
     if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
