@@ -10,10 +10,22 @@ class MainActivity : AudioServiceActivity() {
     companion object {
         private const val CHANNEL_NAME =
             "com.iskander.muslimspro/prayer_countdown"
+        private const val APP_INFO_CHANNEL_NAME =
+            "com.iskander.muslimspro/app_info"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            APP_INFO_CHANNEL_NAME
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getAppVersion" -> result.success(BuildConfig.VERSION_NAME)
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
