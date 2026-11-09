@@ -70,7 +70,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes 7zip
 
-          7zz a -t7z -mhe=on "-p${BOOTSTRAP_BUNDLE_PASSWORD}" "$ARCHIVE_PATH" "$SECRETS_PATH"
+          7z a -t7z -mhe=on "-p${BOOTSTRAP_BUNDLE_PASSWORD}" "$ARCHIVE_PATH" "$SECRETS_PATH"
 
           test -s "$ARCHIVE_PATH"
           echo "Encrypted signing archive created successfully."
