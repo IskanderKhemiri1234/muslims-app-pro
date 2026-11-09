@@ -148,9 +148,17 @@ final class MuminLocalizations {
       'settings_subtitle': 'خصص تجربتك واجعل التطبيق أقرب إلى احتياجاتك',
       'general_settings': 'الإعدادات العامة',
       'app_updates': 'تحديث التطبيق',
-      'update_channel_setup_required': 'افتح صفحة الإصدارات لتنزيل أحدث ملف APK وتثبيته فوق النسخة الحالية.'
-      'update_setup_pending': 'عرض التحديثات'
-      'update_signature_note': 'يجب تثبيت التحديث بتوقيع الإصدار نفسه ورقم إصدار أعلى. لا تحذف التطبيق قبل التحديث.'
+      'update_channel_setup_required': 'تحقق من وجود إصدار جديد ونزّله مباشرة من داخل التطبيق.',
+      'update_setup_pending': 'عرض التحديثات',
+      'update_signature_note': 'يجب تثبيت التحديث بتوقيع الإصدار نفسه ورقم إصدار أعلى. لا تحذف التطبيق قبل التحديث.',
+      'update_checking': 'جارٍ التحقق من وجود تحديث...',
+      'update_latest': 'أنت تستخدم أحدث إصدار من مؤمن برو.',
+      'update_available': 'يتوفر تحديث جديد لمؤمن برو',
+      'update_release_version': 'الإصدار الجديد:',
+      'update_later': 'لاحقاً',
+      'update_download': 'تنزيل التحديث',
+      'update_check_failed': 'تعذر التحقق من التحديث. تحقق من اتصال الإنترنت وحاول مجدداً.',
+      'update_download_failed': 'تعذر فتح رابط تنزيل التحديث.'
 
       'coming_soon': 'هذه الميزة ستتوفر قريباً',
       'let_prayer_illuminate_your_day': 'صلاتك نور يومك',
@@ -457,9 +465,17 @@ final class MuminLocalizations {
       'settings_subtitle': 'Personalize your experience and make the app yours',
       'general_settings': 'General settings',
       'app_updates': 'App updates',
-      'update_channel_setup_required': 'Open the releases page to download and install the latest APK over your current app.'
-      'update_setup_pending': 'View updates'
-      'update_signature_note': 'The update must use the same signing certificate and a higher version code. Do not uninstall the app before updating.'
+      'update_channel_setup_required': 'Check for a new version and download it directly from the app.',
+      'update_setup_pending': 'View updates',
+      'update_signature_note': 'The update must use the same signing certificate and a higher version code. Do not uninstall the app before updating.',
+      'update_checking': 'Checking for updates...',
+      'update_latest': 'You are using the latest version of Mumin Pro.',
+      'update_available': 'A new Mumin Pro update is available',
+      'update_release_version': 'New version:',
+      'update_later': 'Later',
+      'update_download': 'Download update',
+      'update_check_failed': 'Could not check for updates. Check your internet connection and try again.',
+      'update_download_failed': 'Could not open the update download link.'
       'today_label': 'Today',
       'next_prayer_eyebrow': 'Up next',
       'time_remaining': 'Time remaining',
@@ -782,9 +798,17 @@ final class MuminLocalizations {
       'settings_subtitle': 'Personnalisez votre expérience selon vos besoins',
       'general_settings': 'Paramètres généraux',
       'app_updates': 'Mise à jour de l’application',
-      'update_channel_setup_required': 'Ouvrez la page des versions pour télécharger et installer le dernier APK par-dessus votre application actuelle.'
-      'update_setup_pending': 'Voir les mises à jour'
-      'update_signature_note': 'La mise à jour doit utiliser le même certificat de signature et un code de version supérieur. Ne désinstallez pas l’application avant la mise à jour.'
+      'update_channel_setup_required': 'Vérifiez la disponibilité d’une nouvelle version et téléchargez-la directement depuis l’application.',
+      'update_setup_pending': 'Voir les mises à jour',
+      'update_signature_note': 'La mise à jour doit utiliser le même certificat de signature et un code de version supérieur. Ne désinstallez pas l’application avant la mise à jour.',
+      'update_checking': 'Vérification des mises à jour...',
+      'update_latest': 'Vous utilisez la dernière version de Mumin Pro.',
+      'update_available': 'Une nouvelle mise à jour de Mumin Pro est disponible',
+      'update_release_version': 'Nouvelle version :',
+      'update_later': 'Plus tard',
+      'update_download': 'Télécharger la mise à jour',
+      'update_check_failed': 'Impossible de vérifier les mises à jour. Vérifiez votre connexion Internet et réessayez.',
+      'update_download_failed': 'Impossible d’ouvrir le lien de téléchargement.'
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
       'let_prayer_illuminate_your_day':
