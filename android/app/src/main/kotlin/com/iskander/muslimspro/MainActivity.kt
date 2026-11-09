@@ -5,6 +5,8 @@ import android.content.Intent
 import android.location.Geocoder
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -115,6 +117,58 @@ class MainActivity : AudioServiceActivity() {
                                 }
                             }
                         }
+                    }
+                }
+                "verifyApk" -> {
+                    try {
+                        val filePath = call.argument<String>("filePath")
+                            ?: throw IllegalArgumentException(
+                                "APK file path is missing."
+                            )
+                        val expectedSha256 = call.argument<String>("sha256")
+                            ?.trim()
+                            ?.lowercase(Locale.ROOT)
+                            ?: throw IllegalArgumentException(
+                                "Expected APK SHA-256 digest is missing."
+                            )
+
+                        if (!expectedSha256.matches(Regex("^[0-9a-f]{64}$"))) {
+                            throw IllegalArgumentException(
+                                "Expected APK SHA-256 digest is invalid."
+                            )
+                        }
+
+                        val apkFile = File(filePath)
+                        if (!apkFile.isFile || apkFile.length() <= 0L) {
+                            throw IllegalArgumentException(
+                                "Downloaded APK file is missing or empty."
+                            )
+                        }
+
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        FileInputStream(apkFile).buffered().use { input ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val bytesRead = input.read(buffer)
+                                if (bytesRead < 0) break
+                                digest.update(buffer, 0, bytesRead)
+                            }
+                        }
+
+                        val actualSha256 = digest.digest().joinToString("") {
+                            "%02x".format(it)
+                        }
+                        val isValid = MessageDigest.isEqual(
+                            actualSha256.toByteArray(Charsets.US_ASCII),
+                            expectedSha256.toByteArray(Charsets.US_ASCII)
+                        )
+                        result.success(isValid)
+                    } catch (exception: Exception) {
+                        result.error(
+                            "APK_VERIFICATION_ERROR",
+                            exception.message ?: "Unable to verify the downloaded APK.",
+                            null
+                        )
                     }
                 }
                 "installApk" -> {
