@@ -2,8 +2,11 @@
 package com.iskander.muslimspro
 
 import android.content.Intent
+import android.location.Geocoder
 import androidx.core.content.FileProvider
 import java.io.File
+import java.util.Locale
+import java.util.concurrent.Executors
 
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -16,6 +19,7 @@ class MainActivity : AudioServiceActivity() {
             "com.iskander.muslimspro/prayer_countdown"
         private const val APP_INFO_CHANNEL_NAME =
             "com.iskander.muslimspro/app_info"
+        private val geocodingExecutor = Executors.newSingleThreadExecutor()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -27,6 +31,92 @@ class MainActivity : AudioServiceActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getAppVersion" -> result.success(BuildConfig.VERSION_NAME)
+                "reverseGeocode" -> {
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    val languageCode = call.argument<String>("languageCode")
+                        ?.trim()
+                        ?.lowercase(Locale.ROOT)
+                        ?.takeIf { it in setOf("ar", "en", "fr") }
+                        ?: "en"
+
+                    if (latitude == null || longitude == null ||
+                        !latitude.isFinite() || !longitude.isFinite() ||
+                        latitude !in -90.0..90.0 ||
+                        longitude !in -180.0..180.0
+                    ) {
+                        result.error(
+                            "INVALID_COORDINATES",
+                            "Valid latitude and longitude are required.",
+                            null
+                        )
+                    } else {
+                        geocodingExecutor.execute {
+                            try {
+                                if (!Geocoder.isPresent()) {
+                                    throw IllegalStateException(
+                                        "Geocoding is not available on this device."
+                                    )
+                                }
+
+                                val geocoder = Geocoder(
+                                    this@MainActivity,
+                                    Locale.forLanguageTag(languageCode)
+                                )
+
+                                @Suppress("DEPRECATION")
+                                val addresses = geocoder.getFromLocation(
+                                    latitude,
+                                    longitude,
+                                    5
+                                )
+
+                                val address = addresses
+                                    ?.firstOrNull { it.maxAddressLineIndex >= 0 }
+                                    ?: addresses?.firstOrNull()
+
+                                val placeName = listOfNotNull(
+                                    address?.subLocality,
+                                    address?.thoroughfare,
+                                    address?.featureName
+                                ).firstOrNull { it.isNotBlank() }
+
+                                val city = listOfNotNull(
+                                    address?.locality,
+                                    address?.subAdminArea,
+                                    address?.subLocality,
+                                    address?.adminArea
+                                ).firstOrNull { it.isNotBlank() }
+
+                                val region = listOfNotNull(
+                                    address?.adminArea,
+                                    address?.subAdminArea
+                                ).firstOrNull { it.isNotBlank() }
+
+                                val payload = mapOf(
+                                    "placeName" to placeName,
+                                    "city" to city,
+                                    "region" to region,
+                                    "country" to address?.countryName,
+                                    "formattedAddress" to address?.getAddressLine(0)
+                                )
+
+                                runOnUiThread {
+                                    result.success(payload)
+                                }
+                            } catch (exception: Exception) {
+                                runOnUiThread {
+                                    result.error(
+                                        "REVERSE_GEOCODING_ERROR",
+                                        exception.message
+                                            ?: "Unable to resolve the current place name.",
+                                        null
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 "installApk" -> {
                     try {
                         val filePath = call.argument<String>("filePath")
