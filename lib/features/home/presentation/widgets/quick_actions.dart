@@ -95,8 +95,6 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final foreground = Theme.of(context).colorScheme.onSurface;
 
     return Semantics(
