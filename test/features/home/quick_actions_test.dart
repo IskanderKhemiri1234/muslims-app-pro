@@ -65,8 +65,27 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(ClipOval), findsNothing);
-    expect(find.byType(RotationTransition), findsNothing);
     expect(find.byType(Image), findsNWidgets(5));
+
+    // Check the artwork tile itself. Flutter's Scrollbar has its own internal
+    // RotationTransition for thumb animation, unrelated to shortcut artwork.
+    for (final actionId in <String>[
+      'qibla',
+      'quran',
+      'mosques',
+      'adhkar',
+      'tasbih',
+    ]) {
+      final tile = find.byKey(ValueKey<String>(actionId));
+      expect(
+        find.descendant(
+          of: tile,
+          matching: find.byType(RotationTransition),
+        ),
+        findsNothing,
+        reason: '$actionId artwork must remain static.',
+      );
+    }
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
