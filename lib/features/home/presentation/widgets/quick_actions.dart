@@ -225,8 +225,46 @@ class _QuickActionsState extends State<QuickActions>
           _isUserDragging) {
         return;
       }
-      _animationController.repeat(period: _animationDuration);
+      _resumeMarqueeFromCurrentPosition();
     });
+  }
+
+  void _resumeMarqueeFromCurrentPosition() {
+    if (!mounted ||
+        _motionDisabled ||
+        _activePointers > 0 ||
+        _isUserDragging) {
+      return;
+    }
+
+    final currentProgress = _animationController.value.clamp(0.0, 1.0);
+    if (currentProgress >= 1.0) {
+      _animationController.repeat(period: _animationDuration);
+      return;
+    }
+
+    final remainingMilliseconds =
+        (_animationDuration.inMilliseconds * (1.0 - currentProgress))
+            .round()
+            .clamp(1, _animationDuration.inMilliseconds);
+
+    _animationController
+        .animateTo(
+          1.0,
+          duration: Duration(milliseconds: remainingMilliseconds),
+          curve: Curves.linear,
+        )
+        .then((_) {
+          if (!mounted ||
+              _motionDisabled ||
+              _activePointers > 0 ||
+              _isUserDragging) {
+            return;
+          }
+          // Progress 1.0 is visually identical to progress 0.0 after one
+          // complete cycle, so the continuous loop restarts without a jump.
+          _animationController.repeat(period: _animationDuration);
+        });
   }
 
   void _handleHorizontalDragStart(DragStartDetails details) {
@@ -265,13 +303,7 @@ class _QuickActionsState extends State<QuickActions>
 
     if (!mounted || _motionDisabled) return;
 
-    setState(() {
-      _manualDragOffset =
-          (_manualDragOffset -
-                  (_cycleWidth * _animationController.value)) %
-              _cycleWidth;
-    });
-
+    // Keep the exact manually selected offset while the controller is paused.
     if (_activePointers == 0) {
       _scheduleMarqueeResume();
     }
