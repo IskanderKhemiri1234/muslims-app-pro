@@ -30,6 +30,7 @@
             android:ellipsize="end" />
 
         <TextView
+            android:id="@+id/mumin_countdown_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="NEXT PRAYER"
