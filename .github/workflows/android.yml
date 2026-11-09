@@ -75,6 +75,12 @@ jobs:
           test -s "$KEYSTORE_PATH"
           echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
+      - name: Install image processing dependency
+        run: python3 -m pip install --disable-pip-version-check Pillow
+
+      - name: Prepare and verify transparent brand artwork
+        run: python3 scripts/prepare_transparent_brand_assets.py
+
       - name: Install dependencies
         run: flutter pub get
 

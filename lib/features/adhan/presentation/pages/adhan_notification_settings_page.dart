@@ -67,6 +67,17 @@ class _AdhanNotificationSettingsPageState
           await SharedPreferences.getInstance();
 
       final enabled = await _service.getEnabledPrayers();
+      final hasCountdownChoice =
+          preferences.containsKey(_countdownPreferenceKey);
+      final notificationsAllowed =
+          await _service.areNotificationsEnabled();
+      final countdownEnabled =
+          preferences.getBool(_countdownPreferenceKey) ??
+              notificationsAllowed;
+
+      if (!hasCountdownChoice && notificationsAllowed) {
+        await preferences.setBool(_countdownPreferenceKey, true);
+      }
 
       if (!mounted) return;
 
@@ -77,11 +88,16 @@ class _AdhanNotificationSettingsPageState
 
         _preferExact =
             preferences.getBool(_exactPreferenceKey) ?? false;
-        _countdownEnabled =
-            preferences.getBool(_countdownPreferenceKey) ?? false;
+        _countdownEnabled = countdownEnabled;
 
         _loading = false;
       });
+
+      if (countdownEnabled) {
+        await context
+            .read<MuminAdhanNotificationCoordinator>()
+            .refresh(force: true);
+      }
     } catch (error) {
       if (!mounted) return;
 

@@ -54,7 +54,7 @@ void main() {
     },
   );
 
-  testWidgets('image artwork stays clipped inside icon frames', (tester) async {
+  testWidgets('shortcut artwork has transparent edges and no rotating frame', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -64,15 +64,9 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
 
-    final clippedArtwork = find.byType(ClipOval);
-    expect(clippedArtwork, findsNWidgets(5));
-    expect(
-      find.descendant(
-        of: clippedArtwork,
-        matching: find.byType(RotationTransition),
-      ),
-      findsNothing,
-    );
+    expect(find.byType(ClipOval), findsNothing);
+    expect(find.byType(RotationTransition), findsNothing);
+    expect(find.byType(Image), findsNWidgets(5));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
