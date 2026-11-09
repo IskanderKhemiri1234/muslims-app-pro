@@ -442,7 +442,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           const SizedBox(height: 10),
                           RepaintBoundary(
                             child: SizedBox(
-                              height: 216,
+                              height: 232,
                               child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
