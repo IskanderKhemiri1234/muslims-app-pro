@@ -75,7 +75,7 @@ class QuickActions extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final tileWidth = constraints.maxWidth / actions.length;
-          final iconSize = (tileWidth - 8).clamp(46.0, 58.0);
+          final iconSize = (tileWidth - 8).clamp(46.0, 58.0).toDouble();
 
           return Row(
             children: [
