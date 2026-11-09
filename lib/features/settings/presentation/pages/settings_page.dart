@@ -157,12 +157,24 @@ class _SettingsUpdateTile extends StatefulWidget {
 
 class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
   bool _isChecking = false;
+  String _statusKey = 'update_checking';
 
-  Future<void> _checkForUpdates() async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _checkForUpdates(showFeedback: false);
+      }
+    });
+  }
+
+  Future<void> _checkForUpdates({bool showFeedback = true}) async {
     if (_isChecking) return;
 
     setState(() {
       _isChecking = true;
+      _statusKey = 'update_checking';
     });
 
     try {
@@ -170,15 +182,24 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
       if (!mounted) return;
 
       if (!update.isUpdateAvailable) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.localizations.text('update_latest'),
+        setState(() {
+          _statusKey = 'update_latest';
+        });
+        if (showFeedback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.localizations.text('update_latest'),
+              ),
             ),
-          ),
-        );
+          );
+        }
         return;
       }
+
+      setState(() {
+        _statusKey = 'update_available';
+      });
 
       final shouldDownload = await showDialog<bool>(
         context: context,
@@ -214,6 +235,9 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
           await MuminAppUpdateService().downloadAndInstall(update);
         } catch (_) {
           if (!mounted) return;
+          setState(() {
+            _statusKey = 'update_download_failed';
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -225,13 +249,18 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.localizations.text('update_check_failed'),
+      setState(() {
+        _statusKey = 'update_check_failed';
+      });
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.localizations.text('update_check_failed'),
+            ),
           ),
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -246,9 +275,7 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
     return _SettingsTile(
       icon: Icons.system_update_alt_rounded,
       title: widget.localizations.text('app_updates'),
-      subtitle: widget.localizations.text(
-        _isChecking ? 'update_checking' : 'update_channel_setup_required',
-      ),
+      subtitle: widget.localizations.text(_statusKey),
       trailing: _isChecking
           ? const SizedBox(
               width: 20,
@@ -262,7 +289,7 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
               Icons.system_update_alt_rounded,
               color: AppColors.gold,
             ),
-      onTap: _checkForUpdates,
+      onTap: () => _checkForUpdates(),
     );
   }
 }
