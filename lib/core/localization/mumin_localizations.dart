@@ -87,6 +87,9 @@ final class MuminLocalizations {
 
     'ar': <String, String>{
       'app_name': 'Mumin Pro',
+      'home_tab': 'الرئيسية',
+      'prayer_tab': 'الصلاة',
+      'discover_tab': 'اكتشف',
       
 'permission_setup_title': 'لنُعِدّ Mumin Pro معاً',
 'permission_setup_description':
@@ -402,6 +405,9 @@ final class MuminLocalizations {
 
     'en': <String, String>{
       'app_name': 'Mumin Pro',
+      'home_tab': 'Home',
+      'prayer_tab': 'Prayer',
+      'discover_tab': 'Discover',
         
 'permission_setup_title': 'Let’s set up Mumin Pro',
 'permission_setup_description':
@@ -717,6 +723,9 @@ final class MuminLocalizations {
 
     'fr': <String, String>{
       'app_name': 'Mumin Pro',
+      'home_tab': 'Accueil',
+      'prayer_tab': 'Prière',
+      'discover_tab': 'Découvrir',
         
 'permission_setup_title': 'Configurons Mumin Pro',
 'permission_setup_description':
