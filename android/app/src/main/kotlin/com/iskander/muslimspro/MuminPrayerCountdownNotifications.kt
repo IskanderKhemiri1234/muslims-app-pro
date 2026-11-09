@@ -259,6 +259,10 @@ object MuminPrayerCountdownNotifications {
                 context.packageName,
                 R.layout.mumin_prayer_countdown_expanded
             ).apply {
+                setImageViewResource(
+                    R.id.mumin_countdown_logo,
+                    R.drawable.mumin_pro_brand
+                )
                 setTextViewText(R.id.mumin_countdown_title, title)
                 setTextViewText(R.id.mumin_countdown_prayer, prayerName)
                 setTextViewText(
