@@ -558,8 +558,8 @@ class _AnimatedActionArtwork extends StatelessWidget {
           child: Transform.scale(
             scale: scale,
             child: Container(
-              width: 58,
-              height: 58,
+              width: 62,
+              height: 62,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -600,6 +600,22 @@ class _AnimatedActionArtwork extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: MuminColors.goldLight.withValues(
+                              alpha: 0.22,
+                            ),
+                            width: 0.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Positioned(
                     top: 5,
                     right: 7,
@@ -613,7 +629,7 @@ class _AnimatedActionArtwork extends StatelessWidget {
                   ),
                   Icon(
                     icon,
-                    size: 22,
+                    size: 27,
                     color: Color.lerp(
                       color,
                       MuminColors.goldLight,
