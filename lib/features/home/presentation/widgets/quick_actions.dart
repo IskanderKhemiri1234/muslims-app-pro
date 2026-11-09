@@ -6,8 +6,7 @@ import '../../../../core/localization/mumin_domain_localizations.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
 import '../../../../core/localization/mumin_localizations.dart';
 
-/// Five fixed home shortcuts, matching the reference layout.
-/// Navigation IDs remain connected to the existing home action handler.
+/// Six accessible home shortcuts with stable identities and real tap targets.
 class QuickActions extends StatelessWidget {
   const QuickActions({
     super.key,
@@ -19,18 +18,18 @@ class QuickActions extends StatelessWidget {
   List<_ActionData> _buildActions(MuminLocalizations localizations) {
     return <_ActionData>[
       _ActionData(
+        id: 'qibla',
+        title: localizations.qibla,
+        semanticLabel: localizations.qibla,
+        icon: Icons.explore_rounded,
+        color: const Color(0xFF58C9A1),
+      ),
+      _ActionData(
         id: 'quran',
         title: localizations.quran,
         semanticLabel: localizations.quran,
         icon: Icons.menu_book_rounded,
         color: MuminColors.goldLight,
-      ),
-      _ActionData(
-        id: 'adhkar',
-        title: localizations.adhkar,
-        semanticLabel: localizations.adhkar,
-        icon: Icons.volunteer_activism_rounded,
-        color: const Color(0xFFCB9AE8),
       ),
       _ActionData(
         id: 'mosques',
@@ -40,11 +39,18 @@ class QuickActions extends StatelessWidget {
         color: MuminColors.gold,
       ),
       _ActionData(
-        id: 'qibla',
-        title: localizations.qibla,
-        semanticLabel: localizations.qibla,
-        icon: Icons.explore_rounded,
-        color: const Color(0xFF58C9A1),
+        id: 'adhan',
+        title: localizations.text('adhan'),
+        semanticLabel: localizations.text('adhan'),
+        icon: Icons.notifications_active_rounded,
+        color: const Color(0xFFE5B95F),
+      ),
+      _ActionData(
+        id: 'adhkar',
+        title: localizations.adhkar,
+        semanticLabel: localizations.adhkar,
+        icon: Icons.volunteer_activism_rounded,
+        color: const Color(0xFFCB9AE8),
       ),
       _ActionData(
         id: 'tasbih',
@@ -66,19 +72,28 @@ class QuickActions extends StatelessWidget {
 
     return SizedBox(
       height: 116,
-      child: Row(
-        children: [
-          for (final action in actions)
-            Expanded(
-              child: _QuickActionTile(
-                action: action,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  onAction(action.id);
-                },
-              ),
-            ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tileWidth = constraints.maxWidth / actions.length;
+          final iconSize = (tileWidth - 8).clamp(46.0, 58.0);
+
+          return Row(
+            children: [
+              for (final action in actions)
+                SizedBox(
+                  width: tileWidth,
+                  child: _QuickActionTile(
+                    action: action,
+                    iconSize: iconSize,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onAction(action.id);
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -87,10 +102,12 @@ class QuickActions extends StatelessWidget {
 class _QuickActionTile extends StatelessWidget {
   const _QuickActionTile({
     required this.action,
+    required this.iconSize,
     required this.onTap,
   });
 
   final _ActionData action;
+  final double iconSize;
   final VoidCallback onTap;
 
   @override
@@ -101,103 +118,104 @@ class _QuickActionTile extends StatelessWidget {
       button: true,
       label: action.semanticLabel,
       onTap: onTap,
-      child: ExcludeSemantics(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            splashColor: action.color.withValues(alpha: 0.13),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        center: const Alignment(-0.35, -0.45),
-                        radius: 0.95,
-                        colors: [
-                          Color.lerp(
-                            action.color.withValues(alpha: 0.42),
-                            MuminColors.goldLight.withValues(alpha: 0.38),
-                            0.24,
-                          )!,
-                          action.color.withValues(alpha: 0.16),
-                          const Color(0xFF06271E).withValues(alpha: 0.94),
-                        ],
-                        stops: const [0, 0.58, 1],
-                      ),
-                      border: Border.all(
-                        color: MuminColors.goldLight.withValues(alpha: 0.62),
-                        width: 1.35,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: action.color.withValues(alpha: 0.18),
-                          blurRadius: 15,
-                          spreadRadius: 1,
-                        ),
-                        BoxShadow(
-                          color: MuminColors.gold.withValues(alpha: 0.16),
-                          blurRadius: 5,
-                        ),
+      child: Material(
+        key: ValueKey<String>(action.id),
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(17),
+          splashColor: action.color.withValues(alpha: 0.16),
+          highlightColor: action.color.withValues(alpha: 0.07),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: iconSize,
+                  height: iconSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.35, -0.45),
+                      radius: 0.95,
+                      colors: [
+                        Color.lerp(
+                          action.color.withValues(alpha: 0.46),
+                          MuminColors.goldLight.withValues(alpha: 0.38),
+                          0.24,
+                        )!,
+                        action.color.withValues(alpha: 0.17),
+                        const Color(0xFF06271E).withValues(alpha: 0.96),
                       ],
+                      stops: const [0, 0.58, 1],
                     ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Positioned.fill(
-                          child: Padding(
-                            padding: const EdgeInsets.all(3),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: MuminColors.goldLight.withValues(
-                                    alpha: 0.25,
-                                  ),
-                                  width: 0.8,
+                    border: Border.all(
+                      color: MuminColors.goldLight.withValues(alpha: 0.68),
+                      width: 1.25,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: action.color.withValues(alpha: 0.20),
+                        blurRadius: 12,
+                        spreadRadius: 0.5,
+                      ),
+                      BoxShadow(
+                        color: MuminColors.gold.withValues(alpha: 0.14),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: MuminColors.goldLight.withValues(
+                                  alpha: 0.26,
                                 ),
+                                width: 0.8,
                               ),
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 5,
-                          right: 7,
-                          child: Icon(
-                            Icons.auto_awesome_rounded,
-                            size: 7,
-                            color: MuminColors.goldLight.withValues(
-                              alpha: 0.78,
-                            ),
-                          ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 5,
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 6,
+                          color: MuminColors.goldLight.withValues(alpha: 0.82),
                         ),
-                        Icon(
-                          action.icon,
-                          size: 31,
-                          color: Color.lerp(
-                            action.color,
-                            MuminColors.goldLight,
-                            0.28,
-                          ),
-                          shadows: [
-                            Shadow(
-                              color: action.color.withValues(alpha: 0.7),
-                              blurRadius: 9,
-                            ),
-                          ],
+                      ),
+                      Icon(
+                        action.icon,
+                        size: iconSize * 0.47,
+                        color: Color.lerp(
+                          action.color,
+                          MuminColors.goldLight,
+                          0.28,
                         ),
-                      ],
-                    ),
+                        shadows: [
+                          Shadow(
+                            color: action.color.withValues(alpha: 0.72),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 7),
-                  Text(
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: Text(
                     action.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -205,13 +223,13 @@ class _QuickActionTile extends StatelessWidget {
                     textDirection: Directionality.of(context),
                     style: TextStyle(
                       color: foreground,
-                      fontSize: 12.2,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                       height: 1.12,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
