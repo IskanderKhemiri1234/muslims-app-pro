@@ -1,0 +1,92 @@
+name: Mumin Pro - Secure Signing Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mumin-pro-signing-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  create-signing-key:
+    name: Create encrypted Android release signing bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Verify bootstrap encryption secret
+        env:
+          BOOTSTRAP_BUNDLE_PASSWORD: ${{ secrets.BOOTSTRAP_BUNDLE_PASSWORD }}
+        shell: bash
+        run: |
+          if [ -z "${BOOTSTRAP_BUNDLE_PASSWORD:-}" ]; then
+            echo "::error::BOOTSTRAP_BUNDLE_PASSWORD is missing. Add it in repository Actions secrets, then run this workflow again."
+            exit 1
+          fi
+          if [ "${#BOOTSTRAP_BUNDLE_PASSWORD}" -lt 24 ]; then
+            echo "::error::BOOTSTRAP_BUNDLE_PASSWORD must contain at least 24 characters."
+            exit 1
+          fi
+
+      - name: Create a unique Android release keystore and encrypted archive
+        env:
+          BOOTSTRAP_BUNDLE_PASSWORD: ${{ secrets.BOOTSTRAP_BUNDLE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          KEYSTORE_PATH="$RUNNER_TEMP/mumin-pro-release.jks"
+          SECRETS_PATH="$RUNNER_TEMP/mumin-pro-signing-secrets.txt"
+          ARCHIVE_PATH="$RUNNER_TEMP/mumin-pro-signing-bootstrap.7z"
+
+          STORE_PASSWORD="$(openssl rand -hex 32)"
+          KEY_PASSWORD="$(openssl rand -hex 32)"
+          KEY_ALIAS="muminprorelease"
+
+          keytool -genkeypair -noprompt \
+            -keystore "$KEYSTORE_PATH" \
+            -storetype JKS \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -keyalg RSA \
+            -keysize 3072 \
+            -validity 10000 \
+            -dname "CN=Mumin Pro, OU=Mobile, O=Mumin Pro"
+
+          KEYSTORE_BASE64="$(base64 -w 0 "$KEYSTORE_PATH")"
+
+          {
+            printf '%s\n' "ANDROID_KEYSTORE_BASE64=$KEYSTORE_BASE64"
+            printf '%s\n' "ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            printf '%s\n' "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            printf '%s\n' "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } > "$SECRETS_PATH"
+
+          sudo apt-get update
+          sudo apt-get install --yes 7zip
+
+          7zz a -t7z -mhe=on "-p${BOOTSTRAP_BUNDLE_PASSWORD}" "$ARCHIVE_PATH" "$SECRETS_PATH"
+
+          test -s "$ARCHIVE_PATH"
+          echo "Encrypted signing archive created successfully."
+          echo "The archive is encrypted with AES-256 and its file names are encrypted."
+
+      - name: Upload encrypted signing archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mumin-Pro-Signing-Bootstrap-Encrypted
+          path: ${{ runner.temp }}/mumin-pro-signing-bootstrap.7z
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Remove temporary plaintext key material
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/mumin-pro-release.jks"
+          rm -f "$RUNNER_TEMP/mumin-pro-signing-secrets.txt"
