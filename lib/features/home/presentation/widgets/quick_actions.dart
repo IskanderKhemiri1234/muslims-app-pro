@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -374,41 +375,37 @@ class _QuickActionsState extends State<QuickActions>
           onPointerCancel: _handlePointerEnd,
           onPointerMove: _handlePointerMove,
           child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: AnimatedBuilder(
-                animation: _animationController,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildActionSet(
-                      actions,
-                      duplicate: false,
-                    ),
-                    _buildActionSet(
-                      actions,
-                      duplicate: true,
-                    ),
-                  ],
-                ),
-                builder: (context, child) {
-                  final automaticOffset =
-                      -_cycleWidth * _animationController.value;
-
-                  final rawOffset =
-                      automaticOffset + _manualDragOffset;
-
-                  final wrappedOffset = rawOffset % _cycleWidth;
-
-                  final visibleOffset = wrappedOffset > 0
-                      ? wrappedOffset - _cycleWidth
-                      : wrappedOffset;
-
-                  return Transform.translate(
-                    offset: Offset(visibleOffset, 0),
-                    child: child,
-                  );
-                },
+            alignment: AlignmentDirectional.centerStart,
+            child: AnimatedBuilder(
+              animation: _animationController,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildActionSet(
+                    actions,
+                    duplicate: false,
+                  ),
+                  _buildActionSet(
+                    actions,
+                    duplicate: true,
+                  ),
+                ],
               ),
+              builder: (context, child) {
+                final automaticOffset =
+                    -_cycleWidth * _animationController.value;
+                final rawOffset =
+                    automaticOffset + _manualDragOffset;
+                final wrappedOffset = rawOffset % _cycleWidth;
+                final visibleOffset = wrappedOffset > 0
+                    ? wrappedOffset - _cycleWidth
+                    : wrappedOffset;
+
+                return Transform.translate(
+                  offset: Offset(visibleOffset, 0),
+                  child: child,
+                );
+              },
             ),
           ),
         ),
