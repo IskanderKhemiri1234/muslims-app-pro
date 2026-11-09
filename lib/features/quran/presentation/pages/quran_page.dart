@@ -357,11 +357,16 @@ class _QuranPageState extends State<QuranPage>
   void _showMessage(String message) {
     if (!mounted) return;
 
+    final localizedMessage = QuranPageLocalization.feedback(
+      context,
+      message,
+    );
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(localizedMessage),
           behavior: SnackBarBehavior.floating,
           backgroundColor: _deepGreen,
           shape: RoundedRectangleBorder(
@@ -589,13 +594,21 @@ class _QuranPageState extends State<QuranPage>
             size: 48,
             color: _gold,
           ),
-          title: const Text(
-            'مبارك! أتممت ختمة القرآن',
+          title: Text(
+            QuranPageLocalization.text(
+              dialogContext,
+              'quran_khatma_congratulations',
+            ),
             textAlign: TextAlign.center,
           ),
           content: Text(
-            'الحمد لله، أتممت قراءة صفحات المصحف الـ604. '
-            'هذه ختمتك رقم $count.',
+            QuranPageLocalization.text(
+              dialogContext,
+              'quran_khatma_completion_message',
+              parameters: <String, Object?>{
+                'count': count,
+              },
+            ),
             textAlign: TextAlign.center,
           ),
           actions: [
@@ -604,7 +617,12 @@ class _QuranPageState extends State<QuranPage>
                 backgroundColor: _green,
               ),
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('الحمد لله'),
+              child: Text(
+                QuranPageLocalization.text(
+                  dialogContext,
+                  'quran_praise_allah',
+                ),
+              ),
             ),
           ],
         );
