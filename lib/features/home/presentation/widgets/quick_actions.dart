@@ -22,6 +22,7 @@ class QuickActions extends StatelessWidget {
         title: localizations.qibla,
         semanticLabel: localizations.qibla,
         icon: Icons.explore_rounded,
+        assetPath: 'assets/images/home/reference_ui/icon_qibla.png',
         color: const Color(0xFF58C9A1),
       ),
       _ActionData(
@@ -29,6 +30,7 @@ class QuickActions extends StatelessWidget {
         title: localizations.quran,
         semanticLabel: localizations.quran,
         icon: Icons.menu_book_rounded,
+        assetPath: 'assets/images/home/reference_ui/icon_quran.png',
         color: MuminColors.goldLight,
       ),
       _ActionData(
@@ -36,6 +38,7 @@ class QuickActions extends StatelessWidget {
         title: localizations.domainText('nearby_mosques_title'),
         semanticLabel: localizations.domainText('nearby_mosques_title'),
         icon: Icons.mosque_rounded,
+        assetPath: 'assets/images/home/reference_ui/icon_kaaba.png',
         color: MuminColors.gold,
       ),
       _ActionData(
@@ -50,6 +53,7 @@ class QuickActions extends StatelessWidget {
         title: localizations.adhkar,
         semanticLabel: localizations.adhkar,
         icon: Icons.volunteer_activism_rounded,
+        assetPath: 'assets/images/home/reference_ui/icon_azkar.png',
         color: const Color(0xFFCB9AE8),
       ),
       _ActionData(
@@ -57,6 +61,7 @@ class QuickActions extends StatelessWidget {
         title: localizations.tasbih,
         semanticLabel: localizations.tasbih,
         icon: Icons.fingerprint_rounded,
+        assetPath: 'assets/images/home/reference_ui/icon_tasbih.png',
         color: MuminColors.gold,
       ),
     ];
@@ -201,21 +206,37 @@ class _QuickActionTile extends StatelessWidget {
                           color: MuminColors.goldLight.withValues(alpha: 0.82),
                         ),
                       ),
-                      Icon(
-                        action.icon,
-                        size: iconSize * 0.47,
-                        color: Color.lerp(
-                          action.color,
-                          MuminColors.goldLight,
-                          0.28,
-                        ),
-                        shadows: [
-                          Shadow(
-                            color: action.color.withValues(alpha: 0.72),
-                            blurRadius: 8,
+                      if (action.assetPath != null)
+                        Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Image.asset(
+                            action.assetPath!,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Icon(
+                              action.icon,
+                              size: iconSize * 0.47,
+                              color: MuminColors.goldLight,
+                            ),
                           ),
-                        ],
-                      ),
+                        )
+                      else
+                        Icon(
+                          action.icon,
+                          size: iconSize * 0.47,
+                          color: Color.lerp(
+                            action.color,
+                            MuminColors.goldLight,
+                            0.28,
+                          ),
+                          shadows: [
+                            Shadow(
+                              color: action.color.withValues(alpha: 0.72),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -251,6 +272,7 @@ class _ActionData {
     required this.title,
     required this.semanticLabel,
     required this.icon,
+    this.assetPath,
     required this.color,
   });
 
@@ -258,5 +280,6 @@ class _ActionData {
   final String title;
   final String semanticLabel;
   final IconData icon;
+  final String? assetPath;
   final Color color;
 }
