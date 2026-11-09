@@ -6,8 +6,8 @@
         </shape>
     </item>
     <item
-        android:width="96dp"
-        android:height="96dp"
+        android:width="108dp"
+        android:height="108dp"
         android:gravity="center">
         <bitmap
             android:src="@drawable/mumin_pro_brand"
