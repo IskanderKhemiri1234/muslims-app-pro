@@ -11,6 +11,7 @@ import 'core/localization/mumin_localizations.dart';
 import 'core/localization/mumin_localizations_delegate.dart';
 import 'core/notifications/mumin_notification_preferences.dart';
 import 'core/permissions/presentation/mumin_permission_onboarding.dart';
+import 'core/updates/mumin_app_update_service.dart';
 
 import 'features/adhan/data/services/mumin_adhan_audio_handler.dart';
 import 'features/adhan/data/services/mumin_adhan_asset_playback_service.dart';
@@ -304,9 +305,100 @@ class MuminApp extends StatefulWidget {
   State<MuminApp> createState() => _MuminAppState();
 }
 
-class _MuminAppState extends State<MuminApp> {
+class _MuminAppState extends State<MuminApp>
+    with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navigatorKey =
+      GlobalKey<NavigatorState>();
+
+  DateTime? _lastUpdateCheckAt;
+  bool _isCheckingForUpdates = false;
+  bool _isUpdateDialogVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdatesIfNeeded();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForUpdatesIfNeeded();
+    }
+  }
+
+  Future<void> _checkForUpdatesIfNeeded() async {
+    // MuminApp is also constructed directly by widget tests and previews.
+    // Only the real app, with its initialized audio handler, performs
+    // background release checks.
+    if (widget.audioHandler == null ||
+        _isCheckingForUpdates ||
+        _isUpdateDialogVisible) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastCheck = _lastUpdateCheckAt;
+    if (lastCheck != null &&
+        now.difference(lastCheck) < const Duration(hours: 6)) {
+      return;
+    }
+
+    _lastUpdateCheckAt = now;
+    _isCheckingForUpdates = true;
+
+    try {
+      final update = await MuminAppUpdateService().checkForUpdate();
+      if (!mounted || !update.isUpdateAvailable) return;
+
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) return;
+
+      _isUpdateDialogVisible = true;
+      final localizations = widget.languageController.localizations;
+      final shouldDownload = await showDialog<bool>(
+        context: navigator.context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: Text(localizations.text('update_available')),
+            content: Text(
+              '${localizations.text('update_release_version')} '
+              '${update.latestVersion}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(localizations.text('update_later')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(localizations.text('update_download')),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (shouldDownload == true && mounted) {
+        await MuminAppUpdateService().downloadAndInstall(update);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: automatic update check failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _isCheckingForUpdates = false;
+      _isUpdateDialogVisible = false;
+    }
+  }
+
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.languageController.dispose();
     widget.settingsController.dispose();
     super.dispose();
@@ -460,6 +552,7 @@ Provider<MuminAdhanNotificationCoordinator>(
           final localizations = languages.localizations;
 
           return MaterialApp(
+            navigatorKey: _navigatorKey,
             title: localizations.appName,
             debugShowCheckedModeBanner: false,
             theme: MuminTheme.light,
