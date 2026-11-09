@@ -1,20 +1,31 @@
 # Mumin Pro — canonical brand image
 
-Place the final square Mumin Pro logo here:
+The only source image to replace is:
 
 `assets/branding/mumin_pro_logo.png`
 
-Requirements:
-- PNG, exactly square; 1024 × 1024 px recommended.
-- Transparent background is preferred so the logo adapts cleanly to the launcher mask and notification card.
-- Keep the main mark centered with generous safe padding (about 15% on every edge).
-- Do not include prayer names, countdown text, or other changing text in the image.
+The source file is preserved unchanged. The asset preparation script removes
+the connected magenta export canvas and writes a square transparent RGBA PNG to
+`assets/branding/processed/mumin_pro_logo.png`. That processed image is shared
+by the Android launcher, splash screen, and compact/expanded prayer notification.
 
-This is the single canonical image source. Flutter reads it through
-`MuminBrandAssets.logo`. Android copies it during the Gradle pre-build step
-to its native drawable resources for the launcher and persistent countdown
-notification. Replacing this one file updates those image surfaces on the next
-build. Android's tiny status-bar notification glyph remains a separate
-monochrome system icon, as required by Android.
+The same script removes edge-connected white/black export backgrounds from the
+five home shortcut illustrations and writes real RGBA PNG files into
+`assets/images/home/reference_ui/processed/`. The original source images remain
+untouched.
 
-Do not rename the file; replace its contents to change the brand artwork.
+Requirements for a future replacement logo:
+- Square PNG, 1024 × 1024 px or larger.
+- Put the actual Mumin Pro mark in the center.
+- Use transparent pixels outside the mark; do not include a magenta, black,
+  white, or colored export canvas.
+- Keep the lettering and crescent inside a generous launcher-safe margin.
+- Do not include prayer names or countdown text.
+
+The build pipeline runs `scripts/prepare_transparent_brand_assets.py` before
+Flutter asset bundling and verifies actual transparent pixels. Android's tiny
+status-bar glyph remains monochrome because Android requires that; the full
+color logo is displayed inside the notification panel.
+
+To replace the brand artwork in the future, replace only
+`assets/branding/mumin_pro_logo.png` and run the same preparation script.
