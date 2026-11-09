@@ -22,6 +22,7 @@ import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
 import '../../../hijri_calendar/presentation/pages/hijri_calendar_page.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 /// Main dashboard of Mumin Pro.
 ///
@@ -30,12 +31,12 @@ import '../../../hijri_calendar/presentation/pages/hijri_calendar_page.dart';
 class PrayerHomePage extends StatefulWidget {
   const PrayerHomePage({
     super.key,
-    required this.onLanguageToggle,
+    required this.onSettingsTap,
     required this.isDark,
     required this.onThemeToggle,
   });
 
-  final VoidCallback onLanguageToggle;
+  final VoidCallback onSettingsTap;
   final bool isDark;
   final VoidCallback onThemeToggle;
 
@@ -378,7 +379,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                             isLoadingLocation:
                                 snapshot.isLoadingLocation,
                             onLocationUpdate: _updateLocation,
-                            onLanguageToggle: widget.onLanguageToggle,
+                            onSettingsTap: widget.onSettingsTap,
                             onThemeToggle: widget.onThemeToggle,
                           ),
                           const SizedBox(height: 10),
@@ -799,7 +800,7 @@ class _HomeHeader extends StatelessWidget {
     required this.isDark,
     required this.isLoadingLocation,
     required this.onLocationUpdate,
-    required this.onLanguageToggle,
+    required this.onSettingsTap,
     required this.onThemeToggle,
   });
 
@@ -808,11 +809,8 @@ class _HomeHeader extends StatelessWidget {
   final bool isDark;
   final bool isLoadingLocation;
   final VoidCallback onLocationUpdate;
-  final VoidCallback onLanguageToggle;
+  final VoidCallback onSettingsTap;
   final VoidCallback onThemeToggle;
-
-  String get _languageTooltip =>
-      localizations.text('select_language');
 
   @override
   Widget build(BuildContext context) {
@@ -875,54 +873,10 @@ class _HomeHeader extends StatelessWidget {
             onPressed: onThemeToggle,
           ),
           const SizedBox(width: 6),
-          Semantics(
-            button: true,
-            label: _languageTooltip,
-            value: localizations.languageNativeName,
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: onLanguageToggle,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 46,
-                    minHeight: 36,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withValues(alpha: 0.72),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.gold.withValues(alpha: 0.42),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        localizations.languageCode.toUpperCase(),
-                        style: const TextStyle(
-                          color: AppColors.emeraldLight,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.expand_more_rounded,
-                        size: 15,
-                        color: AppColors.gold,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          _HeaderIconButton(
+            tooltip: localizations.text('settings'),
+            icon: Icons.settings_rounded,
+            onPressed: onSettingsTap,
           ),
         ],
       ),
