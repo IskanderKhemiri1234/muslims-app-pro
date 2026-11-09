@@ -256,6 +256,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
         _openPage(const TasbihPage());
         break;
 
+      case 'calendar':
+        _openPage(
+          HijriCalendarPage(
+            localizations: _localizations,
+          ),
+        );
+        break;
+
       default:
         _showMessage(_localizations.comingSoon);
     }
@@ -419,14 +427,20 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           ),
                           const SizedBox(height: 16),
                           RepaintBoundary(
-  child: PrayerScheduleSection(
-    schedule: snapshot.schedule!,
-    nextPrayer: snapshot.nextPrayer,
-    prayerName: _prayerName,
-    formatTime: _formatTime,
-  ),
-),
-                        
+                            child: PrayerScheduleSection(
+                              schedule: snapshot.schedule!,
+                              nextPrayer: snapshot.nextPrayer,
+                              prayerName: _prayerName,
+                              formatTime: _formatTime,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          _DailyEssentialsSection(
+                            title: localizations.dailyEssentials,
+                            localizations: localizations,
+                            onAction: _handleQuickAction,
+                          ),
+
                           if (snapshot.message != null &&
                               snapshot.message!.trim().isNotEmpty) ...[
                             const SizedBox(height: 13),
@@ -655,6 +669,165 @@ class _MuminQuranShowcase extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A second layer of useful, working destinations below the prayer list.
+class _DailyEssentialsSection extends StatelessWidget {
+  const _DailyEssentialsSection({
+    required this.title,
+    required this.localizations,
+    required this.onAction,
+  });
+
+  final String title;
+  final MuminLocalizations localizations;
+  final ValueChanged<String> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final items = <({String id, String label, IconData icon, Color color})>[
+      (
+        id: 'quran',
+        label: localizations.quran,
+        icon: Icons.menu_book_rounded,
+        color: const Color(0xFFD8B66A),
+      ),
+      (
+        id: 'adhkar',
+        label: localizations.adhkar,
+        icon: Icons.volunteer_activism_rounded,
+        color: const Color(0xFF72C9A5),
+      ),
+      (
+        id: 'tasbih',
+        label: localizations.tasbih,
+        icon: Icons.fingerprint_rounded,
+        color: const Color(0xFFB99BE8),
+      ),
+      (
+        id: 'calendar',
+        label: localizations.calendar,
+        icon: Icons.calendar_month_rounded,
+        color: const Color(0xFF8DB8F1),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppColors.gold,
+              size: 21,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final tileWidth = (constraints.maxWidth - 10) / 2;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final item in items)
+                  SizedBox(
+                    width: tileWidth,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      child: InkWell(
+                        onTap: () => onAction(item.id),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Ink(
+                          height: 112,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: LinearGradient(
+                              begin: AlignmentDirectional.topStart,
+                              end: AlignmentDirectional.bottomEnd,
+                              colors: [
+                                item.color.withValues(alpha: 0.13),
+                                theme.colorScheme.surface.withValues(
+                                  alpha: 0.78,
+                                ),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: 0.22),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                width: 39,
+                                height: 39,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: item.color.withValues(alpha: 0.13),
+                                  border: Border.all(
+                                    color: item.color.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: Icon(
+                                  item.icon,
+                                  color: item.color,
+                                  size: 21,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onSurface,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Directionality.of(context) ==
+                                            TextDirection.rtl
+                                        ? Icons.arrow_back_ios_rounded
+                                        : Icons.arrow_forward_ios_rounded,
+                                    size: 13,
+                                    color: AppColors.gold,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
