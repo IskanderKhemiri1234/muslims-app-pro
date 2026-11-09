@@ -150,7 +150,7 @@ final class MuminLocalizations {
       'app_updates': 'تحديث التطبيق',
       'update_channel_setup_required': 'سيتم تفعيل فحص وتثبيت تحديثات APK بعد تثبيت توقيع إصدار دائم.',
       'update_setup_pending': 'قيد الإعداد',
-      'update_signature_note': 'حتى يُثبّت التحديث فوق النسخة الحالية دون حذفها، يجب أن يحمل كل إصدار توقيع الإصدار الأصلي نفسه.'
+      'update_signature_note': 'حتى يُثبّت التحديث فوق النسخة الحالية دون حذفها، يجب أن يحمل كل إصدار توقيع الإصدار الأصلي نفسه.',
 
       'coming_soon': 'هذه الميزة ستتوفر قريباً',
       'let_prayer_illuminate_your_day': 'صلاتك نور يومك',
@@ -459,7 +459,7 @@ final class MuminLocalizations {
       'app_updates': 'App updates',
       'update_channel_setup_required': 'APK update checks and installation will be enabled after a permanent release signature is configured.',
       'update_setup_pending': 'Setup pending',
-      'update_signature_note': 'To install updates over the current app without uninstalling, every release must use the same signing certificate as the installed version.'
+      'update_signature_note': 'To install updates over the current app without uninstalling, every release must use the same signing certificate as the installed version.',
       'today_label': 'Today',
       'next_prayer_eyebrow': 'Up next',
       'time_remaining': 'Time remaining',
@@ -784,7 +784,7 @@ final class MuminLocalizations {
       'app_updates': 'Mise à jour de l’application',
       'update_channel_setup_required': 'La vérification et l’installation des APK seront activées après la configuration d’une signature de version permanente.',
       'update_setup_pending': 'Configuration en attente',
-      'update_signature_note': 'Pour installer une mise à jour sans désinstaller l’application, chaque version doit utiliser le même certificat de signature que la version installée.'
+      'update_signature_note': 'Pour installer une mise à jour sans désinstaller l’application, chaque version doit utiliser le même certificat de signature que la version installée.',
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
       'let_prayer_illuminate_your_day':
