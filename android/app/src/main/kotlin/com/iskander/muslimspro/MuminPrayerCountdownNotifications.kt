@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -233,6 +234,12 @@ object MuminPrayerCountdownNotifications {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // RemoteViews Chronometer expects elapsedRealtime, not epoch time.
+            // Convert the prayer's wall-clock timestamp to a monotonic base.
+            val remainingMillis = (targetTime - System.currentTimeMillis())
+                .coerceAtLeast(0L)
+            val chronometerBase = SystemClock.elapsedRealtime() + remainingMillis
+
             val compactView = RemoteViews(
                 context.packageName,
                 R.layout.mumin_prayer_countdown_collapsed
@@ -245,7 +252,7 @@ object MuminPrayerCountdownNotifications {
                 setTextViewText(R.id.mumin_countdown_prayer, prayerName)
                 setChronometer(
                     R.id.mumin_countdown_timer,
-                    targetTime,
+                    chronometerBase,
                     null,
                     true
                 )
@@ -271,7 +278,7 @@ object MuminPrayerCountdownNotifications {
                 )
                 setChronometer(
                     R.id.mumin_countdown_timer,
-                    targetTime,
+                    chronometerBase,
                     null,
                     true
                 )
