@@ -71,27 +71,34 @@ class QuickActions extends StatelessWidget {
     final actions = _buildActions(localizations);
 
     return SizedBox(
-      height: 116,
+      height: 132,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final tileWidth = constraints.maxWidth / actions.length;
-          final iconSize = (tileWidth - 8).clamp(46.0, 58.0).toDouble();
+          final tileWidth = constraints.maxWidth < 340 ? 76.0 : 84.0;
+          final iconSize = (tileWidth - 20).clamp(54.0, 64.0).toDouble();
 
-          return Row(
-            children: [
-              for (final action in actions)
-                SizedBox(
-                  width: tileWidth,
-                  child: _QuickActionTile(
-                    action: action,
-                    iconSize: iconSize,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      onAction(action.id);
-                    },
-                  ),
-                ),
-            ],
+          return Scrollbar(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.none,
+              child: Row(
+                children: [
+                  for (final action in actions)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _QuickActionTile(
+                        action: action,
+                        iconSize: iconSize,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onAction(action.id);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -123,11 +130,11 @@ class _QuickActionTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(22),
           splashColor: action.color.withValues(alpha: 0.16),
           highlightColor: action.color.withValues(alpha: 0.07),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -151,13 +158,13 @@ class _QuickActionTile extends StatelessWidget {
                       stops: const [0, 0.58, 1],
                     ),
                     border: Border.all(
-                      color: MuminColors.goldLight.withValues(alpha: 0.68),
-                      width: 1.25,
+                      color: MuminColors.goldLight.withValues(alpha: 0.76),
+                      width: 1.35,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: action.color.withValues(alpha: 0.20),
-                        blurRadius: 12,
+                        blurRadius: 16,
                         spreadRadius: 0.5,
                       ),
                       BoxShadow(
@@ -223,7 +230,7 @@ class _QuickActionTile extends StatelessWidget {
                     textDirection: Directionality.of(context),
                     style: TextStyle(
                       color: foreground,
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       height: 1.12,
                     ),
