@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/services.dart';
 
 class MuminAppUpdateInfo {
   const MuminAppUpdateInfo({
@@ -18,13 +18,22 @@ class MuminAppUpdateInfo {
 }
 
 class MuminAppUpdateService {
+  static const MethodChannel _appInfoChannel = MethodChannel(
+    'com.iskander.muslimspro/app_info',
+  );
+
   static final Uri _latestReleaseUri = Uri.https(
     'api.github.com',
     '/repos/IskanderKhemiri1234/muslims-app-pro/releases/latest',
   );
 
   Future<MuminAppUpdateInfo> checkForUpdate() async {
-    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = await _appInfoChannel.invokeMethod<String>(
+      'getAppVersion',
+    );
+    if (currentVersion == null || currentVersion.trim().isEmpty) {
+      throw StateError('Unable to read the installed app version.');
+    }
     final response = await http
         .get(
           _latestReleaseUri,
@@ -80,7 +89,6 @@ class MuminAppUpdateService {
       );
     }
 
-    final currentVersion = packageInfo.version;
     return MuminAppUpdateInfo(
       currentVersion: currentVersion,
       latestVersion: latestVersion,
