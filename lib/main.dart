@@ -20,6 +20,7 @@ import 'features/adhan/data/services/mumin_adhan_recording_playback_service.dart
 import 'features/adhan/data/services/mumin_adhan_notification_coordinator.dart';
 
 import 'features/home/presentation/pages/home_page.dart';
+import 'features/settings/presentation/pages/settings_page.dart';
 import 'features/prayer_times/presentation/controllers/prayer_controller.dart';
 
 /// Initialized only by the real application entry point.
@@ -495,10 +496,19 @@ home: Builder(
   builder: (homeContext) {
     return MuminPermissionOnboarding(
       child: PrayerHomePage(
-        onLanguageToggle: () {
-          _showLanguagePicker(
-            homeContext,
-            languages,
+        onSettingsTap: () {
+          Navigator.of(homeContext).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => SettingsPage(
+                localizations: languages.localizations,
+                onLanguageTap: () {
+                  _showLanguagePicker(
+                    homeContext,
+                    languages,
+                  );
+                },
+              ),
+            ),
           );
         },
         isDark: settings.isDark,
