@@ -241,6 +241,9 @@ class MainActivity : AudioServiceActivity() {
                                     "Missing prayer name at index $index."
                                 )
 
+                            val englishName = rawMap["englishName"] as? String
+                                ?: prayer
+
                             val timeMillis = (rawMap["timeMillis"] as? Number)
                                 ?.toLong()
                                 ?: throw IllegalArgumentException(
@@ -250,6 +253,7 @@ class MainActivity : AudioServiceActivity() {
                             mapOf<String, Any>(
                                 "prayer" to prayer,
                                 "name" to name,
+                                "englishName" to englishName,
                                 "timeMillis" to timeMillis
                             )
                         }
