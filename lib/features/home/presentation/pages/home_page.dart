@@ -488,7 +488,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           const SizedBox(height: 10),
                           RepaintBoundary(
                             child: SizedBox(
-                              height: 210,
+                              height: 238,
                               child: PrayerHeroCard(
                               controller:
                                   context.read<PrayerController>(),
@@ -505,14 +505,14 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 20),
                           RepaintBoundary(
                             child: QuickActions(
                               onAction: _handleQuickAction,
                             ),
                           ),
         
-                          const SizedBox(height: 15),
+                          const SizedBox(height: 24),
                           RepaintBoundary(
                             child: _MuminQuranShowcase(
                               title: localizations.appName,
@@ -716,11 +716,11 @@ class _MuminQuranShowcase extends StatelessWidget {
               Positioned.fill(
                 child: IgnorePointer(
                   child: Opacity(
-                    opacity: 0.72,
+                    opacity: 0.94,
                     child: Image.asset(
                       'assets/images/home/mumin_reference_mosque.webp',
                       fit: BoxFit.cover,
-                      alignment: Alignment.centerRight,
+                      alignment: Alignment.center,
                       filterQuality: FilterQuality.high,
                     ),
                   ),
@@ -838,7 +838,7 @@ class _MuminQuranShowcase extends StatelessWidget {
                             angle: -0.12,
                             child: Icon(
                               Icons.menu_book_rounded,
-                              size: 82,
+                              size: 90,
                               color: AppColors.goldLight,
                               shadows: [
                                 Shadow(
@@ -1253,8 +1253,8 @@ class _HomeBottomNavigation extends StatelessWidget {
       (label: localizations.text('home_tab'), icon: Icons.home_rounded),
       (label: localizations.text('prayer_tab'), icon: Icons.mosque_rounded),
       (label: localizations.text('discover_tab'), icon: Icons.explore_rounded),
-      (label: localizations.quran, icon: Icons.menu_book_rounded),
-      (label: localizations.settings, icon: Icons.person_rounded),
+      (label: localizations.text('messages_tab'), icon: Icons.chat_bubble_outline_rounded),
+      (label: localizations.text('profile_tab'), icon: Icons.person_outline_rounded),
     ];
 
     return DecoratedBox(
