@@ -8,14 +8,13 @@ for each source image, then writes real RGBA PNG assets for Flutter and Android.
 from __future__ import annotations
 
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUTS = {
     "assets/branding/mumin_pro_logo.png": {
         "output": "assets/branding/processed/mumin_pro_logo.png",
         "backgrounds": [((255, 0, 255), 105)],
-        "seeds": "all",
         "crop_square": True,
     },
     "assets/images/home/reference_ui/icon_qibla.png": {
@@ -60,7 +59,6 @@ def color_distance(pixel, color):
 
 def remove_edge_background(image: Image.Image, backgrounds):
     image = image.convert("RGBA")
-    draw = ImageDraw.Draw(image)
     seeds = border_seeds(*image.size)
 
     for background, threshold in backgrounds:
