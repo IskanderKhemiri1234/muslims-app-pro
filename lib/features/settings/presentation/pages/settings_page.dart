@@ -226,7 +226,7 @@ class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
           );
         }
       }
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
