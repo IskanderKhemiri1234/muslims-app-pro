@@ -689,7 +689,17 @@ class _QuranPageState extends State<QuranPage>
         });
 
         _showMessage(
-          'تم حفظ الآية ${selection.aya} من سورة ${selection.suraName}',
+          QuranPageLocalization.text(
+            context,
+            'quran_ayah_saved',
+            parameters: <String, Object?>{
+              'ayah': selection.aya,
+              'surah': QuranPageLocalization.surahName(
+                context,
+                selection.sura,
+              ),
+            },
+          ),
         );
       });
     } catch (_) {
