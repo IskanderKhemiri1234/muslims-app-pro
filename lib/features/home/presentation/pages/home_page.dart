@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:adhan/adhan.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -220,7 +221,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     if (!mounted) return;
 
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+      CupertinoPageRoute<void>(
         builder: (routeContext) => page,
       ),
     );
