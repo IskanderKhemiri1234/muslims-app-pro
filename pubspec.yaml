@@ -3,7 +3,7 @@ name: muslims_app
 description: A global Muslim companion app built with Flutter.
 publish_to: 'none'
 
-version: 1.1.4+6
+version: 1.1.5+7
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
