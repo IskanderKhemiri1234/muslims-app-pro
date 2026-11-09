@@ -164,42 +164,15 @@ class _HeroSurface extends StatelessWidget {
               ),
             ),
             PositionedDirectional(
-              end: 10,
-              top: 24,
-              bottom: 36,
+              end: 0,
+              top: 0,
+              bottom: 0,
               child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0.22,
-                  child: SizedBox(
-                    width: 124,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Icon(
-                            Icons.mosque_rounded,
-                            size: 106,
-                            color: AppColors.goldLight,
-                            shadows: [
-                              Shadow(
-                                color: AppColors.gold.withValues(alpha: 0.8),
-                                blurRadius: 18,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Positioned(
-                          top: 0,
-                          right: 24,
-                          child: Icon(
-                            Icons.nightlight_round,
-                            size: 31,
-                            color: AppColors.goldLight,
-                          ),
-                        ),
-                      ],
-                    ),
+                child: SizedBox(
+                  width: 190,
+                  child: CustomPaint(
+                    painter: const _HeroMosquePainter(),
+                    child: const SizedBox.expand(),
                   ),
                 ),
               ),
@@ -357,6 +330,162 @@ class _HeroSurface extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A bespoke mosque skyline with a luminous mihrab arch, domes,
+/// minarets and crescent. It keeps the hero independent of remote images.
+class _HeroMosquePainter extends CustomPainter {
+  const _HeroMosquePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gold = AppColors.goldLight;
+    final base = Paint()..color = const Color(0xFF022A21).withValues(alpha: 0.66);
+    final silhouette = Paint()..color = const Color(0xFF032B22).withValues(alpha: 0.82);
+    final glow = Paint()
+      ..color = gold.withValues(alpha: 0.24)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 13);
+    final outline = Paint()
+      ..color = gold.withValues(alpha: 0.58)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.15;
+    final window = Paint()..color = gold.withValues(alpha: 0.74);
+
+    final arch = Path()
+      ..moveTo(size.width * 0.06, size.height * 0.83)
+      ..lineTo(size.width * 0.06, size.height * 0.43)
+      ..cubicTo(size.width * 0.08, size.height * 0.23,
+          size.width * 0.29, size.height * 0.18,
+          size.width * 0.50, size.height * 0.02)
+      ..cubicTo(size.width * 0.71, size.height * 0.18,
+          size.width * 0.92, size.height * 0.23,
+          size.width * 0.94, size.height * 0.43)
+      ..lineTo(size.width * 0.94, size.height * 0.83)
+      ..close();
+    canvas.drawPath(arch, glow);
+    canvas.drawPath(arch, outline);
+
+    final skyline = Path()
+      ..moveTo(0, size.height * 0.84)
+      ..lineTo(0, size.height * 0.72)
+      ..lineTo(size.width * 0.12, size.height * 0.72)
+      ..lineTo(size.width * 0.12, size.height * 0.62)
+      ..lineTo(size.width * 0.18, size.height * 0.62)
+      ..lineTo(size.width * 0.18, size.height * 0.72)
+      ..lineTo(size.width * 0.27, size.height * 0.72)
+      ..lineTo(size.width * 0.27, size.height * 0.58)
+      ..lineTo(size.width * 0.33, size.height * 0.58)
+      ..lineTo(size.width * 0.33, size.height * 0.72)
+      ..lineTo(size.width * 0.40, size.height * 0.72)
+      ..lineTo(size.width * 0.40, size.height * 0.55)
+      ..quadraticBezierTo(size.width * 0.50, size.height * 0.35,
+          size.width * 0.60, size.height * 0.55)
+      ..lineTo(size.width * 0.60, size.height * 0.72)
+      ..lineTo(size.width * 0.70, size.height * 0.72)
+      ..lineTo(size.width * 0.70, size.height * 0.58)
+      ..lineTo(size.width * 0.76, size.height * 0.58)
+      ..lineTo(size.width * 0.76, size.height * 0.72)
+      ..lineTo(size.width * 0.86, size.height * 0.72)
+      ..lineTo(size.width * 0.86, size.height * 0.62)
+      ..lineTo(size.width * 0.92, size.height * 0.62)
+      ..lineTo(size.width * 0.92, size.height * 0.72)
+      ..lineTo(size.width, size.height * 0.72)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(skyline, base);
+
+    void drawMinaret(double x, double top, double width) {
+      final rect = Rect.fromLTWH(
+        x - width / 2, top, width, size.height * 0.84 - top,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(width * 0.18)),
+        silhouette,
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(x - width * 0.72, top + size.height * 0.19,
+            width * 1.44, 3),
+        outline,
+      );
+      final spire = Path()
+        ..moveTo(x - width * 0.52, top)
+        ..lineTo(x, top - size.height * 0.12)
+        ..lineTo(x + width * 0.52, top)
+        ..close();
+      canvas.drawPath(spire, Paint()..color = gold.withValues(alpha: 0.68));
+      for (var k = 0; k < 3; k++) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(x, top + size.height * (0.27 + k * 0.13)),
+              width: width * 0.24,
+              height: size.height * 0.055,
+            ),
+            const Radius.circular(3),
+          ),
+          window,
+        );
+      }
+    }
+
+    drawMinaret(size.width * 0.18, size.height * 0.31, 10);
+    drawMinaret(size.width * 0.82, size.height * 0.31, 10);
+
+    final domeRect = Rect.fromCenter(
+      center: Offset(size.width * 0.50, size.height * 0.59),
+      width: size.width * 0.34,
+      height: size.height * 0.28,
+    );
+    canvas.drawOval(domeRect, glow);
+    canvas.drawOval(domeRect, Paint()..color = const Color(0xFF075B4A));
+    canvas.drawOval(domeRect, outline);
+    canvas.drawRect(
+      Rect.fromLTWH(size.width * 0.33, size.height * 0.59,
+          size.width * 0.34, size.height * 0.25),
+      silhouette,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.5, size.height * 0.42),
+      Offset(size.width * 0.5, size.height * 0.34),
+      outline,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.32),
+      2.5,
+      window,
+    );
+
+    for (final x in [0.39, 0.50, 0.61]) {
+      final rect = Rect.fromCenter(
+        center: Offset(size.width * x, size.height * 0.74),
+        width: size.width * 0.045,
+        height: size.height * 0.13,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.025)),
+        window,
+      );
+    }
+
+    final crescentCenter = Offset(size.width * 0.50, size.height * 0.20);
+    canvas.drawCircle(crescentCenter, 12, glow);
+    canvas.drawCircle(crescentCenter, 9, Paint()..color = gold);
+    canvas.drawCircle(
+      crescentCenter.translate(5, -3),
+      8,
+      Paint()..color = const Color(0xFF087B5C),
+    );
+
+    for (var i = 0; i < 8; i++) {
+      final x = size.width * (0.12 + (i * 0.105));
+      final y = size.height * (0.16 + ((i % 3) * 0.075));
+      canvas.drawCircle(Offset(x, y), i.isEven ? 1.3 : 0.8, window);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroMosquePainter oldDelegate) => false;
 }
 
 /// Lightweight decorative background painted without image assets.
