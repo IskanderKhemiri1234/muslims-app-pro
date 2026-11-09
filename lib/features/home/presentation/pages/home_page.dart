@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:adhan/adhan.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/localization/mumin_language_registry.dart';
@@ -206,7 +207,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     if (!mounted) return;
 
     try {
-      await context.read<PrayerController>().updateLocation();
+      await context.read<PrayerController>().updateLocation(
+        languageCode: _localizations.languageCode,
+      );
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: location update failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -309,6 +312,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
             schedule: controller.globalSchedule,
             nextPrayer: controller.nextPrayer,
             city: controller.city,
+            placeName: controller.placeName,
+            region: controller.region,
+            country: controller.country,
             isLoadingLocation: controller.isLoadingLocation,
             message: controller.message,
           );
@@ -383,6 +389,9 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           _HomeHeader(
                             localizations: localizations,
                             city: snapshot.city,
+                            placeName: snapshot.placeName,
+                            region: snapshot.region,
+                            country: snapshot.country,
                             isDark: widget.isDark,
                             isLoadingLocation:
                                 snapshot.isLoadingLocation,
@@ -843,6 +852,9 @@ class _HomeSnapshot {
     required this.schedule,
     required this.nextPrayer,
     required this.city,
+    required this.placeName,
+    required this.region,
+    required this.country,
     required this.isLoadingLocation,
     required this.message,
   });
@@ -850,6 +862,9 @@ class _HomeSnapshot {
   final GlobalPrayerSchedule? schedule;
   final Prayer? nextPrayer;
   final String city;
+  final String placeName;
+  final String region;
+  final String country;
   final bool isLoadingLocation;
   final String? message;
 
@@ -859,6 +874,9 @@ class _HomeSnapshot {
         identical(schedule, other.schedule) &&
         nextPrayer == other.nextPrayer &&
         city == other.city &&
+        placeName == other.placeName &&
+        region == other.region &&
+        country == other.country &&
         isLoadingLocation == other.isLoadingLocation &&
         message == other.message;
   }
@@ -869,6 +887,9 @@ class _HomeSnapshot {
       identityHashCode(schedule),
       nextPrayer,
       city,
+      placeName,
+      region,
+      country,
       isLoadingLocation,
       message,
     );
@@ -970,6 +991,9 @@ class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
     required this.localizations,
     required this.city,
+    required this.placeName,
+    required this.region,
+    required this.country,
     required this.isDark,
     required this.isLoadingLocation,
     required this.onLocationUpdate,
@@ -979,6 +1003,9 @@ class _HomeHeader extends StatelessWidget {
 
   final MuminLocalizations localizations;
   final String city;
+  final String placeName;
+  final String region;
+  final String country;
   final bool isDark;
   final bool isLoadingLocation;
   final VoidCallback onLocationUpdate;
@@ -990,52 +1017,28 @@ class _HomeHeader extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return SizedBox(
-      height: 40,
+      height: 50,
       child: Row(
         children: [
-          Tooltip(
-            message: isLoadingLocation
+          _LocationRefreshButton(
+            tooltip: isLoadingLocation
                 ? localizations.updatingLocation
                 : localizations.updateLocation,
-            child: InkWell(
-              onTap: isLoadingLocation ? null : onLocationUpdate,
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 32,
-                height: 36,
-                child: Center(
-                  child: isLoadingLocation
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.gold,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.location_on_rounded,
-                          color: AppColors.gold,
-                          size: 19,
-                        ),
-                ),
-              ),
-            ),
+            isLoading: isLoadingLocation,
+            onPressed: onLocationUpdate,
           ),
-          const SizedBox(width: 3),
+          const SizedBox(width: 7),
           Expanded(
-            child: Text(
-              city,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
+            child: _LocationNameSwitcher(
+              city: city,
+              placeName: placeName,
+              region: region,
+              country: country,
+              color: colorScheme.onSurface,
+              secondaryColor: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           _HeaderIconButton(
             tooltip: isDark
                 ? localizations.lightMode
@@ -1052,6 +1055,241 @@ class _HomeHeader extends StatelessWidget {
             onPressed: onSettingsTap,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LocationRefreshButton extends StatefulWidget {
+  const _LocationRefreshButton({
+    required this.tooltip,
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  @override
+  State<_LocationRefreshButton> createState() =>
+      _LocationRefreshButtonState();
+}
+
+class _LocationRefreshButtonState extends State<_LocationRefreshButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1450),
+    );
+    if (widget.isLoading) _rotationController.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocationRefreshButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading && !oldWidget.isLoading) {
+      _rotationController.repeat();
+    } else if (!widget.isLoading && oldWidget.isLoading) {
+      _rotationController
+        ..stop()
+        ..reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: Material(
+        color: AppColors.emerald.withValues(alpha: 0.16),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: widget.isLoading
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  widget.onPressed();
+                },
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.gold.withValues(alpha: 0.48),
+                width: 1.1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.gold.withValues(alpha: 0.10),
+                  blurRadius: 13,
+                  spreadRadius: 0.5,
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: widget.isLoading && !reduceMotion
+                ? RotationTransition(
+                    turns: _rotationController,
+                    child: const Icon(
+                      Icons.sync_rounded,
+                      color: AppColors.gold,
+                      size: 25,
+                    ),
+                  )
+                : Icon(
+                    widget.isLoading
+                        ? Icons.hourglass_top_rounded
+                        : Icons.my_location_rounded,
+                    color: AppColors.gold,
+                    size: 25,
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationNameSwitcher extends StatefulWidget {
+  const _LocationNameSwitcher({
+    required this.city,
+    required this.placeName,
+    required this.region,
+    required this.country,
+    required this.color,
+    required this.secondaryColor,
+  });
+
+  final String city;
+  final String placeName;
+  final String region;
+  final String country;
+  final Color color;
+  final Color secondaryColor;
+
+  @override
+  State<_LocationNameSwitcher> createState() =>
+      _LocationNameSwitcherState();
+}
+
+class _LocationNameSwitcherState extends State<_LocationNameSwitcher> {
+  Timer? _cycleTimer;
+  bool _showCity = true;
+
+  bool get _hasPlaceName =>
+      widget.placeName.trim().isNotEmpty &&
+      widget.placeName.trim() != widget.city.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _startCycle();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocationNameSwitcher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.city != widget.city ||
+        oldWidget.placeName != widget.placeName) {
+      _showCity = true;
+      _startCycle();
+    }
+  }
+
+  void _startCycle() {
+    _cycleTimer?.cancel();
+    _cycleTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) {
+        if (!mounted || !_hasPlaceName) return;
+        setState(() => _showCity = !_showCity);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _cycleTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showCity = _showCity || !_hasPlaceName;
+    final primary = showCity ? widget.city : widget.placeName;
+    final secondary = showCity
+        ? <String>[widget.region, widget.country]
+            .where((value) => value.trim().isNotEmpty)
+            .join(' · ')
+        : widget.city;
+
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 480),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0, 0.22),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: slide,
+              child: child,
+            ),
+          );
+        },
+        child: Column(
+          key: ValueKey<bool>(showCity),
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              primary.isEmpty ? widget.city : primary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: widget.color,
+                fontSize: showCity ? 15.5 : 12.5,
+                fontWeight: showCity ? FontWeight.w800 : FontWeight.w700,
+                height: 1.05,
+              ),
+            ),
+            if (secondary.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                secondary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: widget.secondaryColor,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1082,12 +1320,12 @@ class _HeaderIconButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             child: Icon(
               icon,
               color: AppColors.gold,
-              size: 21,
+              size: 22,
             ),
           ),
         ),
