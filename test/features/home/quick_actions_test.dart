@@ -33,9 +33,14 @@ void main() {
       for (final actionId in actionIds) {
         final tile = find.byKey(ValueKey<String>(actionId));
         expect(tile, findsOneWidget, reason: 'Missing action: $actionId');
+        final hitTarget = find.descendant(
+          of: tile,
+          matching: find.byType(InkWell),
+        );
+        expect(hitTarget, findsOneWidget);
 
         final gesture = await tester.startGesture(
-          tester.getCenter(tile),
+          tester.getCenter(hitTarget),
         );
         await gesture.moveBy(const Offset(4, 2));
         await gesture.up();
