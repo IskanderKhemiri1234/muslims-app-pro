@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mumin-pro-signing-bootstrap
@@ -12,36 +12,21 @@ concurrency:
 
 jobs:
   create-signing-key:
-    name: Create encrypted Android release signing bundle
+    name: Create temporary Android release signing file
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Verify bootstrap encryption secret
+      - name: Create a unique Android release keystore and plain-text secrets file
         env:
-          BOOTSTRAP_BUNDLE_PASSWORD: ${{ secrets.BOOTSTRAP_BUNDLE_PASSWORD }}
-        shell: bash
-        run: |
-          if [ -z "${BOOTSTRAP_BUNDLE_PASSWORD:-}" ]; then
-            echo "::error::BOOTSTRAP_BUNDLE_PASSWORD is missing. Add it in repository Actions secrets, then run this workflow again."
-            exit 1
-          fi
-          if [ "${#BOOTSTRAP_BUNDLE_PASSWORD}" -lt 24 ]; then
-            echo "::error::BOOTSTRAP_BUNDLE_PASSWORD must contain at least 24 characters."
-            exit 1
-          fi
-
-      - name: Create a unique Android release keystore and encrypted archive
-        env:
-          BOOTSTRAP_BUNDLE_PASSWORD: ${{ secrets.BOOTSTRAP_BUNDLE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           umask 077
 
           KEYSTORE_PATH="$RUNNER_TEMP/mumin-pro-release.jks"
-          SECRETS_PATH="$RUNNER_TEMP/mumin-pro-signing-secrets.txt"
-          ARCHIVE_PATH="$RUNNER_TEMP/mumin-pro-signing-bootstrap.7z"
+          SECRETS_PATH="$RUNNER_TEMP/Mumin-Pro-Signing-Secrets.txt"
 
           STORE_PASSWORD="$(openssl rand -hex 32)"
           KEY_PASSWORD="$(openssl rand -hex 32)"
@@ -67,26 +52,22 @@ jobs:
             printf '%s\n' "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
           } > "$SECRETS_PATH"
 
-          sudo apt-get update
-          sudo apt-get install --yes 7zip
+          test -s "$SECRETS_PATH"
+          TAG="mumin-pro-signing-bootstrap-$GITHUB_RUN_ID"
 
-          7z a -t7z -mhe=on "-p${BOOTSTRAP_BUNDLE_PASSWORD}" "$ARCHIVE_PATH" "$SECRETS_PATH"
+          gh release create "$TAG" "$SECRETS_PATH#Mumin-Pro-Signing-Secrets.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Temporary Mumin Pro signing secrets" \
+            --notes "PRIVATE TEMPORARY SIGNING MATERIAL. Download only for adding the four Android signing values to repository Actions secrets. Delete this release immediately after saving them. Do not share this file." \
+            --prerelease \
+            --target "$GITHUB_SHA"
 
-          test -s "$ARCHIVE_PATH"
-          echo "Encrypted signing archive created successfully."
-          echo "The archive is encrypted with AES-256 and its file names are encrypted."
+          echo "Temporary plain-text signing file published as a private release asset."
+          echo "Do not print or share its contents."
 
-      - name: Upload encrypted signing archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mumin-Pro-Signing-Bootstrap-Encrypted
-          path: ${{ runner.temp }}/mumin-pro-signing-bootstrap.7z
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Remove temporary plaintext key material
+      - name: Remove temporary plaintext key material from runner
         if: always()
         shell: bash
         run: |
           rm -f "$RUNNER_TEMP/mumin-pro-release.jks"
-          rm -f "$RUNNER_TEMP/mumin-pro-signing-secrets.txt"
+          rm -f "$RUNNER_TEMP/Mumin-Pro-Signing-Secrets.txt"
