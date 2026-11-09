@@ -118,40 +118,11 @@ class _QuickActionsState extends State<QuickActions>
   ) {
     return <_ActionData>[
       _ActionData(
-        id: 'qibla',
-        title: localizations.qibla,
-        semanticLabel: localizations.qibla,
-        icon: Icons.explore_rounded,
-        color: const Color(0xFF58C9A1),
-      ),
-      _ActionData(
         id: 'quran',
         title: localizations.quran,
         semanticLabel: localizations.quran,
         icon: Icons.menu_book_rounded,
         color: MuminColors.goldLight,
-      ),
-      _ActionData(
-        id: 'mosques',
-        title: localizations.domainText(
-          'nearby_mosques_title',
-        ),
-        semanticLabel: localizations.domainText(
-          'nearby_mosques_title',
-        ),
-        icon: Icons.mosque_rounded,
-        color: MuminColors.gold,
-      ),
-      _ActionData(
-        id: 'adhan',
-        title: localizations.text(
-          'permission_notifications_title',
-        ),
-        semanticLabel: localizations.text(
-          'permission_notifications_title',
-        ),
-        icon: Icons.notifications_active_rounded,
-        color: const Color(0xFF8DB8F1),
       ),
       _ActionData(
         id: 'adhkar',
@@ -161,14 +132,27 @@ class _QuickActionsState extends State<QuickActions>
         color: const Color(0xFFCB9AE8),
       ),
       _ActionData(
+        id: 'mosques',
+        title: localizations.domainText('nearby_mosques_title'),
+        semanticLabel: localizations.domainText('nearby_mosques_title'),
+        icon: Icons.mosque_rounded,
+        color: MuminColors.gold,
+      ),
+      _ActionData(
+        id: 'qibla',
+        title: localizations.qibla,
+        semanticLabel: localizations.qibla,
+        icon: Icons.explore_rounded,
+        color: const Color(0xFF58C9A1),
+      ),
+      _ActionData(
         id: 'tasbih',
         title: localizations.tasbih,
         semanticLabel: localizations.tasbih,
         icon: Icons.fingerprint_rounded,
         color: MuminColors.gold,
       ),
-    ];
-  }
+    ];  }
 
   Widget _buildActionSet(
     List<_ActionData> actions, {
