@@ -16,7 +16,7 @@ on:
       - ".github/workflows/**"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-${{ github.ref }}
@@ -171,6 +171,26 @@ jobs:
           fi
 
           "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+
+
+      - name: Publish versioned APK release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          VERSION="$(sed -n 's/^version: //p' pubspec.yaml | cut -d+ -f1)"
+          TAG="v${VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_PATH" --clobber
+          else
+            gh release create "$TAG" "$APK_PATH" \
+              --title "Mumin Pro $VERSION" \
+              --notes "Mumin Pro Android APK release. Install over the existing app; do not uninstall first." \
+              --latest
+          fi
 
       - name: Remove temporary release keystore
         if: always()
