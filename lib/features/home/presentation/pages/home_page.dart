@@ -561,112 +561,6 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   }
 }
 
-class _QuranShowcasePainter extends CustomPainter {
-  const _QuranShowcasePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gold = Paint()
-      ..color = AppColors.goldLight.withValues(alpha: 0.42)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final softGold = Paint()
-      ..color = AppColors.gold.withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-    final page = Paint()..color = const Color(0xFFF0D99E);
-    final stand = Paint()..color = const Color(0xFF8D642D);
-
-    final center = Offset(size.width * 0.79, size.height * 0.52);
-    canvas.drawCircle(center, size.height * 0.48, softGold);
-    final arch = Path()
-      ..moveTo(size.width * 0.55, size.height)
-      ..lineTo(size.width * 0.55, size.height * 0.38)
-      ..cubicTo(size.width * 0.56, size.height * 0.08,
-          size.width * 0.95, size.height * 0.08,
-          size.width * 0.98, size.height * 0.38)
-      ..lineTo(size.width * 0.98, size.height)
-      ..close();
-    canvas.drawPath(arch, gold);
-
-    // Open Qur'an with a gold-edged cover and luminous pages.
-    final leftPage = Path()
-      ..moveTo(size.width * 0.67, size.height * 0.47)
-      ..quadraticBezierTo(size.width * 0.77, size.height * 0.39,
-          size.width * 0.82, size.height * 0.51)
-      ..lineTo(size.width * 0.82, size.height * 0.77)
-      ..quadraticBezierTo(size.width * 0.74, size.height * 0.68,
-          size.width * 0.67, size.height * 0.72)
-      ..close();
-    final rightPage = Path()
-      ..moveTo(size.width * 0.82, size.height * 0.51)
-      ..quadraticBezierTo(size.width * 0.89, size.height * 0.39,
-          size.width * 0.96, size.height * 0.47)
-      ..lineTo(size.width * 0.96, size.height * 0.72)
-      ..quadraticBezierTo(size.width * 0.88, size.height * 0.68,
-          size.width * 0.82, size.height * 0.77)
-      ..close();
-    canvas.drawPath(leftPage, page);
-    canvas.drawPath(rightPage, page);
-    canvas.drawPath(leftPage, gold);
-    canvas.drawPath(rightPage, gold);
-    for (var i = 0; i < 4; i++) {
-      final y = size.height * (0.53 + i * 0.045);
-      canvas.drawLine(
-        Offset(size.width * 0.70, y),
-        Offset(size.width * 0.79, y - 1),
-        Paint()
-          ..color = const Color(0xFF9B793C).withValues(alpha: 0.58)
-          ..strokeWidth = 0.7,
-      );
-      canvas.drawLine(
-        Offset(size.width * 0.85, y - 1),
-        Offset(size.width * 0.93, y),
-        Paint()
-          ..color = const Color(0xFF9B793C).withValues(alpha: 0.58)
-          ..strokeWidth = 0.7,
-      );
-    }
-    canvas.drawLine(
-      Offset(size.width * 0.82, size.height * 0.51),
-      Offset(size.width * 0.82, size.height * 0.77),
-      gold,
-    );
-
-    // Wooden rehal silhouette beneath the book.
-    final rehal = Path()
-      ..moveTo(size.width * 0.68, size.height * 0.80)
-      ..lineTo(size.width * 0.96, size.height * 0.80)
-      ..lineTo(size.width * 0.89, size.height * 0.91)
-      ..lineTo(size.width * 0.75, size.height * 0.91)
-      ..close();
-    canvas.drawPath(rehal, stand);
-    canvas.drawPath(rehal, gold);
-    canvas.drawLine(
-      Offset(size.width * 0.75, size.height * 0.91),
-      Offset(size.width * 0.88, size.height * 0.80),
-      Paint()
-        ..color = const Color(0xFFE4BC6D)
-        ..strokeWidth = 3,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.89, size.height * 0.91),
-      Offset(size.width * 0.77, size.height * 0.80),
-      Paint()
-        ..color = const Color(0xFFE4BC6D)
-        ..strokeWidth = 3,
-    );
-
-    for (var i = 0; i < 11; i++) {
-      final x = size.width * (0.58 + i * 0.038);
-      final y = size.height * (0.18 + (i % 4) * 0.12);
-      canvas.drawCircle(Offset(x, y), i % 3 == 0 ? 1.5 : 0.8, gold);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _QuranShowcasePainter oldDelegate) => false;
-}
-
 class _MuminQuranShowcase extends StatelessWidget {
   const _MuminQuranShowcase({
     required this.title,
@@ -718,18 +612,29 @@ class _MuminQuranShowcase extends StatelessWidget {
                   child: Opacity(
                     opacity: 0.94,
                     child: Image.asset(
-                      'assets/images/home/mumin_reference_mosque.webp',
+                      'assets/images/home/reference_ui/banner_mumin_pro.webp',
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
-                      filterQuality: FilterQuality.high,
+                      filterQuality: FilterQuality.medium,
                     ),
                   ),
                 ),
               ),
               const Positioned.fill(
                 child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _QuranShowcasePainter(),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: [
+                          Color(0xE608211B),
+                          Color(0xB808211B),
+                          Color(0x1608211B),
+                        ],
+                        stops: [0, 0.58, 1],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -815,58 +720,7 @@ class _MuminQuranShowcase extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 4,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 104,
-                            height: 104,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  AppColors.gold.withValues(alpha: 0.28),
-                                  AppColors.gold.withValues(alpha: 0.015),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Transform.rotate(
-                            angle: -0.12,
-                            child: Icon(
-                              Icons.menu_book_rounded,
-                              size: 90,
-                              color: AppColors.goldLight,
-                              shadows: [
-                                Shadow(
-                                  color: AppColors.gold.withValues(
-                                    alpha: 0.72,
-                                  ),
-                                  blurRadius: 22,
-                                ),
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.35),
-                                  blurRadius: 9,
-                                  offset: const Offset(0, 7),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Positioned(
-                            top: 7,
-                            right: 13,
-                            child: Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 15,
-                              color: AppColors.goldLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+
                   ],
                 ),
               ),
