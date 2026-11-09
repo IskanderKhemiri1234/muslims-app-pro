@@ -1823,11 +1823,20 @@ Widget _buildMushafPage({
   required double width,
   required double height,
 }) {
-  // Give the WebView its real viewport constraints. FittedBox must not wrap
-  // this platform view: scaling a WebView can make the Mushaf appear as a
-  // small partial page instead of occupying the reader screen.
-  final pageHeight = height.clamp(1.0, 4000.0);
-  final fontSize = (width / 19).clamp(17.0, 25.0);
+  // Keep the WebView at the exact available viewport size. Never wrap a
+  // platform WebView in FittedBox/Transform: that scales its native surface
+  // incorrectly and can make the Mushaf appear clipped or miniature.
+  //
+  // The 1441H Madina layout declares a 15.4376-em line width. Calculate the
+  // font size from BOTH viewport dimensions: width fills the reading area,
+  // while height prevents the complete printed page from being clipped on
+  // short phones or landscape displays.
+  final pageHeight = height > 0 ? height : 1.0;
+  final widthFit = width / 15.4376;
+  final heightFit = pageHeight / 32.0;
+  final fontSize = (widthFit < heightFit ? widthFit : heightFit)
+      .clamp(10.0, 32.0)
+      .toDouble();
 
   return SizedBox.expand(
     child: ClipRect(
