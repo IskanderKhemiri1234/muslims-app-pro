@@ -326,7 +326,12 @@ class _QuranPageState extends State<QuranPage>
         _isLoading = false;
       });
 
-      _showMessage(QuranPageLocalization.text(context, 'quran_saved_reading_data_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_saved_reading_data_error',
+          ),
+        );
     }
   }
 
@@ -350,7 +355,12 @@ class _QuranPageState extends State<QuranPage>
         });
       });
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_daily_reading_update_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_daily_reading_update_error',
+          ),
+        );
     }
   }
 
@@ -392,7 +402,12 @@ class _QuranPageState extends State<QuranPage>
         await _progressRepository.saveProgress(updated);
       });
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_reading_position_save_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_reading_position_save_error',
+          ),
+        );
     }
   }
 
@@ -508,10 +523,23 @@ class _QuranPageState extends State<QuranPage>
       if (khatmaFinished) {
         await _showKhatmaDialog(resultingKhatmas);
       } else {
-        _showMessage(QuranPageLocalization.text(context, 'quran_page_marked_read', parameters: <String, Object?>{'page': pageToMark}));
+        _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_page_marked_read',
+            parameters: <String, Object?>{
+              'page': pageToMark,
+            },
+          ),
+        );
       }
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_page_mark_read_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_page_mark_read_error',
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -560,10 +588,20 @@ class _QuranPageState extends State<QuranPage>
       });
 
       if (mounted) {
-        _showMessage(QuranPageLocalization.text(context, 'quran_page_read_mark_removed'));
+        _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_page_read_mark_removed',
+          ),
+        );
       }
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_reading_record_update_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_reading_record_update_error',
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -636,7 +674,12 @@ class _QuranPageState extends State<QuranPage>
     if (selection.sura < 1 ||
         selection.sura > 114 ||
         selection.aya < 1) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_invalid_ayah_data'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_invalid_ayah_data',
+          ),
+        );
       return;
     }
 
@@ -666,7 +709,12 @@ class _QuranPageState extends State<QuranPage>
 
         if (alreadySaved) {
           if (mounted) {
-            _showMessage(QuranPageLocalization.text(context, 'quran_ayah_already_saved'));
+            _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_ayah_already_saved',
+          ),
+        );
           }
           return;
         }
@@ -703,7 +751,12 @@ class _QuranPageState extends State<QuranPage>
         );
       });
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_ayah_save_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_ayah_save_error',
+          ),
+        );
     }
   }
 
@@ -746,10 +799,20 @@ class _QuranPageState extends State<QuranPage>
       });
 
       if (mounted) {
-        _showMessage(QuranPageLocalization.text(context, 'quran_ayah_bookmark_removed'));
+        _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_ayah_bookmark_removed',
+          ),
+        );
       }
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_ayah_bookmark_remove_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_ayah_bookmark_remove_error',
+          ),
+        );
     }
   }
 
@@ -896,12 +959,23 @@ class _QuranPageState extends State<QuranPage>
 
         _showMessage(
           _bookmarks.contains(page)
-              ? QuranPageLocalization.text(context, 'quran_page_bookmark_saved')
-              : QuranPageLocalization.text(context, 'quran_page_bookmark_removed'),
+              ? QuranPageLocalization.text(
+                  context,
+                  'quran_page_bookmark_saved',
+                )
+              : QuranPageLocalization.text(
+                  context,
+                  'quran_page_bookmark_removed',
+                ),
         );
       });
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_page_bookmark_save_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_page_bookmark_save_error',
+          ),
+        );
     }
   }
 
@@ -924,7 +998,12 @@ class _QuranPageState extends State<QuranPage>
         });
       });
     } catch (_) {
-      _showMessage(QuranPageLocalization.text(context, 'quran_page_bookmark_remove_error'));
+      _showMessage(
+          QuranPageLocalization.text(
+            context,
+            'quran_page_bookmark_remove_error',
+          ),
+        );
     }
   }
 
