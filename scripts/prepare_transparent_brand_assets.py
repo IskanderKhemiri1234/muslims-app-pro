@@ -19,7 +19,7 @@ OUTPUTS = {
     },
     "assets/images/home/reference_ui/icon_qibla.png": {
         "output": "assets/images/home/reference_ui/processed/icon_qibla.png",
-        "backgrounds": [((255, 255, 255), 100)],
+        "backgrounds": [((255, 255, 255), 65)],
         "seeds": "all",
     },
     "assets/images/home/reference_ui/icon_quran.png": {
