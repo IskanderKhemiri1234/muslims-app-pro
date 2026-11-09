@@ -10,20 +10,20 @@ def prepareMuminBrandAssets = tasks.register('prepareMuminBrandAssets', Exec) {
     workingDir rootProject.projectDir.parentFile
     commandLine 'python3', 'scripts/prepare_transparent_brand_assets.py'
     inputs.files(
-        file('../assets/branding/mumin_pro_logo.png'),
-        file('../scripts/prepare_transparent_brand_assets.py'),
-        fileTree('../assets/images/home/reference_ui') {
+        rootProject.file('../assets/branding/mumin_pro_logo.png'),
+        rootProject.file('../scripts/prepare_transparent_brand_assets.py'),
+        fileTree(rootProject.file('../assets/images/home/reference_ui')) {
             include 'icon_qibla.png', 'icon_quran.png', 'icon_kaaba.png',
                     'icon_azkar.png', 'icon_tasbih.png'
         }
     )
     outputs.files(
-        file('../assets/branding/processed/mumin_pro_logo.png'),
-        file('../assets/images/home/reference_ui/processed/icon_qibla.png'),
-        file('../assets/images/home/reference_ui/processed/icon_quran.png'),
-        file('../assets/images/home/reference_ui/processed/icon_kaaba.png'),
-        file('../assets/images/home/reference_ui/processed/icon_azkar.png'),
-        file('../assets/images/home/reference_ui/processed/icon_tasbih.png')
+        rootProject.file('../assets/branding/processed/mumin_pro_logo.png'),
+        rootProject.file('../assets/images/home/reference_ui/processed/icon_qibla.png'),
+        rootProject.file('../assets/images/home/reference_ui/processed/icon_quran.png'),
+        rootProject.file('../assets/images/home/reference_ui/processed/icon_kaaba.png'),
+        rootProject.file('../assets/images/home/reference_ui/processed/icon_azkar.png'),
+        rootProject.file('../assets/images/home/reference_ui/processed/icon_tasbih.png')
     )
 }
 
