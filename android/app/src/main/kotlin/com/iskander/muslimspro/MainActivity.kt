@@ -156,7 +156,7 @@ class MainActivity : AudioServiceActivity() {
                         }
 
                         val actualSha256 = digest.digest().joinToString("") {
-                            "%02x".format(it)
+                            "%02x".format(it.toInt() and 0xff)
                         }
                         val isValid = MessageDigest.isEqual(
                             actualSha256.toByteArray(Charsets.US_ASCII),
