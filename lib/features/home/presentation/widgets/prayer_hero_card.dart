@@ -132,21 +132,21 @@ class _HeroSurface extends StatelessWidget {
     final foreground = Colors.white;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(26),
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF07966F),
-              Color(0xFF087B5C),
-              Color(0xFF064A3B),
+              Color(0xFF075D43),
+              Color(0xFF064B38),
+              Color(0xFF052D23),
             ],
           ),
           border: Border.all(
             color: AppColors.gold.withValues(alpha: 0.72),
-            width: 1.35,
+            width: 1.7,
           ),
           boxShadow: [
             BoxShadow(
@@ -170,7 +170,7 @@ class _HeroSurface extends StatelessWidget {
               bottom: 0,
               child: IgnorePointer(
                 child: SizedBox(
-                  width: 190,
+                  width: 220,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -294,7 +294,7 @@ class _HeroSurface extends StatelessWidget {
                                   textDirection: TextDirection.ltr,
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 39,
+                                    fontSize: 43,
                                     height: 1.05,
                                     fontWeight: FontWeight.w900,
                                     fontFeatures: [
