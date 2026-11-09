@@ -158,7 +158,7 @@ final class MuminLocalizations {
       'update_later': 'لاحقاً',
       'update_download': 'تنزيل التحديث',
       'update_check_failed': 'تعذر التحقق من التحديث. تحقق من اتصال الإنترنت وحاول مجدداً.',
-      'update_download_failed': 'تعذر فتح رابط تنزيل التحديث.'
+      'update_download_failed': 'تعذر فتح رابط تنزيل التحديث.',
 
       'coming_soon': 'هذه الميزة ستتوفر قريباً',
       'let_prayer_illuminate_your_day': 'صلاتك نور يومك',
@@ -475,7 +475,7 @@ final class MuminLocalizations {
       'update_later': 'Later',
       'update_download': 'Download update',
       'update_check_failed': 'Could not check for updates. Check your internet connection and try again.',
-      'update_download_failed': 'Could not open the update download link.'
+      'update_download_failed': 'Could not open the update download link.',
       'today_label': 'Today',
       'next_prayer_eyebrow': 'Up next',
       'time_remaining': 'Time remaining',
@@ -808,7 +808,7 @@ final class MuminLocalizations {
       'update_later': 'Plus tard',
       'update_download': 'Télécharger la mise à jour',
       'update_check_failed': 'Impossible de vérifier les mises à jour. Vérifiez votre connexion Internet et réessayez.',
-      'update_download_failed': 'Impossible d’ouvrir le lien de téléchargement.'
+      'update_download_failed': 'Impossible d’ouvrir le lien de téléchargement.',
 
       'coming_soon': 'Cette fonctionnalité sera bientôt disponible',
       'let_prayer_illuminate_your_day':
