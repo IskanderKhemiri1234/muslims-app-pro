@@ -910,7 +910,7 @@ class _DailyEssentialsSection extends StatelessWidget {
         id: 'tasbih',
         label: localizations.tasbih,
         icon: Icons.fingerprint_rounded,
-        color: const Color(0xFFB99BE8),
+        color: const Color(0xFF72C9A5),
       ),
       (
         id: 'calendar',
