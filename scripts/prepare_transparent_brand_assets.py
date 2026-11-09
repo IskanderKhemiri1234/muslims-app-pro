@@ -20,11 +20,10 @@ OUTPUTS = {
     "assets/images/home/reference_ui/icon_qibla.png": {
         "output": "assets/images/home/reference_ui/processed/icon_qibla.png",
         "backgrounds": [((255, 255, 255), 65)],
-        "seeds": "all",
     },
     "assets/images/home/reference_ui/icon_quran.png": {
         "output": "assets/images/home/reference_ui/processed/icon_quran.png",
-        "backgrounds": [((255, 255, 255), 100)],
+        "backgrounds": [((255, 255, 255), 65)],
         "seeds": "all",
     },
     "assets/images/home/reference_ui/icon_kaaba.png": {
@@ -34,13 +33,13 @@ OUTPUTS = {
     },
     "assets/images/home/reference_ui/icon_azkar.png": {
         "output": "assets/images/home/reference_ui/processed/icon_azkar.png",
-        "backgrounds": [((255, 255, 255), 100)],
+        "backgrounds": [((255, 255, 255), 65)],
         "seeds": "all",
     },
     "assets/images/home/reference_ui/icon_tasbih.png": {
         "output": "assets/images/home/reference_ui/processed/icon_tasbih.png",
         "backgrounds": [
-            ((255, 255, 255), 100),
+            ((255, 255, 255), 65),
             ((0, 0, 0), 35),
         ],
         "seeds": "all",
@@ -99,7 +98,7 @@ def verify(path: Path):
             raise RuntimeError(f"{path} is not encoded as PNG.")
         rgba = image.convert("RGBA")
         alpha = rgba.getchannel("A")
-        minimum, maximum = alpha.getextrema()
+        minimum, _ = alpha.getextrema()
         transparent = sum(1 for value in alpha.getdata() if value == 0)
         total = rgba.width * rgba.height
         if minimum != 0 or transparent < max(100, total // 200):
