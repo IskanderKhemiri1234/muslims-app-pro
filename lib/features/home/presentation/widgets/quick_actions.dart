@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/localization/mumin_domain_localizations.dart';
 import '../../../../core/localization/mumin_language_registry.dart';
@@ -45,6 +46,11 @@ class _QuickActionsState extends State<QuickActions>
   double _manualDragOffset = 0;
   bool _isUserDragging = false;
   int _activePointers = 0;
+  int? _dragPointer;
+  Offset? _pointerDownPosition;
+  Offset? _lastPointerPosition;
+  bool _pointerRejectedAsVertical = false;
+  DateTime? _lastActionTap;
   Timer? _resumeTimer;
 
   @override
@@ -205,6 +211,14 @@ class _QuickActionsState extends State<QuickActions>
   }
 
   void _handleActionTap(String actionId) {
+    final now = DateTime.now();
+    final previousTap = _lastActionTap;
+    if (previousTap != null &&
+        now.difference(previousTap) < const Duration(milliseconds: 350)) {
+      return;
+    }
+    _lastActionTap = now;
+    HapticFeedback.selectionClick();
     widget.onAction(actionId);
   }
 
@@ -267,43 +281,79 @@ class _QuickActionsState extends State<QuickActions>
         });
   }
 
-  void _handleHorizontalDragStart(DragStartDetails details) {
-    _isUserDragging = true;
-    _pauseMarquee();
-  }
-
   void _handlePointerDown(PointerDownEvent event) {
     _activePointers++;
     _pauseMarquee();
+
+    if (_activePointers == 1) {
+      _dragPointer = event.pointer;
+      _pointerDownPosition = event.position;
+      _lastPointerPosition = event.position;
+      _pointerRejectedAsVertical = false;
+      _isUserDragging = false;
+    }
+  }
+
+  /// Observes movement without entering Flutter's gesture arena.
+  ///
+  /// This is deliberate: a small finger drift must not cancel an icon tap.
+  /// A manual marquee drag starts only after clear horizontal intent.
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!mounted ||
+        _activePointers != 1 ||
+        event.pointer != _dragPointer) {
+      return;
+    }
+
+    final start = _pointerDownPosition;
+    final previous = _lastPointerPosition;
+    if (start == null || previous == null) return;
+
+    final totalDelta = event.position - start;
+
+    if (!_isUserDragging) {
+      if (_pointerRejectedAsVertical) return;
+      if (totalDelta.distance < kTouchSlop) return;
+
+      if (totalDelta.dy.abs() > totalDelta.dx.abs() * 1.15) {
+        _pointerRejectedAsVertical = true;
+        return;
+      }
+
+      if (totalDelta.dx.abs() < kTouchSlop) return;
+
+      _isUserDragging = true;
+      final initialDrag = totalDelta.dx;
+      setState(() {
+        _manualDragOffset =
+            (_manualDragOffset + initialDrag) % _cycleWidth;
+      });
+    } else {
+      final delta = event.position.dx - previous.dx;
+      if (delta != 0) {
+        setState(() {
+          _manualDragOffset =
+              (_manualDragOffset + delta) % _cycleWidth;
+        });
+      }
+    }
+
+    _lastPointerPosition = event.position;
   }
 
   void _handlePointerEnd(PointerEvent event) {
     if (_activePointers > 0) {
       _activePointers--;
     }
-    if (_activePointers == 0 && !_isUserDragging) {
-      _scheduleMarqueeResume();
+
+    if (event.pointer == _dragPointer) {
+      _dragPointer = null;
+      _pointerDownPosition = null;
+      _lastPointerPosition = null;
+      _pointerRejectedAsVertical = false;
+      _isUserDragging = false;
     }
-  }
 
-  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
-    if (!mounted || !_isUserDragging) return;
-
-    final delta = details.delta.dx;
-    if (delta == 0) return;
-
-    setState(() {
-      _manualDragOffset =
-          (_manualDragOffset + delta) % _cycleWidth;
-    });
-  }
-
-  void _handleHorizontalDragEnd(DragEndDetails details) {
-    _isUserDragging = false;
-
-    if (!mounted || _motionDisabled) return;
-
-    // Keep the exact manually selected offset while the controller is paused.
     if (_activePointers == 0) {
       _scheduleMarqueeResume();
     }
@@ -322,17 +372,8 @@ class _QuickActionsState extends State<QuickActions>
           onPointerDown: _handlePointerDown,
           onPointerUp: _handlePointerEnd,
           onPointerCancel: _handlePointerEnd,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragStart: _handleHorizontalDragStart,
-            onHorizontalDragUpdate: _handleHorizontalDragUpdate,
-            onHorizontalDragEnd: _handleHorizontalDragEnd,
-            onHorizontalDragCancel: () {
-              _handleHorizontalDragEnd(
-                DragEndDetails(),
-              );
-            },
-            child: Align(
+          onPointerMove: _handlePointerMove,
+          child: Align(
               alignment: AlignmentDirectional.centerStart,
               child: AnimatedBuilder(
                 animation: _animationController,
