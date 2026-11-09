@@ -1079,6 +1079,57 @@ class _HomeSnapshot {
   }
 }
 
+class _IslamicGeometryPainter extends CustomPainter {
+  const _IslamicGeometryPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = const Color(0xFFD8B66A).withValues(alpha: 0.035)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.75;
+    final starPaint = Paint()
+      ..color = const Color(0xFFE8CE91).withValues(alpha: 0.20)
+      ..style = PaintingStyle.fill;
+
+    final spacing = size.width < 500 ? 58.0 : 82.0;
+    for (var row = -1; row < (size.height / spacing).ceil() + 1; row++) {
+      for (var column = -1;
+          column < (size.width / spacing).ceil() + 1;
+          column++) {
+        final center = Offset(
+          column * spacing + (row.isEven ? 0 : spacing / 2),
+          row * spacing,
+        );
+        final radius = spacing * 0.34;
+        final diamond = Path()
+          ..moveTo(center.dx, center.dy - radius)
+          ..lineTo(center.dx + radius, center.dy)
+          ..lineTo(center.dx, center.dy + radius)
+          ..lineTo(center.dx - radius, center.dy)
+          ..close();
+        canvas.drawPath(diamond, line);
+        canvas.drawCircle(center, 1.1, starPaint);
+        if ((row + column).abs() % 4 == 0) {
+          canvas.drawLine(
+            Offset(center.dx - radius * 0.45, center.dy - radius * 0.45),
+            Offset(center.dx + radius * 0.45, center.dy + radius * 0.45),
+            line,
+          );
+          canvas.drawLine(
+            Offset(center.dx + radius * 0.45, center.dy - radius * 0.45),
+            Offset(center.dx - radius * 0.45, center.dy + radius * 0.45),
+            line,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _IslamicGeometryPainter oldDelegate) => false;
+}
+
 class _HomeBackground extends StatelessWidget {
   const _HomeBackground();
 
@@ -1109,6 +1160,11 @@ class _HomeBackground extends StatelessWidget {
           ),
           child: const Stack(
             children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _IslamicGeometryPainter(),
+                ),
+              ),
               PositionedDirectional(
                 top: -150,
                 end: -120,
