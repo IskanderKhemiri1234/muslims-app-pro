@@ -52,6 +52,8 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   Timer? _midnightTimer;
   bool _isRetrying = false;
   String? _placeNameLanguageCode;
+  final ScrollController _dashboardScrollController = ScrollController();
+  final GlobalKey _prayerScheduleKey = GlobalKey();
 
   MuminLocalizations get _localizations {
     final locale = Localizations.localeOf(context);
@@ -264,6 +266,44 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     );
   }
 
+  void _handleBottomNavigation(int index) {
+    switch (index) {
+      case 0:
+        if (_dashboardScrollController.hasClients) {
+          _dashboardScrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 520),
+            curve: Curves.easeOutCubic,
+          );
+        }
+        break;
+      case 1:
+        final targetContext = _prayerScheduleKey.currentContext;
+        if (targetContext != null) {
+          Scrollable.ensureVisible(
+            targetContext,
+            duration: const Duration(milliseconds: 560),
+            curve: Curves.easeInOutCubic,
+            alignment: 0.08,
+          );
+        }
+        break;
+      case 2:
+        _openPage(
+          NearbyMosquesPage(
+            languageCode: _localizations.languageCode,
+          ),
+        );
+        break;
+      case 3:
+        _openPage(const QuranPage());
+        break;
+      case 4:
+        widget.onSettingsTap();
+        break;
+    }
+  }
+
   void _handleQuickAction(String action) {
     switch (action) {
       case 'qibla':
@@ -328,6 +368,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
   @override
   void dispose() {
     _cancelMidnightRefresh();
+    _dashboardScrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -382,6 +423,10 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      bottomNavigationBar: _HomeBottomNavigation(
+        localizations: localizations,
+        onTap: _handleBottomNavigation,
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -414,6 +459,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                       notificationPredicate: (notification) =>
                           notification.depth == 0,
                       child: ListView(
+                        controller: _dashboardScrollController,
                         physics: const AlwaysScrollableScrollPhysics(
                           parent: BouncingScrollPhysics(),
                         ),
@@ -478,6 +524,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
                           const SizedBox(height: 16),
                           RepaintBoundary(
                             child: PrayerScheduleSection(
+                              key: _prayerScheduleKey,
                               schedule: snapshot.schedule!,
                               nextPrayer: snapshot.nextPrayer,
                               prayerName: _prayerName,
@@ -1116,6 +1163,147 @@ class _AmbientGlow extends StatelessWidget {
               color,
               color.withValues(alpha: 0),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeBottomNavigation extends StatelessWidget {
+  const _HomeBottomNavigation({
+    required this.localizations,
+    required this.onTap,
+  });
+
+  final MuminLocalizations localizations;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <({String label, IconData icon})>[
+      (label: localizations.text('home_tab'), icon: Icons.home_rounded),
+      (label: localizations.text('prayer_tab'), icon: Icons.mosque_rounded),
+      (label: localizations.text('discover_tab'), icon: Icons.explore_rounded),
+      (label: localizations.quran, icon: Icons.menu_book_rounded),
+      (label: localizations.settings, icon: Icons.person_rounded),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF061C16).withValues(alpha: 0.98),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.gold.withValues(alpha: 0.34),
+            width: 0.8,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00130E).withValues(alpha: 0.42),
+            blurRadius: 22,
+            offset: const Offset(0, -7),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 66,
+          child: Row(
+            children: [
+              for (var index = 0; index < items.length; index++)
+                Expanded(
+                  child: _HomeBottomNavigationItem(
+                    label: items[index].label,
+                    icon: items[index].icon,
+                    selected: index == 0,
+                    onTap: () => onTap(index),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeBottomNavigationItem extends StatelessWidget {
+  const _HomeBottomNavigationItem({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.goldLight : Colors.white70;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: SizedBox.expand(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppColors.gold.withValues(alpha: 0.12),
+                          Colors.transparent,
+                        ],
+                      )
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: selected ? 25 : 23,
+                    color: color,
+                    shadows: selected
+                        ? [
+                            Shadow(
+                              color: AppColors.gold.withValues(alpha: 0.55),
+                              blurRadius: 12,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10.5,
+                      fontWeight:
+                          selected ? FontWeight.w900 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
