@@ -22,7 +22,6 @@ import '../widgets/prayer_hero_card.dart';
 import '../widgets/prayer_schedule_section.dart';
 import '../widgets/quick_actions.dart';
 import '../../../hijri_calendar/presentation/pages/hijri_calendar_page.dart';
-import '../../../settings/presentation/pages/settings_page.dart';
 
 /// Main dashboard of Mumin Pro.
 ///
