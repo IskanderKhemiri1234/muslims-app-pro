@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/updates/mumin_app_update_service.dart';
+
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -125,24 +127,7 @@ class SettingsPage extends StatelessWidget {
               title: localizations.text('app_updates'),
             ),
             const SizedBox(height: 10),
-            _SettingsTile(
-              icon: Icons.system_update_alt_rounded,
-              title: localizations.text('app_updates'),
-              subtitle: localizations.text('update_channel_setup_required'),
-              trailing: const Icon(
-                Icons.open_in_new_rounded,
-                color: AppColors.gold,
-              ),
-              onTap: () async {
-                final uri = Uri.parse(
-                  'https://github.com/IskanderKhemiri1234/muslims-app-pro/releases/latest',
-                );
-                await launchUrl(
-                  uri,
-                  mode: LaunchMode.externalApplication,
-                );
-              },
-            ),
+            _SettingsUpdateTile(localizations: localizations),
             const SizedBox(height: 24),
             Text(
               localizations.text('update_signature_note'),
@@ -154,6 +139,131 @@ class SettingsPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _SettingsUpdateTile extends StatefulWidget {
+  const _SettingsUpdateTile({
+    required this.localizations,
+  });
+
+  final MuminLocalizations localizations;
+
+  @override
+  State<_SettingsUpdateTile> createState() =>
+      _SettingsUpdateTileState();
+}
+
+class _SettingsUpdateTileState extends State<_SettingsUpdateTile> {
+  bool _isChecking = false;
+
+  Future<void> _checkForUpdates() async {
+    if (_isChecking) return;
+
+    setState(() {
+      _isChecking = true;
+    });
+
+    try {
+      final update = await MuminAppUpdateService().checkForUpdate();
+      if (!mounted) return;
+
+      if (!update.isUpdateAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.localizations.text('update_latest'),
+            ),
+          ),
+        );
+        return;
+      }
+
+      final shouldDownload = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: Text(
+              widget.localizations.text('update_available'),
+            ),
+            content: Text(
+              '${widget.localizations.text('update_release_version')} '
+              '${update.latestVersion}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(
+                  widget.localizations.text('update_later'),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(
+                  widget.localizations.text('update_download'),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (shouldDownload == true && mounted) {
+        final opened = await launchUrl(
+          update.apkUri,
+          mode: LaunchMode.externalApplication,
+        );
+
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.localizations.text('update_download_failed'),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.localizations.text('update_check_failed'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsTile(
+      icon: Icons.system_update_alt_rounded,
+      title: widget.localizations.text('app_updates'),
+      subtitle: widget.localizations.text('update_channel_setup_required'),
+      trailing: _isChecking
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.gold,
+              ),
+            )
+          : const Icon(
+              Icons.system_update_alt_rounded,
+              color: AppColors.gold,
+            ),
+      onTap: _checkForUpdates,
     );
   }
 }
