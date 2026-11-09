@@ -4,15 +4,40 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
-// The canonical logo lives in Flutter assets. Mirror it into Android's native
-// drawable resources when present so launcher and RemoteViews share one source.
+// Generate the transparent RGBA logo and shortcut illustrations from the
+// original uploaded artwork before Flutter bundles assets or Android compiles.
+def prepareMuminBrandAssets = tasks.register('prepareMuminBrandAssets', Exec) {
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'python3', 'scripts/prepare_transparent_brand_assets.py'
+    inputs.files(
+        file('../assets/branding/mumin_pro_logo.png'),
+        file('../scripts/prepare_transparent_brand_assets.py'),
+        fileTree('../assets/images/home/reference_ui') {
+            include 'icon_qibla.png', 'icon_quran.png', 'icon_kaaba.png',
+                    'icon_azkar.png', 'icon_tasbih.png'
+        }
+    )
+    outputs.files(
+        file('../assets/branding/processed/mumin_pro_logo.png'),
+        file('../assets/images/home/reference_ui/processed/icon_qibla.png'),
+        file('../assets/images/home/reference_ui/processed/icon_quran.png'),
+        file('../assets/images/home/reference_ui/processed/icon_kaaba.png'),
+        file('../assets/images/home/reference_ui/processed/icon_azkar.png'),
+        file('../assets/images/home/reference_ui/processed/icon_tasbih.png')
+    )
+}
+
 def syncMuminBrandAsset = tasks.register('syncMuminBrandAsset', Copy) {
-    def brandSource = rootProject.file('../assets/branding/mumin_pro_logo.png')
-    onlyIf { brandSource.isFile() }
+    dependsOn(prepareMuminBrandAssets)
+    def brandSource = rootProject.file('../assets/branding/processed/mumin_pro_logo.png')
     from(brandSource) {
         rename { 'mumin_pro_brand.png' }
     }
     into("$projectDir/src/main/res/drawable-nodpi")
+}
+
+tasks.matching { it.name.startsWith('compileFlutterBuild') }.configureEach {
+    dependsOn(prepareMuminBrandAssets)
 }
 
 tasks.named('preBuild').configure {
