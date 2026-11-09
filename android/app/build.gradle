@@ -4,6 +4,21 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
+// The canonical logo lives in Flutter assets. Mirror it into Android's native
+// drawable resources when present so launcher and RemoteViews share one source.
+def syncMuminBrandAsset = tasks.register('syncMuminBrandAsset', Copy) {
+    def brandSource = rootProject.file('../assets/branding/mumin_pro_logo.png')
+    onlyIf { brandSource.isFile() }
+    from(brandSource) {
+        rename { 'mumin_pro_brand.png' }
+    }
+    into("$projectDir/src/main/res/drawable-nodpi")
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(syncMuminBrandAsset)
+}
+
 android {
     namespace 'com.iskander.muslimspro'
 
