@@ -124,13 +124,18 @@ class SettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _SettingsSectionTitle(
-              title: localizations.text('notifications'),
+              title: localizations.isArabic ? 'الإشعارات' : 'Notifications',
             ),
             const SizedBox(height: 10),
             _SettingsTile(
               icon: Icons.notifications_active_rounded,
-              title: localizations.text('prayer_notifications'),
-              subtitle: localizations.text('manage_prayer_notifications'),
+              title: localizations.isArabic ? 'إشعارات الصلاة' :
+                  localizations.isFrench ? 'Notifications de prière' : 'Prayer notifications',
+              subtitle: localizations.isArabic
+                  ? 'إدارة تنبيهات الصلاة والعدّ التنازلي الدائم'
+                  : localizations.isFrench
+                      ? 'Gérer les alertes et le compte à rebours permanent'
+                      : 'Manage prayer alerts and the persistent countdown',
               trailing: const Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.gold,
