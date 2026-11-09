@@ -64,8 +64,15 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byType(ClipOval), findsNWidgets(5));
-    expect(find.byType(RotationTransition), findsNWidgets(5));
+    final clippedArtwork = find.byType(ClipOval);
+    expect(clippedArtwork, findsNWidgets(5));
+    expect(
+      find.descendant(
+        of: clippedArtwork,
+        matching: find.byType(RotationTransition),
+      ),
+      findsNWidgets(5),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
