@@ -1,6 +1,10 @@
 
 package com.iskander.muslimspro
 
+import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
+
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -23,6 +27,42 @@ class MainActivity : AudioServiceActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getAppVersion" -> result.success(BuildConfig.VERSION_NAME)
+                "installApk" -> {
+                    try {
+                        val filePath = call.argument<String>("filePath")
+                            ?: throw IllegalArgumentException(
+                                "APK file path is missing."
+                            )
+                        val apkFile = File(filePath)
+                        if (!apkFile.isFile || apkFile.length() <= 0L) {
+                            throw IllegalArgumentException(
+                                "Downloaded APK file is missing or empty."
+                            )
+                        }
+
+                        val apkUri = FileProvider.getUriForFile(
+                            applicationContext,
+                            "${BuildConfig.APPLICATION_ID}.fileprovider",
+                            apkFile
+                        )
+                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(
+                                apkUri,
+                                "application/vnd.android.package-archive"
+                            )
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        startActivity(installIntent)
+                        result.success(true)
+                    } catch (exception: Exception) {
+                        result.error(
+                            "APK_INSTALL_ERROR",
+                            exception.message ?: "Unable to open Android installer.",
+                            null
+                        )
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
