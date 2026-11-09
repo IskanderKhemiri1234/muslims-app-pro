@@ -15,6 +15,10 @@ OUTPUTS = {
     "assets/branding/mumin_pro_logo.png": {
         "output": "assets/branding/processed/mumin_pro_logo.png",
         "backgrounds": [((255, 0, 255), 105)],
+        # The uploaded export also contains a black outer frame around the
+        # colored app mark. Remove only black pixels connected to the newly
+        # exposed outer edge; enclosed dark artwork remains untouched.
+        "post_backgrounds": [((0, 0, 0), 52)],
         "crop_square": True,
     },
     "assets/images/home/reference_ui/icon_qibla.png": {
@@ -122,6 +126,12 @@ def main():
             prepared = remove_edge_background(
                 original,
                 config["backgrounds"],
+            )
+
+        for background, threshold in config.get("post_backgrounds", []):
+            prepared = remove_edge_background(
+                prepared,
+                [(background, threshold)],
             )
 
         if config.get("crop_square"):
