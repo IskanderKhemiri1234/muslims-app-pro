@@ -51,6 +51,7 @@ class _PrayerHomePageState extends State<PrayerHomePage>
 
   Timer? _midnightTimer;
   bool _isRetrying = false;
+  String? _placeNameLanguageCode;
 
   MuminLocalizations get _localizations {
     final locale = Localizations.localeOf(context);
@@ -68,6 +69,24 @@ class _PrayerHomePageState extends State<PrayerHomePage>
     _currentDate = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     _scheduleMidnightRefresh();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final languageCode = _localizations.languageCode;
+    if (_placeNameLanguageCode == languageCode) return;
+
+    _placeNameLanguageCode = languageCode;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        context.read<PrayerController>().refreshPlaceName(
+          languageCode: languageCode,
+        ),
+      );
+    });
   }
 
   @override
