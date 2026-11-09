@@ -52,6 +52,7 @@ class _QuickActionsState extends State<QuickActions>
   Offset? _lastPointerPosition;
   bool _pointerRejectedAsVertical = false;
   DateTime? _lastActionTap;
+  String? _lastActionId;
   Timer? _resumeTimer;
 
   @override
@@ -215,10 +216,12 @@ class _QuickActionsState extends State<QuickActions>
     final now = DateTime.now();
     final previousTap = _lastActionTap;
     if (previousTap != null &&
+        _lastActionId == actionId &&
         now.difference(previousTap) < const Duration(milliseconds: 350)) {
       return;
     }
     _lastActionTap = now;
+    _lastActionId = actionId;
     HapticFeedback.selectionClick();
     widget.onAction(actionId);
   }
