@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/localization/mumin_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -128,28 +129,19 @@ class SettingsPage extends StatelessWidget {
               icon: Icons.system_update_alt_rounded,
               title: localizations.text('app_updates'),
               subtitle: localizations.text('update_channel_setup_required'),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Text(
-                  localizations.text('update_setup_pending'),
-                  style: const TextStyle(
-                    color: AppColors.gold,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+              trailing: const Icon(
+                Icons.open_in_new_rounded,
+                color: AppColors.gold,
               ),
-              onTap: null,
+              onTap: () async {
+                final uri = Uri.parse(
+                  'https://github.com/IskanderKhemiri1234/muslims-app-pro/releases/latest',
+                );
+                await launchUrl(
+                  uri,
+                  mode: LaunchMode.externalApplication,
+                );
+              },
             ),
             const SizedBox(height: 24),
             Text(
