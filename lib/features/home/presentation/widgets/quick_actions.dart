@@ -28,8 +28,8 @@ class QuickActions extends StatefulWidget {
 
 class _QuickActionsState extends State<QuickActions>
     with TickerProviderStateMixin {
-  static const double _itemHeight = 72;
-  static const double _itemWidth = 68;
+  static const double _itemHeight = 106;
+  static const double _itemWidth = 78;
   static const double _spacing = 0;
   static const double _pixelsPerSecond = 22;
 
@@ -506,7 +506,7 @@ class _QuickActionTile extends StatelessWidget {
                             textDirection: Directionality.of(context),
                             style: TextStyle(
                               color: foreground,
-                              fontSize: 11.5,
+                              fontSize: 11.8,
                               fontWeight: FontWeight.w700,
                               height: 1.12,
                               letterSpacing: 0.05,
@@ -558,8 +558,8 @@ class _AnimatedActionArtwork extends StatelessWidget {
           child: Transform.scale(
             scale: scale,
             child: Container(
-              width: 36,
-              height: 36,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -580,13 +580,13 @@ class _AnimatedActionArtwork extends StatelessWidget {
                   color: MuminColors.goldLight.withValues(
                     alpha: 0.42 + glowOpacity * 0.35,
                   ),
-                  width: 1.1,
+                  width: 1.35,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: color.withValues(alpha: glowOpacity),
-                    blurRadius: 13,
-                    spreadRadius: 1,
+                    blurRadius: 18,
+                    spreadRadius: 1.4,
                   ),
                   BoxShadow(
                     color: MuminColors.gold.withValues(
