@@ -41,6 +41,8 @@ object MuminPrayerCountdownNotifications {
 
             val name = entry["name"]?.toString()?.trim().orEmpty()
             val prayer = entry["prayer"]?.toString().orEmpty()
+            val englishName = entry["englishName"]?.toString()?.trim()
+                .orEmpty().ifBlank { prayer }
 
             if (timestamp <= 0L || name.isEmpty() || prayer.isEmpty()) {
                 return@forEach
@@ -50,6 +52,7 @@ object MuminPrayerCountdownNotifications {
                 JSONObject()
                     .put("timeMillis", timestamp)
                     .put("name", name)
+                    .put("englishName", englishName)
                     .put("prayer", prayer)
             )
         }
@@ -124,7 +127,12 @@ object MuminPrayerCountdownNotifications {
             return
         }
 
-        val name = nextEntry.optString("name")
+        // Keep the upcoming prayer label consistently English in the
+        // persistent system notification, regardless of the app language.
+        val name = nextEntry.optString(
+            "englishName",
+            nextEntry.optString("name")
+        ).ifBlank { nextEntry.optString("name") }
         val title = preferences.getString(TITLE_KEY, "Mumin Pro")
             ?: "Mumin Pro"
         val description = preferences.getString(DESCRIPTION_KEY, "")
@@ -229,6 +237,10 @@ object MuminPrayerCountdownNotifications {
                 context.packageName,
                 R.layout.mumin_prayer_countdown_collapsed
             ).apply {
+                setImageViewResource(
+                    R.id.mumin_countdown_logo,
+                    R.drawable.mumin_pro_brand
+                )
                 setTextViewText(R.id.mumin_countdown_title, title)
                 setTextViewText(R.id.mumin_countdown_prayer, prayerName)
                 setChronometer(
