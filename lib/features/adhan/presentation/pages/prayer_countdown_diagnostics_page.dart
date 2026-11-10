@@ -60,6 +60,7 @@ class _PrayerCountdownDiagnosticsPageState
       if (android == null) {
         throw StateError('Android returned an empty diagnostics response.');
       }
+      if (!mounted) return;
 
       final controller = context.read<PrayerController>();
       final local = <String, Object?>{
@@ -293,8 +294,6 @@ class _PrayerCountdownDiagnosticsPageState
                           SelectableText(android['activeNotificationCheckError'].toString()),
                       ],
                     ),
-                  if (_loadError != null && dart['syncError'] == null)
-                    const SizedBox.shrink(),
                   const SizedBox(height: 8),
                   FilledButton.icon(
                     onPressed: _syncing ? null : _synchronizeNow,
