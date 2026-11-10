@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
-/// Offline-first source for the three-column Quran reader.
+/// Bundled, offline-first source for the complete three-language Quran.
 ///
-/// Arabic text and both translations are fetched from QuranEnc and kept
-/// verbatim. A complete surah is written atomically only after every verse
-/// has passed alignment checks.
+/// All 114 surahs are embedded in the application. The CI asset generator
+/// validates every Arabic verse against the official Hafs v20 CSV and checks
+/// both QuranEnc translations before the APK is built.
 class QuranTrilingualDataSource {
   const QuranTrilingualDataSource();
   static const String arabicSource = 'QuranEnc.com / King Fahd Complex / Uthmanic Hafs v20';
@@ -87,7 +87,7 @@ class QuranTrilingualDataSource {
       throw RangeError.range(surah, 1, 114, 'surah');
     }
   }
-
+}
 
 class QuranTrilingualSurah {
   const QuranTrilingualSurah({
