@@ -687,6 +687,10 @@ class _QuranPageState extends State<QuranPage>
       'aya': verse.ayahNumber,
       'page': _currentPage,
       'text': verse.arabic,
+      'french': verse.french,
+      'english': verse.english,
+      'frenchFootnotes': verse.frenchFootnotes,
+      'englishFootnotes': verse.englishFootnotes,
       'suraName': surahName,
       'layout': 'trilingual',
     };
