@@ -68,6 +68,7 @@ flutter:
         - asset: assets/quran_trilingual/fonts/Hafs_20.ttf
 
   assets:
+    - assets/quran_trilingual/data/Quran_text.csv
     - assets/branding/
     - assets/branding/processed/
     - assets/images/adhan/mumin_adhan_hero.jpg
