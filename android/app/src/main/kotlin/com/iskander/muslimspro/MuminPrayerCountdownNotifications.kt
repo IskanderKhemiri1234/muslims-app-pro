@@ -13,7 +13,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.SystemClock
 import android.util.Log
-import android.widget.RemoteViews
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
 import org.json.JSONObject
@@ -310,90 +309,40 @@ object MuminPrayerCountdownNotifications {
             throw IllegalStateException("The Mumin Pro countdown channel is blocked.")
         }
 
-        val remainingMillis = (targetTime - System.currentTimeMillis()).coerceAtLeast(0L)
+        val remainingMillis =
+            (targetTime - System.currentTimeMillis()).coerceAtLeast(0L)
+        check(remainingMillis > 0L) {
+            "The selected next-prayer time is no longer in the future."
+        }
         val chronometerBase = SystemClock.elapsedRealtime() + remainingMillis
 
-        // Phase 1: post a complete platform-native notification first. It is
-        // deliberately independent of RemoteViews and remains as fallback.
-        val baseNotification = createBaseBuilder(
+        // Use Android's native chronometer only. Custom RemoteViews can be
+        // accepted by NotificationManager yet suppress or mis-render the
+        // countdown on vendor notification surfaces (including One UI).
+        val builder = createBaseBuilder(
             context, title, prayerName, description, targetTime
-        ).build()
-        manager.notify(NOTIFICATION_ID, baseNotification)
+        ).apply {
+            setWhen(chronometerBase)
+            setUsesChronometer(true)
+            setShowWhen(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                setChronometerCountDown(true)
+            }
+        }
+
+        val notification = builder.build()
+        manager.notify(NOTIFICATION_ID, notification)
+
+        check(isNotificationActive(manager)) {
+            "NotificationManager did not retain countdown notification $NOTIFICATION_ID."
+        }
+
         Log.i(
             TAG,
-            "BASE_POSTED id=$NOTIFICATION_ID target=$targetTime remainingMs=$remainingMillis"
+            "NATIVE_COUNTDOWN_POSTED id=$NOTIFICATION_ID " +
+                "target=$targetTime remainingMs=$remainingMillis " +
+                "chronometerBase=$chronometerBase active=true"
         )
-
-        if (!isNotificationActive(manager)) {
-            throw IllegalStateException(
-                "NotificationManager.notify returned but notification $NOTIFICATION_ID is not active."
-            )
-        }
-
-        // Phase 2: enhance the already-visible notification. Any failure in
-        // custom layout inflation/action application leaves the base intact.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
-
-        try {
-            val compactView = RemoteViews(
-                context.packageName,
-                R.layout.mumin_prayer_countdown_collapsed
-            ).apply {
-                setImageViewResource(R.id.mumin_countdown_logo, R.drawable.mumin_pro_brand)
-                setTextViewText(R.id.mumin_countdown_title, title)
-                setTextViewText(R.id.mumin_countdown_prayer, prayerName)
-                setChronometer(R.id.mumin_countdown_timer, chronometerBase, null, true)
-                setChronometerCountDown(R.id.mumin_countdown_timer, true)
-            }
-
-            val expandedView = RemoteViews(
-                context.packageName,
-                R.layout.mumin_prayer_countdown_expanded
-            ).apply {
-                setImageViewResource(R.id.mumin_countdown_logo, R.drawable.mumin_pro_brand)
-                setTextViewText(R.id.mumin_countdown_title, title)
-                setTextViewText(R.id.mumin_countdown_prayer, prayerName)
-                setTextViewText(R.id.mumin_countdown_label, description)
-                setChronometer(R.id.mumin_countdown_timer, chronometerBase, null, true)
-                setChronometerCountDown(R.id.mumin_countdown_timer, true)
-            }
-
-            val customNotification = createBaseBuilder(
-                context, title, prayerName, description, targetTime
-            )
-                .setStyle(Notification.DecoratedCustomViewStyle())
-                .setCustomContentView(compactView)
-                .setCustomBigContentView(expandedView)
-                .build()
-
-            manager.notify(NOTIFICATION_ID, customNotification)
-            Log.i(TAG, "CUSTOM_POSTED id=$NOTIFICATION_ID")
-            if (!isNotificationActive(manager)) {
-                Log.e(TAG, "CUSTOM_POST not active; restoring platform-native notification")
-                manager.notify(NOTIFICATION_ID, baseNotification)
-            }
-        } catch (exception: Exception) {
-            Log.e(
-                TAG,
-                "CUSTOM_RENDER_SETUP_FAILED; retaining/restoring platform-native notification",
-                exception
-            )
-            manager.notify(NOTIFICATION_ID, baseNotification)
-        } catch (error: LinkageError) {
-            Log.e(
-                TAG,
-                "CUSTOM_RENDER_LINKAGE_FAILED; retaining/restoring platform-native notification",
-                error
-            )
-            manager.notify(NOTIFICATION_ID, baseNotification)
-        }
-
-        if (!isNotificationActive(manager)) {
-            throw IllegalStateException(
-                "Countdown notification is not present in NotificationManager.activeNotifications after fallback."
-            )
-        }
-        Log.i(TAG, "VERIFY_ACTIVE id=$NOTIFICATION_ID active=true")
     }
 
     private fun isNotificationActive(manager: NotificationManager): Boolean {

@@ -3,9 +3,10 @@
 
 The uploaded source files are intentionally preserved. This script removes
 edge-connected background regions using each source's known background color.
-The Qibla asset also receives a narrowly scoped near-white cleanup in its lower
-18% band. The generated RGBA output is inspected and reported without changing
-the artwork during that inspection.
+The Qibla asset receives a narrowly scoped near-white cleanup only where
+fragments connect to the bottom edge within the final 3.5% of the image. Isolated
+white artwork and highlights are preserved. The generated RGBA output is
+inspected and reported without changing the artwork during that inspection.
 """
 from __future__ import annotations
 
@@ -81,20 +82,17 @@ def remove_edge_background(image: Image.Image, backgrounds):
     return image
 
 def remove_qibla_bottom_white_residue(image: Image.Image):
-    """Remove near-white pixels throughout the lower 18% of the Qibla icon.
+    """Remove only near-white fragments connected to the bottom image edge.
 
-    The previous edge-seeded flood fill missed isolated white fragments that
-    were separated from the image border by transparent or dark pixels. Every
-    near-white pixel in the lower band is now seeded, so disconnected residue
-    is removed as well as edge-connected background. The verification checks
-    the complete lower band rather than only the outermost image edges.
+    The cleanup is limited to the final 3.5% of the image and starts only from
+    near-white pixels on the bottom row. Disconnected white highlights and
+    intentional artwork are retained.
     """
     image = image.convert("RGBA")
     pixels = image.load()
     width, height = image.size
-    first_row = max(0, int(height * 0.82))
-    band_height = height - first_row
-    visited = bytearray(width * band_height)
+    first_row = max(0, int(height * 0.965))
+    visited = bytearray(width * (height - first_row))
     queue = []
 
     def is_target(x: int, y: int) -> bool:
@@ -111,11 +109,8 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
             visited[index] = 1
             queue.append((x, y))
 
-    # Seed every near-white pixel in the lower band, not only pixels
-    # connected to the outer border. This catches isolated white fragments.
-    for y in range(first_row, height):
-        for x in range(width):
-            add_seed(x, y)
+    for x in range(width):
+        add_seed(x, height - 1)
 
     cursor = 0
     removed = 0
@@ -135,26 +130,18 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
                 if is_target(next_x, next_y):
                     queue.append((next_x, next_y))
 
-    remaining_lower_band_pixels = sum(
+    retained_lower_white = sum(
         1
         for y in range(first_row, height)
         for x in range(width)
         if is_target(x, y)
     )
-    if remaining_lower_band_pixels:
-        raise RuntimeError(
-            "Qibla icon still has "
-            f"{remaining_lower_band_pixels} near-white pixels in the lower band."
-        )
-
-    if removed == 0:
-        print("QIBLA lower-band cleanup: no near-white pixels found")
-    else:
-        print(
-            "QIBLA lower-edge cleanup verified: "
-            f"removed {removed} near-white pixels in rows "
-            f"{first_row}-{height - 1}"
-        )
+    print(
+        "QIBLA lower-edge cleanup: "
+        f"removed {removed} bottom-connected near-white pixels; "
+        f"preserved {retained_lower_white} isolated near-white pixels "
+        f"in rows {first_row}-{height - 1}"
+    )
     return image
 
 def inspect_qibla_output(path: Path):
@@ -173,7 +160,7 @@ def inspect_qibla_output(path: Path):
             edge_opaque += int(pixels[0, y][3] > 0)
             edge_opaque += int(pixels[width - 1, y][3] > 0)
 
-        first_lower_row = max(0, int(height * 0.82))
+        first_lower_row = max(0, int(height * 0.965))
         lower_near_white = sum(
             1
             for y in range(first_lower_row, height)
@@ -186,7 +173,7 @@ def inspect_qibla_output(path: Path):
             "QIBLA_OUTPUT_INSPECTION: "
             f"size={width}x{height}, alpha_bbox={alpha_bbox}, "
             f"nontransparent_outer_edge_pixels={edge_opaque}, "
-            f"visible_near_white_lower_pixels={lower_near_white}, "
+            f"visible_near_white_bottom_band_pixels={lower_near_white}, "
             f"corner_alpha={[pixels[0, 0][3], pixels[width - 1, 0][3], pixels[0, height - 1][3], pixels[width - 1, height - 1][3]]}"
         )
 
