@@ -1940,7 +1940,7 @@ Widget _buildMushafPage({
               child: Material(
                 color: selected
                     ? _ornamentColor.withValues(alpha: 0.20)
-                    : Colors.white.withValues(alpha: 0.045),
+                    : _textColor.withValues(alpha: 0.045),
                 borderRadius: BorderRadius.circular(13),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(13),
@@ -1955,7 +1955,7 @@ Widget _buildMushafPage({
                       border: Border.all(
                         color: selected
                             ? _ornamentColor
-                            : Colors.white.withValues(alpha: 0.16),
+                            : _textColor.withValues(alpha: 0.16),
                         width: selected ? 1.4 : 0.8,
                       ),
                     ),
@@ -2001,7 +2001,7 @@ Widget _buildMushafPage({
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: _textColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                           ),
@@ -2049,7 +2049,7 @@ Widget _buildMushafPage({
           onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back_rounded,
-            color: Colors.white,
+            color: _textColor,
           ),
         ),
         Expanded(
@@ -2064,7 +2064,7 @@ Widget _buildMushafPage({
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: _textColor,
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                 ),
@@ -2165,7 +2165,7 @@ Widget _buildMushafPage({
                       _isCompleted
                           ? Icons.check_circle_rounded
                           : Icons.radio_button_unchecked_rounded,
-                      color: _isCompleted ? _ornamentColor : Colors.white70,
+                      color: _isCompleted ? _ornamentColor : _textColor.withValues(alpha: 0.72),
                       size: 19,
                     ),
                     const SizedBox(width: 7),
@@ -2178,7 +2178,7 @@ Widget _buildMushafPage({
                               : 'quran_page_read_question',
                         ),
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: _textColor,
                           fontSize: 11,
                         ),
                       ),
@@ -2222,7 +2222,7 @@ Widget _buildMushafPage({
                         data: SliderTheme.of(context).copyWith(
                           activeTrackColor: _ornamentColor,
                           inactiveTrackColor:
-                              Colors.white.withValues(alpha: 0.22),
+                              _textColor.withValues(alpha: 0.22),
                           thumbColor: Colors.white,
                           overlayColor:
                               _ornamentColor.withValues(alpha: 0.15),
@@ -2269,7 +2269,7 @@ Widget _buildMushafPage({
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: DefaultTextStyle(
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: _textColor,
                     ),
                     child: Row(
                       children: [
