@@ -367,6 +367,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                 fontSize: 28,
                 height: 1.9,
                 fontWeight: FontWeight.w600,
+                fontFamily: 'MuminHafs',
                 fontFamilyFallback: const ['Noto Naskh Arabic', 'serif'],
               ),
             ),
