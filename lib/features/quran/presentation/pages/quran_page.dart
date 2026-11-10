@@ -17,6 +17,8 @@ import '../../domain/models/quran_reading_progress.dart';
 import '../../domain/repositories/quran_bookmark_repository.dart';
 import '../../domain/repositories/quran_reading_progress_repository.dart';
 import '../localization/quran_page_localization.dart';
+import '../widgets/quran_trilingual_reader.dart';
+import '../../data/datasources/quran_trilingual_data_source.dart';
 
 class _SurahInfo {
   final String name;
@@ -667,6 +669,70 @@ class _QuranPageState extends State<QuranPage>
         );
       },
     );
+  }
+
+  Future<void> _saveTrilingualVerseBookmark(
+    QuranTrilingualAyah verse,
+    String surahName,
+  ) async {
+    if (verse.surahNumber < 1 ||
+        verse.surahNumber > 114 ||
+        verse.ayahNumber < 1 ||
+        verse.arabic.isEmpty) {
+      _showMessage(
+        QuranPageLocalization.text(context, 'quran_invalid_ayah_data'),
+      );
+      return;
+    }
+
+    final entry = <String, dynamic>{
+      'sura': verse.surahNumber,
+      'aya': verse.ayahNumber,
+      'page': _currentPage,
+      'text': verse.arabic,
+      'suraName': surahName,
+      'layout': 'trilingual',
+    };
+
+    try {
+      await _queueWrite(() async {
+        final preferences = await SharedPreferences.getInstance();
+        final entries =
+            preferences.getStringList(_verseBookmarksKey) ?? [];
+        final alreadySaved = _verseBookmarks.any(
+          (item) =>
+              item['sura'] == verse.surahNumber &&
+              item['aya'] == verse.ayahNumber,
+        );
+
+        if (alreadySaved) {
+          if (mounted) {
+            _showMessage(
+              QuranPageLocalization.text(context, 'quran_ayah_already_saved'),
+            );
+          }
+          return;
+        }
+
+        entries.add(jsonEncode(entry));
+        final saved = await preferences.setStringList(
+          _verseBookmarksKey,
+          entries,
+        );
+        if (!saved) {
+          throw StateError('Verse bookmark could not be saved');
+        }
+        if (!mounted) return;
+        setState(() => _verseBookmarks.add(entry));
+        _showMessage(
+          QuranPageLocalization.text(context, 'quran_ayah_saved'),
+        );
+      });
+    } catch (_) {
+      _showMessage(
+        QuranPageLocalization.text(context, 'quran_ayah_save_error'),
+      );
+    }
   }
 
   Future<void> _saveVerseBookmark(
@@ -1339,23 +1405,23 @@ Future<int?> _goToPage() async {
   Future<void> _openFullReader() async {
     if (_isLoading || !mounted) return;
 
+    var initialSurah = 1;
+    for (var index = 0; index < _surahs.length; index++) {
+      if (_surahs[index].page <= _currentPage) {
+        initialSurah = index + 1;
+      } else {
+        break;
+      }
+    }
+
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => _QuranFullScreenReader(
-          initialPage: _currentPage,
-          completedPages: _completedPages,
-          bookmarkedPages: _bookmarks,
-          onPageChanged: (page) {
-            _selectPage(page, saveImmediately: true);
-          },
-          onTogglePageBookmark: _toggleBookmark,
-          onMarkPageRead: _markCurrentPageRead,
-          onUndoPageRead: _undoCurrentPageRead,
-          onVerseAction: _saveVerseBookmark,
-          onOpenIndex: _openIndex,
-          onOpenPageBookmarks: _openBookmarks,
-          onOpenVerseBookmarks: _openVerseBookmarks,
-          onGoToPage: _goToPage,
+        builder: (_) => QuranTrilingualReader(
+          initialSurah: initialSurah,
+          initialAyah: 1,
+          surahNames: _surahs.map((item) => item.name).toList(growable: false),
+          onClose: () => Navigator.of(_).pop(),
+          onVerseBookmark: _saveTrilingualVerseBookmark,
         ),
       ),
     );
@@ -1364,7 +1430,6 @@ Future<int?> _goToPage() async {
       setState(() {});
     }
   }
-
 void _openSurahFromNavigation(int page) {
   if (_isLoading || !_isValidPage(page)) return;
 
