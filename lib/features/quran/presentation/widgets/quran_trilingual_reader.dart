@@ -348,7 +348,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                 tooltip: _text('quran_reader_copy_verse'),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => Clipboard.setData(
-                  ClipboardData(text: '${verse.arabic}\n\n${verse.french}\n\n${verse.english}'),
+                  ClipboardData(
+                    text: '${verse.arabic}\n\n${verse.french}\n${verse.frenchFootnotes}\n\n${verse.english}\n${verse.englishFootnotes}',
+                  ),
                 ),
                 icon: Icon(Icons.copy_rounded, color: _secondaryText, size: 19),
               ),
@@ -373,8 +375,22 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           Container(height: 1, color: _accent.withValues(alpha: 0.25)),
           const SizedBox(height: 11),
           _translationBlock(_text('quran_reader_french_label'), verse.french),
+          if (verse.frenchFootnotes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _translationBlock(
+              _text('quran_reader_french_notes'),
+              verse.frenchFootnotes,
+            ),
+          ],
           const SizedBox(height: 12),
           _translationBlock(_text('quran_reader_english_label'), verse.english),
+          if (verse.englishFootnotes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _translationBlock(
+              _text('quran_reader_english_notes'),
+              verse.englishFootnotes,
+            ),
+          ],
         ],
       ),
       ),
@@ -493,6 +509,8 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     final arabicSource = _text('quran_reader_arabic_source');
     final englishSource = _text('quran_reader_english_source');
     final frenchSource = _text('quran_reader_french_source');
+    final translationDisclaimer =
+        QuranPageLocalization.text(context, 'quran_translation_disclaimer');
     return Scaffold(
       backgroundColor: _background,
       body: CustomPaint(
@@ -570,6 +588,12 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                 '$frenchSource v${QuranTrilingualDataSource.frenchVersion}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _secondaryText.withValues(alpha: 0.75), fontSize: 8),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                translationDisclaimer,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _secondaryText.withValues(alpha: 0.68), fontSize: 8),
               ),
             ),
           ],
