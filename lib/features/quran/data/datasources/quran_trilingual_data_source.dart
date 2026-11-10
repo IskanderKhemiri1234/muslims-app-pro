@@ -117,11 +117,11 @@ class QuranTrilingualSurah {
   factory QuranTrilingualSurah.fromJson(Map<String, dynamic> json) {
     final raw = json['verses'];
     if (raw is! List || raw.isEmpty) {
-      throw const FormatException('Cached surah has no verses.');
+      throw const FormatException('Bundled surah has no verses.');
     }
     final number = json['number'];
     if (number is! int || number < 1 || number > 114) {
-      throw const FormatException('Cached surah number is invalid.');
+      throw const FormatException('Bundled surah number is invalid.');
     }
     final verses = raw
         .map((item) => QuranTrilingualAyah.fromJson(
@@ -129,11 +129,11 @@ class QuranTrilingualSurah {
             ))
         .toList(growable: false);
     if (verses.length != QuranTrilingualDataSource.expectedAyahCounts[number - 1]) {
-      throw const FormatException('Cached surah ayah count is invalid.');
+      throw const FormatException('Bundled surah ayah count is invalid.');
     }
     for (var i = 0; i < verses.length; i++) {
       if (verses[i].surahNumber != number || verses[i].ayahNumber != i + 1) {
-        throw const FormatException('Cached verse sequence is invalid.');
+        throw const FormatException('Bundled verse sequence is invalid.');
       }
     }
     return QuranTrilingualSurah(
@@ -192,7 +192,7 @@ class QuranTrilingualAyah {
         arabic.isEmpty ||
         english.isEmpty ||
         french.isEmpty) {
-      throw const FormatException('Cached Quran verse is invalid.');
+      throw const FormatException('Bundled Quran verse is invalid.');
     }
     return QuranTrilingualAyah(
       surahNumber: surah,
