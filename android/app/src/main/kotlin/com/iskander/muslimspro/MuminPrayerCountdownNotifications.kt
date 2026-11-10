@@ -11,7 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
@@ -265,12 +264,12 @@ object MuminPrayerCountdownNotifications {
             setCategory(Notification.CATEGORY_STATUS)
             setVisibility(Notification.VISIBILITY_PUBLIC)
             setShowWhen(true)
-            // Notification chronometers use elapsedRealtime(), not
-            // wall-clock epoch milliseconds. Passing targetTime directly
-            // makes Android calculate an invalid countdown base.
-            val remainingMillis =
-                (targetTime - System.currentTimeMillis()).coerceAtLeast(0L)
-            setWhen(SystemClock.elapsedRealtime() + remainingMillis)
+            // Notification.when is a wall-clock timestamp. Android's
+            // Notification chronometer converts it internally; supplying an
+            // elapsedRealtime() value here makes the UI treat a small uptime
+            // as an epoch timestamp and can display hundreds of thousands
+            // of hours instead of the remaining prayer time.
+            setWhen(targetTime)
             setUsesChronometer(true)
             setOngoing(true)
             setAutoCancel(false)
@@ -314,15 +313,14 @@ object MuminPrayerCountdownNotifications {
         check(remainingMillis > 0L) {
             "The selected next-prayer time is no longer in the future."
         }
-        val chronometerBase = SystemClock.elapsedRealtime() + remainingMillis
-
-        // Use Android's native chronometer only. Custom RemoteViews can be
-        // accepted by NotificationManager yet suppress or mis-render the
-        // countdown on vendor notification surfaces (including One UI).
+        // Keep the absolute prayer instant as Notification.when. Android
+        // owns the live countdown rendering and updates it every second.
+        // Do not replace this wall-clock timestamp with elapsedRealtime():
+        // Notification.Builder.setWhen() expects the event timestamp, unlike
+        // Chronometer.setBase(), which uses the monotonic elapsed clock.
         val builder = createBaseBuilder(
             context, title, prayerName, description, targetTime
         ).apply {
-            setWhen(chronometerBase)
             setUsesChronometer(true)
             setShowWhen(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -341,7 +339,7 @@ object MuminPrayerCountdownNotifications {
             TAG,
             "NATIVE_COUNTDOWN_POSTED id=$NOTIFICATION_ID " +
                 "target=$targetTime remainingMs=$remainingMillis " +
-                "chronometerBase=$chronometerBase active=true"
+                "notificationWhen=$targetTime active=true"
         )
     }
 
