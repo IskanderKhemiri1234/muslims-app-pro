@@ -1,6 +1,7 @@
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
@@ -35,6 +36,74 @@ class MuminPrayerCountdownNotificationService {
   final GlobalPrayerCalculationService _calculationService;
   final MethodChannel _channel;
 
+  static const String diagnosticsStatusKey = 'mumin_countdown_diag_status';
+  static const String diagnosticsErrorKey = 'mumin_countdown_diag_error';
+  static const String diagnosticsGeneratedEntriesKey =
+      'mumin_countdown_diag_generated_entries';
+  static const String diagnosticsLastSyncAtKey =
+      'mumin_countdown_diag_last_sync_at';
+  static const String diagnosticsTimezoneKey = 'mumin_countdown_diag_timezone';
+  static const String diagnosticsNextPrayerKey =
+      'mumin_countdown_diag_next_prayer';
+  static const String diagnosticsNextPrayerTimeKey =
+      'mumin_countdown_diag_next_prayer_time';
+
+  Future<Map<String, Object?>> getAndroidDiagnostics() async {
+    final diagnostics = await _channel.invokeMapMethod<String, Object?>(
+      'getPrayerCountdownDiagnostics',
+    );
+    if (diagnostics == null) {
+      throw StateError('Android returned an empty countdown diagnostics report.');
+    }
+    return diagnostics;
+  }
+
+  Future<void> saveDiagnosticFailure(Object error) async {
+    await _saveDiagnostics(
+      status: 'failed',
+      error: error.toString(),
+    );
+  }
+
+  Future<void> _saveDiagnostics({
+    required String status,
+    String? error,
+    int? generatedEntries,
+    String? timezone,
+    String? nextPrayer,
+    int? nextPrayerTimeMillis,
+  }) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(diagnosticsStatusKey, status);
+    if (error == null || error.isEmpty) {
+      await preferences.remove(diagnosticsErrorKey);
+    } else {
+      await preferences.setString(diagnosticsErrorKey, error);
+    }
+    if (generatedEntries != null) {
+      await preferences.setInt(
+        diagnosticsGeneratedEntriesKey,
+        generatedEntries,
+      );
+    }
+    if (timezone != null) {
+      await preferences.setString(diagnosticsTimezoneKey, timezone);
+    }
+    if (nextPrayer != null) {
+      await preferences.setString(diagnosticsNextPrayerKey, nextPrayer);
+    }
+    if (nextPrayerTimeMillis != null) {
+      await preferences.setInt(
+        diagnosticsNextPrayerTimeKey,
+        nextPrayerTimeMillis,
+      );
+    }
+    await preferences.setString(
+      diagnosticsLastSyncAtKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
+  }
+
   /// Sends a validated future prayer schedule to Android.
   ///
   /// The notification itself is created and maintained by the
@@ -45,15 +114,20 @@ class MuminPrayerCountdownNotificationService {
     required String notificationTitle,
     required String notificationDescription,
   }) async {
-    if (!controller.isInitialized ||
-        !controller.hasUsableSchedule) {
-      return;
+    await _saveDiagnostics(status: 'generating');
+
+    if (!controller.isInitialized || !controller.hasUsableSchedule) {
+      throw StateError(
+        'Prayer countdown synchronization stopped: the prayer controller is not initialized or has no usable schedule.',
+      );
     }
 
     final timezone = controller.timezoneLocation;
 
     if (timezone == null) {
-      return;
+      throw StateError(
+        'Prayer countdown synchronization stopped: the prayer timezone is not initialized.',
+      );
     }
 
     if (notificationTitle.trim().isEmpty ||
@@ -122,14 +196,42 @@ class MuminPrayerCountdownNotificationService {
       );
     }
 
-    await _channel.invokeMethod<void>(
-      'syncPrayerCountdown',
-      <String, Object>{
-        'entries': entries,
-        'title': notificationTitle,
-        'description': notificationDescription,
-        'timezone': timezone.name,
-      },
+    await _saveDiagnostics(
+      status: 'sending',
+      generatedEntries: entries.length,
+      timezone: timezone.name,
+      nextPrayer: entries.first['name']! as String,
+      nextPrayerTimeMillis: entries.first['timeMillis']! as int,
+    );
+
+    try {
+      await _channel.invokeMethod<void>(
+        'syncPrayerCountdown',
+        <String, Object>{
+          'entries': entries,
+          'title': notificationTitle,
+          'description': notificationDescription,
+          'timezone': timezone.name,
+        },
+      );
+    } catch (error) {
+      await _saveDiagnostics(
+        status: 'failed',
+        error: error.toString(),
+        generatedEntries: entries.length,
+        timezone: timezone.name,
+        nextPrayer: entries.first['name']! as String,
+        nextPrayerTimeMillis: entries.first['timeMillis']! as int,
+      );
+      rethrow;
+    }
+
+    await _saveDiagnostics(
+      status: 'synchronized',
+      generatedEntries: entries.length,
+      timezone: timezone.name,
+      nextPrayer: entries.first['name']! as String,
+      nextPrayerTimeMillis: entries.first['timeMillis']! as int,
     );
   }
 
