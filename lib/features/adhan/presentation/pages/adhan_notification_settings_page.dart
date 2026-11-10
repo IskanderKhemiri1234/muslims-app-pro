@@ -8,6 +8,7 @@ import '../../../../core/localization/mumin_language_controller.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../data/services/mumin_adhan_notification_service.dart';
 import '../../data/services/mumin_adhan_notification_coordinator.dart';
+import 'prayer_countdown_diagnostics_page.dart';
 
 class AdhanNotificationSettingsPage extends StatefulWidget {
   const AdhanNotificationSettingsPage({super.key});
@@ -697,6 +698,32 @@ class _AdhanNotificationSettingsPageState
                     value: _countdownEnabled,
                     onChanged: _saving ? null : _toggleCountdown,
                     activeThumbColor: const Color(0xFFD8B66A),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton.icon(
+                      onPressed: _saving
+                          ? null
+                          : () {
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      const PrayerCountdownDiagnosticsPage(),
+                                ),
+                              );
+                            },
+                      icon: const Icon(Icons.monitor_heart_outlined),
+                      label: Text(
+                        _t(
+                          'تشخيص حالة الإشعار',
+                          'Diagnose notification status',
+                          'Diagnostiquer les notifications',
+                        ),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 20),

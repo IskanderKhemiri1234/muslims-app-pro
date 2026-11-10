@@ -218,6 +218,23 @@ class MainActivity : AudioServiceActivity() {
 
             when (call.method) {
 
+                "getPrayerCountdownDiagnostics" -> {
+                    try {
+                        result.success(
+                            MuminPrayerCountdownNotifications.diagnostics(
+                                applicationContext
+                            )
+                        )
+                    } catch (exception: Exception) {
+                        result.error(
+                            "PRAYER_COUNTDOWN_DIAGNOSTICS_ERROR",
+                            exception.message
+                                ?: "Unable to read Android countdown diagnostics.",
+                            null
+                        )
+                    }
+                }
+
                 "syncPrayerCountdown" -> {
                     try {
                         val rawEntries = call.argument<List<*>>("entries")

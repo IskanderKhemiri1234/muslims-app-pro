@@ -79,6 +79,73 @@ object MuminPrayerCountdownNotifications {
         refresh(context)
     }
 
+    fun diagnostics(context: Context): Map<String, Any?> {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.getNotificationChannel(CHANNEL_ID)
+        } else {
+            null
+        }
+        val storedEntries = preferences.getString(ENTRIES_KEY, null)
+        val entries = try {
+            storedEntries?.let { JSONArray(it) }
+        } catch (exception: Exception) {
+            null
+        }
+        val now = System.currentTimeMillis()
+        var nextPrayer: JSONObject? = null
+        var nextPrayerTime = Long.MAX_VALUE
+        if (entries != null) {
+            for (index in 0 until entries.length()) {
+                val entry = entries.optJSONObject(index) ?: continue
+                val timestamp = entry.optLong("timeMillis", 0L)
+                if (timestamp > now && timestamp < nextPrayerTime) {
+                    nextPrayer = entry
+                    nextPrayerTime = timestamp
+                }
+            }
+        }
+        var activeNotification = false
+        var activeNotificationCheckError: String? = null
+        try {
+            activeNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                manager.activeNotifications.any { it.id == NOTIFICATION_ID }
+            } else {
+                false
+            }
+        } catch (exception: SecurityException) {
+            activeNotificationCheckError = exception.message ?: exception.javaClass.simpleName
+        }
+
+        val permissionGranted =
+            Build.VERSION.SDK_INT < 33 ||
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+        val notificationsEnabled =
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val channelImportance = channel?.importance ?: -1
+
+        return mapOf(
+            "sdkInt" to Build.VERSION.SDK_INT,
+            "permissionGranted" to permissionGranted,
+            "notificationsEnabled" to notificationsEnabled,
+            "channelId" to CHANNEL_ID,
+            "channelExists" to (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || channel != null),
+            "channelImportance" to channelImportance,
+            "channelBlocked" to (channelImportance == NotificationManager.IMPORTANCE_NONE),
+            "notificationId" to NOTIFICATION_ID,
+            "activeNotification" to activeNotification,
+            "activeNotificationCheckError" to activeNotificationCheckError,
+            "scheduleStored" to (storedEntries != null),
+            "storedEntriesCount" to (entries?.length() ?: 0),
+            "timezone" to preferences.getString(TIMEZONE_KEY, null),
+            "nextPrayerName" to nextPrayer?.optString("name"),
+            "nextPrayerEnglishName" to nextPrayer?.optString("englishName"),
+            "nextPrayerTimeMillis" to nextPrayer?.optLong("timeMillis")
+        )
+    }
+
     fun cancel(context: Context) {
         cancelAlarm(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
