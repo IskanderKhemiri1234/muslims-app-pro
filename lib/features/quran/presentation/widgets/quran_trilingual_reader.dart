@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/quran_trilingual_data_source.dart';
+import '../localization/quran_page_localization.dart';
 
 enum _TrilingualTheme { day, night, warmPaper }
 
@@ -220,17 +221,22 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتمل تنزيل القرآن وترجمتيه للعمل دون اتصال')),
+        SnackBar(
+          content: Text(_text('quran_reader_download_complete')),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إكمال التنزيل: $error')),
+        SnackBar(content: Text(_text('quran_reader_download_failed'))),
       );
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
   }
+
+  String _text(String key, {Map<String, Object?> parameters = const {}}) =>
+      QuranPageLocalization.text(context, key, parameters: parameters);
 
   String _surahName(int number) {
     if (number < 1 || number > widget.surahNames.length) {
@@ -245,9 +251,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   Widget _buildThemePicker() {
     const labels = <_TrilingualTheme, String>{
-      _TrilingualTheme.day: 'الزمرد الملكي',
-      _TrilingualTheme.night: 'ليالي سماوية',
-      _TrilingualTheme.warmPaper: 'العاج الملكي',
+      _TrilingualTheme.day: 'quran_theme_day',
+      _TrilingualTheme.night: 'quran_theme_night',
+      _TrilingualTheme.warmPaper: 'quran_theme_warm_paper',
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
@@ -270,7 +276,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                     ),
                   ),
                   child: Text(
-                    entry.value,
+                    _text(entry.value),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -333,13 +339,13 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
               ),
               const Spacer(),
               IconButton(
-                tooltip: 'حفظ الآية',
+                tooltip: _text('quran_reader_bookmark_verse'),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _bookmark(verse),
                 icon: Icon(Icons.bookmark_add_outlined, color: _accent, size: 21),
               ),
               IconButton(
-                tooltip: 'نسخ الآية',
+                tooltip: _text('quran_reader_copy_verse'),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => Clipboard.setData(
                   ClipboardData(text: '${verse.arabic}\n\n${verse.french}\n\n${verse.english}'),
@@ -366,9 +372,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           const SizedBox(height: 15),
           Container(height: 1, color: _accent.withValues(alpha: 0.25)),
           const SizedBox(height: 11),
-          _translationBlock('FRANÇAIS', verse.french),
+          _translationBlock(_text('quran_reader_french_label'), verse.french),
           const SizedBox(height: 12),
-          _translationBlock('ENGLISH', verse.english),
+          _translationBlock(_text('quran_reader_english_label'), verse.english),
         ],
       ),
       ),
@@ -420,14 +426,14 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
               Icon(Icons.cloud_off_rounded, color: _accent, size: 42),
               const SizedBox(height: 12),
               Text(
-                'تعذر تحميل السورة. تحقق من الاتصال أو أعد المحاولة.',
+                _text('quran_reader_load_failed'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _primaryText),
               ),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => _loadSurah(_surahNumber, targetAyah: _currentAyah),
-                child: const Text('إعادة المحاولة'),
+                child: Text(_text('quran_reader_retry')),
               ),
             ],
           ),
@@ -463,7 +469,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '${surah.verses.length} آية  •  AR / FR / EN',
+                    '${_text('quran_reader_verse_count', parameters: {'count': surah.verses.length})}  •  ${_text('quran_reader_languages')}',
                     textDirection: TextDirection.ltr,
                     style: TextStyle(color: _secondaryText, fontSize: 11),
                   ),
@@ -518,7 +524,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'تنزيل القرآن كاملاً',
+                    tooltip: _text('quran_reader_download_all'),
                     onPressed: _downloading ? null : _downloadAll,
                     icon: Icon(Icons.download_for_offline_outlined, color: _accent),
                   ),
@@ -537,7 +543,10 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'تنزيل السور: $_downloadedSurahs / 114',
+                      _text('quran_reader_download_progress', parameters: {
+                        'completed': _downloadedSurahs,
+                        'total': 114,
+                      }),
                       style: TextStyle(color: _secondaryText, fontSize: 10),
                     ),
                   ],
@@ -548,9 +557,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 9),
               child: Text(
-                'النص العربي: QuranEnc / رواية حفص • '
-                'English: Saheeh International v${QuranTrilingualDataSource.englishVersion} • '
-                'Français: Rachid Maach v${QuranTrilingualDataSource.frenchVersion}',
+                '${_text('quran_reader_arabic_source')} • '
+                '${_text('quran_reader_english_source')} v${QuranTrilingualDataSource.englishVersion} • '
+                '${_text('quran_reader_french_source')} v${QuranTrilingualDataSource.frenchVersion}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _secondaryText.withValues(alpha: 0.75), fontSize: 8),
               ),
