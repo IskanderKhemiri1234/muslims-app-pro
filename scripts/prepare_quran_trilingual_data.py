@@ -64,7 +64,7 @@ def verify_pinned_translation_versions() -> None:
     }
     for language in ("en", "fr"):
         url = (
-            f"https://quranenc.com/api/v1/translations/list/{language}"
+            f"https://quranenc.com/api/v1/translations/list/{language}/"
             f"?localization={language}"
         )
         request = urllib.request.Request(
