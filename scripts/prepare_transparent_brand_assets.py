@@ -78,6 +78,39 @@ def remove_edge_background(image: Image.Image, backgrounds):
 
     return image
 
+def remove_qibla_bottom_white_residue(image: Image.Image):
+    """Clear only near-white background residue in the empty bottom safety margin.
+
+    The compass ornament ends above this narrow strip. Restricting the cleanup
+    to neutral near-white pixels in the final 3.5% of the source prevents
+    touching the gold/teal artwork, its highlights, or its soft shadow.
+    """
+    image = image.convert("RGBA")
+    pixels = image.load()
+    width, height = image.size
+    first_row = int(height * 0.965)
+    removed = 0
+
+    for y in range(first_row, height):
+        for x in range(width):
+            red, green, blue, alpha = pixels[x, y]
+            if alpha == 0:
+                continue
+            if (
+                min(red, green, blue) >= 238
+                and max(red, green, blue) - min(red, green, blue) <= 18
+            ):
+                pixels[x, y] = (red, green, blue, 0)
+                removed += 1
+
+    print(
+        "QIBLA bottom-margin cleanup: "
+        f"{removed} near-white pixels made transparent "
+        f"within rows {first_row}-{height - 1}"
+    )
+    return image
+
+
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -133,6 +166,9 @@ def main():
                 prepared,
                 [(background, threshold)],
             )
+
+        if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
+            prepared = remove_qibla_bottom_white_residue(prepared)
 
         if config.get("crop_square"):
             prepared = crop_logo(prepared)
