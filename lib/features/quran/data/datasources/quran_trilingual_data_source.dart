@@ -35,7 +35,7 @@ class QuranTrilingualDataSource {
   }
 
   File _fileFor(Directory directory, int surah) =>
-      File('${directory.path}/surah_${surah.toString().padLeft(3, '0')}.json');
+      File("${directory.path}/surah_${surah.toString().padLeft(3, '0')}.json");
 
   Future<QuranTrilingualSurah> getSurah(int surahNumber) async {
     _validateSurah(surahNumber);
