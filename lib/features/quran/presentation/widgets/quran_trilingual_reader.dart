@@ -125,17 +125,15 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     try {
       final surah = await _source.getSurah(number);
       if (!mounted) return;
-      if (targetAyah > surah.verses.length) {
-        throw const FormatException('Saved verse is outside this surah.');
-      }
+      final safeAyah = targetAyah.clamp(1, surah.verses.length);
       setState(() {
         _surah = surah;
         _loading = false;
-        _currentAyah = targetAyah;
+        _currentAyah = safeAyah;
       });
-      await _savePosition(number, targetAyah);
+      await _savePosition(number, safeAyah);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _revealAyah(targetAyah);
+        if (mounted) _revealAyah(safeAyah);
       });
     } catch (error) {
       if (!mounted) return;
