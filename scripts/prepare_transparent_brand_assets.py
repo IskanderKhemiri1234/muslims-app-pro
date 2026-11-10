@@ -370,6 +370,12 @@ def main():
 
         if config.get("crop_square"):
             prepared = crop_logo(prepared)
+            # Lanczos resampling can create a fresh dark fringe at the final
+            # transparent boundary even after the source outline was removed.
+            # Run the edge-connected cleanup once more on the exact 1024px
+            # deliverable, then let verify() reject any remaining dark halo.
+            if source_relative == "assets/branding/mumin_pro_logo.png":
+                prepared = remove_logo_black_outline(prepared)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         prepared.save(output, format="PNG", optimize=True)
