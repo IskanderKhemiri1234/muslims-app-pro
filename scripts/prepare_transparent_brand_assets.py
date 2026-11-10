@@ -18,10 +18,6 @@ OUTPUTS = {
     "assets/branding/mumin_pro_logo.png": {
         "output": "assets/branding/processed/mumin_pro_logo.png",
         "backgrounds": [((255, 0, 255), 105)],
-        # The uploaded export also contains a black outer frame around the
-        # colored app mark. Remove only black pixels connected to the newly
-        # exposed outer edge; enclosed dark artwork remains untouched.
-        "post_backgrounds": [((0, 0, 0), 52)],
         "crop_square": True,
     },
     "assets/images/home/reference_ui/icon_qibla.png": {
@@ -183,6 +179,76 @@ def inspect_qibla_output(path: Path):
             f"corner_alpha={[pixels[0, 0][3], pixels[width - 1, 0][3], pixels[0, height - 1][3], pixels[width - 1, height - 1][3]]}"
         )
 
+def remove_logo_black_outline(image: Image.Image):
+    """Remove only the near-black outline touching the transparent logo edge.
+
+    The source export has a thin black stroke around the rounded-square tile.
+    Removing the magenta first exposes that stroke, so seed from every dark
+    pixel directly adjacent to transparency and flood only through near-black
+    pixels. Dark emerald/blue artwork and enclosed details are preserved.
+    """
+    image = image.convert("RGBA")
+    pixels = image.load()
+    width, height = image.size
+    visited = bytearray(width * height)
+    queue = []
+
+    def is_outline(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return alpha > 0 and max(red, green, blue) <= 72
+
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y][3] != 0:
+                continue
+            for nx, ny in (
+                (x - 1, y - 1), (x, y - 1), (x + 1, y - 1),
+                (x - 1, y),                 (x + 1, y),
+                (x - 1, y + 1), (x, y + 1), (x + 1, y + 1),
+            ):
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                index = ny * width + nx
+                if not visited[index] and is_outline(nx, ny):
+                    visited[index] = 1
+                    queue.append((nx, ny))
+
+    cursor = 0
+    removed = 0
+    while cursor < len(queue):
+        x, y = queue[cursor]
+        cursor += 1
+        red, green, blue, _ = pixels[x, y]
+        pixels[x, y] = (red, green, blue, 0)
+        removed += 1
+
+        for nx, ny in (
+            (x - 1, y - 1), (x, y - 1), (x + 1, y - 1),
+            (x - 1, y),                 (x + 1, y),
+            (x - 1, y + 1), (x, y + 1), (x + 1, y + 1),
+        ):
+            if not (0 <= nx < width and 0 <= ny < height):
+                continue
+            index = ny * width + nx
+            if visited[index]:
+                continue
+            visited[index] = 1
+            if is_outline(nx, ny):
+                queue.append((nx, ny))
+
+    if removed == 0:
+        raise RuntimeError(
+            "The Mumin Pro source outline was not detected; refusing to "
+            "publish an icon that may retain the black perimeter."
+        )
+
+    print(
+        "MUMIN_LOGO_OUTLINE_CLEANUP: "
+        f"removed {removed} transparent-edge-connected near-black pixels"
+    )
+    return image
+
+
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -234,6 +300,32 @@ def verify(path: Path):
                     f"{width_fraction:.1%} x {height_fraction:.1%}; "
                     f"maximum is {safe_zone_limit:.0%}."
                 )
+            boundary_dark_pixels = 0
+            pixels = rgba.load()
+            for y in range(bbox[1], bbox[3]):
+                for x in range(bbox[0], bbox[2]):
+                    if pixels[x, y][3] == 0:
+                        continue
+                    red, green, blue, _ = pixels[x, y]
+                    if max(red, green, blue) > 72:
+                        continue
+                    if any(
+                        not (0 <= nx < rgba.width and 0 <= ny < rgba.height)
+                        or pixels[nx, ny][3] == 0
+                        for nx, ny in (
+                            (x - 1, y), (x + 1, y),
+                            (x, y - 1), (x, y + 1),
+                        )
+                    ):
+                        boundary_dark_pixels += 1
+            if boundary_dark_pixels:
+                raise RuntimeError(
+                    "Mumin Pro still has a near-black outline touching its "
+                    f"transparent edge ({boundary_dark_pixels} pixels)."
+                )
+            print(
+                "MUMIN_LOGO_EDGE_CHECK: no near-black perimeter remains"
+            )
             print(
                 "ADAPTIVE_ICON_SAFE_ZONE: "
                 f"artwork={width_fraction:.1%}x{height_fraction:.1%}, "
@@ -262,11 +354,8 @@ def main():
                 config["backgrounds"],
             )
 
-        for background, threshold in config.get("post_backgrounds", []):
-            prepared = remove_edge_background(
-                prepared,
-                [(background, threshold)],
-            )
+        if source_relative == "assets/branding/mumin_pro_logo.png":
+            prepared = remove_logo_black_outline(prepared)
 
         if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
             prepared = remove_qibla_bottom_white_residue(prepared)
