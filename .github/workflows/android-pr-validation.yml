@@ -48,6 +48,9 @@ jobs:
           test -f android/app/build.gradle
           test -f android/app/src/main/AndroidManifest.xml
 
+      - name: Prepare official Hafs v20 Quran font
+        run: python3 scripts/prepare_quran_font.py
+
       - name: Install dependencies
         run: flutter pub get
 
