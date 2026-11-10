@@ -1,0 +1,93 @@
+name: Android Pull Request Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Flutter and Android changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          flutter --version
+          dart --version
+          java -version
+
+      - name: Validate required project files
+        run: |
+          test -f pubspec.yaml
+          test -f lib/main.dart
+          test -f android/app/build.gradle
+          test -f android/app/src/main/AndroidManifest.xml
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate offline Madina Quran assets
+        run: dart run quran_madina_flutter:bundle
+
+      - name: Verify offline Quran asset output
+        run: |
+          test -d assets/quran_madina/assets/db/v2
+          test -d assets/quran_madina/assets/img
+          test -d assets/quran_madina/dist
+
+      - name: Validate Android XML resources
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          root = Path("android/app/src/main")
+          failed = []
+          for path in sorted(root.rglob("*.xml")):
+              try:
+                  ET.fromstring(path.read_text(encoding="utf-8-sig"))
+              except Exception as error:
+                  failed.append((path, error))
+
+          for path, error in failed:
+              print(f"INVALID XML: {path}: {error}")
+
+          if failed:
+              raise SystemExit(f"{len(failed)} Android XML file(s) are invalid.")
+
+          print("All Android XML resources are valid.")
+          PY
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Compile Android debug APK
+        run: flutter build apk --debug
