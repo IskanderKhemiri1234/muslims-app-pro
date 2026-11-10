@@ -85,8 +85,8 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
     """Remove only near-white fragments connected to the bottom image edge.
 
     The cleanup is limited to the final 3.5% of the image and starts only from
-    near-white pixels on the bottom row. Disconnected white highlights and
-    intentional artwork are retained.
+    near-white pixels on the bottom row. Only orthogonal (4-connected)
+    pixels are removed; diagonal-only contact does not erase artwork.
     """
     image = image.convert("RGBA")
     pixels = image.load()
@@ -121,14 +121,20 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
         pixels[x, y] = (red, green, blue, 0)
         removed += 1
 
-        for next_y in range(max(first_row, y - 1), min(height - 1, y + 1) + 1):
-            for next_x in range(max(0, x - 1), min(width - 1, x + 1) + 1):
-                index = (next_y - first_row) * width + next_x
-                if visited[index]:
-                    continue
-                visited[index] = 1
-                if is_target(next_x, next_y):
-                    queue.append((next_x, next_y))
+        # Use 4-connected neighbors only. Diagonal contact is not enough
+        # to classify a white pixel as residue: this protects nearby white
+        # details and edges of the Qibla artwork from being erased.
+        for next_x, next_y in (
+            (x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)
+        ):
+            if not (0 <= next_x < width and first_row <= next_y < height):
+                continue
+            index = (next_y - first_row) * width + next_x
+            if visited[index]:
+                continue
+            visited[index] = 1
+            if is_target(next_x, next_y):
+                queue.append((next_x, next_y))
 
     retained_lower_white = sum(
         1
