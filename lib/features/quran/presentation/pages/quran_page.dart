@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1706,36 +1707,36 @@ class _QuranFullScreenReaderState
   bool get _isBookmarked =>
       widget.bookmarkedPages.contains(_currentPage);
 
-  Color get _background {
-    switch (_readerTheme) {
-      case _QuranReaderTheme.day:
-        return const Color(0xFF35432B);
-      case _QuranReaderTheme.night:
-        return const Color(0xFF000000);
-      case _QuranReaderTheme.warmPaper:
-        return const Color(0xFF4C2E1D);
-    }
-  }
+  Color get _background => switch (_readerTheme) {
+        _QuranReaderTheme.day => const Color(0xFF061D18),
+        _QuranReaderTheme.night => const Color(0xFF071326),
+        _QuranReaderTheme.warmPaper => const Color(0xFFE9D9B8),
+      };
 
-  Color get _pageBackground {
-    switch (_readerTheme) {
-      case _QuranReaderTheme.day:
-        return const Color(0xFF6F7B4D);
-      case _QuranReaderTheme.night:
-        return const Color(0xFF050505);
-      case _QuranReaderTheme.warmPaper:
-        return const Color(0xFF805638);
-    }
-  }
+  Color get _textColor => switch (_readerTheme) {
+        _QuranReaderTheme.day => const Color(0xFFF4EBD7),
+        _QuranReaderTheme.night => const Color(0xFFF0F3F7),
+        _QuranReaderTheme.warmPaper => const Color(0xFF33281D),
+      };
 
-  Color get _textColor => Colors.white;
+  Color get _secondaryTextColor => switch (_readerTheme) {
+        _QuranReaderTheme.day => const Color(0xFFC7D8C8),
+        _QuranReaderTheme.night => const Color(0xFFB8C8DC),
+        _QuranReaderTheme.warmPaper => const Color(0xFF6D5638),
+      };
 
-  Color get _secondaryTextColor =>
-      Colors.white.withValues(alpha: 0.78);
+  Color get _ornamentColor => switch (_readerTheme) {
+        _QuranReaderTheme.day => const Color(0xFFD9BA75),
+        _QuranReaderTheme.night => const Color(0xFFC6D4E8),
+        _QuranReaderTheme.warmPaper => const Color(0xFF806039),
+      };
 
   String _cssColor(Color color) {
-    final rgb = color.toARGB32() & 0xFFFFFF;
+    final argb = color.toARGB32();
+    final alpha = (argb >> 24) & 0xFF;
+    if (alpha == 0) return 'transparent';
 
+    final rgb = argb & 0xFFFFFF;
     return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
   }
 
@@ -1827,14 +1828,14 @@ Widget _buildMushafPage({
   // platform WebView in FittedBox/Transform: that scales its native surface
   // incorrectly and can make the Mushaf appear clipped or miniature.
   //
-  // The bundled 1441H page has exactly 15 printed lines and a 15.4376-em
-  // line width. The local renderer's line pitch is tuned to 2.3em so all
-  // fifteen lines use the portrait viewport instead of leaving a large
-  // unused lower band. Keep a 44dp total horizontal inset so the first and
-  // last glyphs never sit against the screen edges.
+  // The Madina 1441H source uses 15 printed lines and a 15.4376-em
+  // line width. Fit glyph width first, then constrain font size by the
+  // available height using a 2.7em pitch to eliminate the lower dead zone.
+  // Measurements are logical pixels, so the result scales cleanly to 4K
+  // displays without shipping large raster backgrounds or taxing older GPUs.
   const lineWidthEm = 15.4376;
   const pageLineCount = 15.0;
-  const linePitchEm = 2.3;
+  const linePitchEm = 2.7;
   const horizontalInset = 44.0;
   final pageHeight = height > 0 ? height : 1.0;
   final usableWidth = (width - horizontalInset).clamp(1.0, width);
@@ -1846,8 +1847,8 @@ Widget _buildMushafPage({
 
   return SizedBox.expand(
     child: ClipRect(
-      child: ColoredBox(
-        color: _pageBackground,
+      child: CustomPaint(
+        painter: _MushafBackgroundPainter(theme: _readerTheme),
         child: RepaintBoundary(
           child: QuranMadinaFlutter(
             key: ValueKey<String>(
@@ -1859,7 +1860,7 @@ Widget _buildMushafPage({
             headless: true,
             fontSize: fontSize,
             textColor: _cssColor(_textColor),
-            backgroundColor: _cssColor(_pageBackground),
+            backgroundColor: 'transparent',
             ayaActions: [
               QuranAyaAction(
                 id: 'save_ayah',
@@ -1912,15 +1913,6 @@ Widget _buildMushafPage({
                     ),
                   );
                 },
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _MushafOrnamentPainter(
-                      color: _gold,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -2364,130 +2356,146 @@ Widget build(BuildContext context) {
 }
 }
 
-  class _MushafOrnamentPainter extends CustomPainter {
-  const _MushafOrnamentPainter({
-    required this.color,
-  });
+class _MushafBackgroundPainter extends CustomPainter {
+  const _MushafBackgroundPainter({required this.theme});
 
-  final Color color;
+  final _QuranReaderTheme theme;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = color.withValues(alpha: 0.88)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.15;
-
-    final softPaint = Paint()
-      ..color = color.withValues(alpha: 0.48)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.75;
-
-    final outerRect = Rect.fromLTWH(
-      3,
-      3,
-      size.width - 6,
-      size.height - 6,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        outerRect,
-        const Radius.circular(11),
-      ),
-      linePaint,
-    );
-
-    final innerRect = Rect.fromLTWH(
-      7,
-      7,
-      size.width - 14,
-      size.height - 14,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        innerRect,
-        const Radius.circular(9),
-      ),
-      softPaint,
-    );
-
-    void drawCorner(
-      double x,
-      double y,
-      double horizontalDirection,
-      double verticalDirection,
-    ) {
-      final path = Path()
-        ..moveTo(
-          x + horizontalDirection * 34,
-          y,
-        )
-        ..lineTo(
-          x + horizontalDirection * 11,
-          y,
-        )
-        ..quadraticBezierTo(
-          x,
-          y,
-          x,
-          y + verticalDirection * 11,
-        )
-        ..lineTo(
-          x,
-          y + verticalDirection * 34,
-        );
-
-      canvas.drawPath(path, linePaint);
-
-      final diamond = Path()
-        ..moveTo(
-          x + horizontalDirection * 8,
-          y + verticalDirection * 8,
-        )
-        ..lineTo(
-          x + horizontalDirection * 13,
-          y + verticalDirection * 13,
-        )
-        ..lineTo(
-          x + horizontalDirection * 8,
-          y + verticalDirection * 18,
-        )
-        ..lineTo(
-          x + horizontalDirection * 3,
-          y + verticalDirection * 13,
-        )
-        ..close();
-
-      canvas.drawPath(diamond, linePaint);
-
-      canvas.drawCircle(
-        Offset(
-          x + horizontalDirection * 21,
-          y + verticalDirection * 21,
+    final colors = switch (theme) {
+      _QuranReaderTheme.day => (
+          base: const Color(0xFF061D18),
+          middle: const Color(0xFF0B382D),
+          deep: const Color(0xFF031510),
+          accent: const Color(0xFFD9BA75),
+          secondary: const Color(0xFF8DB5A3),
         ),
-        2,
-        linePaint,
+      _QuranReaderTheme.night => (
+          base: const Color(0xFF050D1B),
+          middle: const Color(0xFF142641),
+          deep: const Color(0xFF07111F),
+          accent: const Color(0xFFC6D4E8),
+          secondary: const Color(0xFF7795B5),
+        ),
+      _QuranReaderTheme.warmPaper => (
+          base: const Color(0xFFF1E5C9),
+          middle: const Color(0xFFE3D0A7),
+          deep: const Color(0xFFC9AE7B),
+          accent: const Color(0xFF806039),
+          secondary: const Color(0xFFB18B55),
+        ),
+    };
+
+    final bounds = Offset.zero & size;
+    final backgroundPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [colors.base, colors.middle, colors.deep],
+        stops: const [0, 0.56, 1],
+      ).createShader(bounds);
+    canvas.drawRect(bounds, backgroundPaint);
+
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          colors.secondary.withValues(alpha: 0.15),
+          colors.secondary.withValues(alpha: 0.035),
+          Colors.transparent,
+        ],
+        stops: const [0, 0.48, 1],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.5, size.height * 0.42),
+          radius: size.longestSide * 0.72,
+        ),
       );
+    canvas.drawRect(bounds, glowPaint);
+
+    final framePaint = Paint()
+      ..color = colors.accent.withValues(alpha: 0.24)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    final fineFramePaint = Paint()
+      ..color = colors.secondary.withValues(alpha: 0.17)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.55;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(9, 9, size.width - 18, size.height - 18),
+        const Radius.circular(18),
+      ),
+      framePaint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(14, 14, size.width - 28, size.height - 28),
+        const Radius.circular(14),
+      ),
+      fineFramePaint,
+    );
+
+    void drawStar(Offset center, double radius, Paint paint) {
+      final path = Path();
+      for (var point = 0; point < 16; point++) {
+        final angle = -math.pi / 2 + point * math.pi / 8;
+        final currentRadius = point.isEven ? radius : radius * 0.48;
+        final offset = Offset(
+          center.dx + math.cos(angle) * currentRadius,
+          center.dy + math.sin(angle) * currentRadius,
+        );
+        if (point == 0) {
+          path.moveTo(offset.dx, offset.dy);
+        } else {
+          path.lineTo(offset.dx, offset.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(path, paint);
+      canvas.drawCircle(center, 2.2, paint);
     }
 
-    drawCorner(5, 5, 1, 1);
-    drawCorner(size.width - 5, 5, -1, 1);
-    drawCorner(5, size.height - 5, 1, -1);
-    drawCorner(
-      size.width - 5,
-      size.height - 5,
-      -1,
-      -1,
+    final motifPaint = Paint()
+      ..color = colors.accent.withValues(alpha: 0.18)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
+    final dotPaint = Paint()
+      ..color = colors.secondary.withValues(alpha: 0.22);
+
+    // Restrict detailed geometry to the margins. The centre remains calm
+    // behind the sacred text and repaint work stays light on older devices.
+    for (var y = 76.0; y < size.height - 70; y += 112) {
+      drawStar(Offset(30, y), 12, motifPaint);
+      drawStar(Offset(size.width - 30, y), 12, motifPaint);
+      canvas.drawCircle(Offset(30, y + 27), 1.5, dotPaint);
+      canvas.drawCircle(Offset(size.width - 30, y + 27), 1.5, dotPaint);
+    }
+
+    drawStar(const Offset(30, 30), 17, framePaint);
+    drawStar(Offset(size.width - 30, 30), 17, framePaint);
+    drawStar(Offset(30, size.height - 30), 17, framePaint);
+    drawStar(Offset(size.width - 30, size.height - 30), 17, framePaint);
+
+    final sideLine = Paint()
+      ..color = colors.accent.withValues(alpha: 0.13)
+      ..strokeWidth = 0.6;
+    canvas.drawLine(
+      Offset(24, 62),
+      Offset(24, size.height - 62),
+      sideLine,
+    );
+    canvas.drawLine(
+      Offset(size.width - 24, 62),
+      Offset(size.width - 24, size.height - 62),
+      sideLine,
     );
   }
 
   @override
-  bool shouldRepaint(
-    covariant _MushafOrnamentPainter oldDelegate,
-  ) {
-    return oldDelegate.color != color;
+  bool shouldRepaint(covariant _MushafBackgroundPainter oldDelegate) {
+    return oldDelegate.theme != theme;
   }
 }
 
