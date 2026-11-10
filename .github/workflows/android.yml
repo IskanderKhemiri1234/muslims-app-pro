@@ -82,6 +82,9 @@ jobs:
       - name: Prepare and verify transparent brand artwork
         run: python3 scripts/prepare_transparent_brand_assets.py
 
+      - name: Prepare official Hafs v20 Quran font
+        run: python3 scripts/prepare_quran_font.py
+
       - name: Install dependencies
         run: flutter pub get
 
