@@ -311,6 +311,16 @@ class _AdhanNotificationSettingsPageState
               ),
       );
     } catch (error) {
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setBool(
+          _countdownPreferenceKey,
+          _countdownEnabled,
+        );
+      } catch (_) {
+        // Preserve the original synchronization error for the user.
+      }
+
       if (!mounted) return;
       setState(() {
         _saving = false;
@@ -318,9 +328,9 @@ class _AdhanNotificationSettingsPageState
       });
       _showMessage(
         _t(
-          'تعذر تفعيل شريط الصلاة. تحقق من إذن الإشعارات.',
-          'Could not update the prayer countdown. Check notification permission.',
-          'Impossible de modifier le compte à rebours. Vérifiez l’autorisation des notifications.',
+          'تعذر تفعيل شريط الصلاة. تحقق من إذن الإشعارات أو قناة الإشعار الدائم في إعدادات Android.',
+          'Could not update the prayer countdown. Check notification permission or the persistent notification channel in Android settings.',
+          'Impossible de modifier le compte à rebours. Vérifiez l’autorisation ou le canal de notification permanent dans les paramètres Android.',
         ),
       );
     }
