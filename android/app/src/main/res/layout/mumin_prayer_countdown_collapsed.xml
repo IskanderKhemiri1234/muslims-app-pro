@@ -2,13 +2,13 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="64dp"
+    android:minHeight="48dp"
     android:orientation="vertical"
     android:gravity="center_vertical"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp"
     android:background="@drawable/mumin_countdown_notification_bg">
 
     <TextView
@@ -22,27 +22,34 @@
         android:maxLines="1"
         android:ellipsize="end" />
 
-    <TextView
-        android:id="@+id/mumin_countdown_prayer"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
-        android:textColor="#FFFFFCF5"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:layout_marginTop="2dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <Chronometer
-        android:id="@+id/mumin_countdown_timer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="0dp"
-        android:format="%s"
-        android:textColor="#E8CE91"
-        android:textSize="19sp"
-        android:textStyle="bold"
-        android:fontFamily="sans"
-        android:gravity="start"
-        android:contentDescription="Countdown to next prayer" />
+        <TextView
+            android:id="@+id/mumin_countdown_prayer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#FFFFFCF5"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <Chronometer
+            android:id="@+id/mumin_countdown_timer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:format="%s"
+            android:textColor="#E8CE91"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:fontFamily="sans"
+            android:gravity="end"
+            android:contentDescription="Countdown to next prayer" />
+    </LinearLayout>
 </LinearLayout>
