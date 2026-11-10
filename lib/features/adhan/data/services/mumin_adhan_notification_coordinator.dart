@@ -70,9 +70,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
       _locationNotificationService;
 
   bool _disposed = false;
-  bool _refreshing = false;
-  bool _refreshRequested = false;
-  bool _forceRefreshRequested = false;
+  Future<void> _refreshTail = Future<void>.value();
 
   String? _lastFingerprint;
   String? _lastSuccessfulScheduleSignature;
@@ -167,36 +165,42 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     }
   }
 
-  /// Serializes refresh operations and coalesces repeated requests.
-  Future<void> refresh({bool force = false, bool rethrowErrors = false}) async {
-    if (_disposed) return;
+  /// Queues every synchronization request.
+  ///
+  /// A caller that requests error propagation waits for its own queued
+  /// synchronization to finish; it can no longer return early merely because
+  /// another refresh was already running.
+  Future<void> refresh({
+    bool force = false,
+    bool rethrowErrors = false,
+  }) {
+    if (_disposed) return Future<void>.value();
 
-    _refreshRequested = true;
-    _forceRefreshRequested =
-        _forceRefreshRequested || force;
+    final operation = _refreshTail.then((_) async {
+      if (_disposed) return;
+      await _performRefresh(force: force);
+    });
 
-    if (_refreshing) return;
+    _refreshTail = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint(
+          'Mumin Pro: notification coordinator failed: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      },
+    );
 
-    _refreshing = true;
+    if (rethrowErrors) return operation;
 
-    try {
-      while (_refreshRequested && !_disposed) {
-        _refreshRequested = false;
-
-        final forceCurrent = _forceRefreshRequested;
-        _forceRefreshRequested = false;
-
-        await _performRefresh(force: forceCurrent);
-      }
-    } catch (error, stackTrace) {
-      debugPrint(
-        'Mumin Pro: notification coordinator failed: $error',
-      );
-      debugPrintStack(stackTrace: stackTrace);
-      if (rethrowErrors) rethrow;
-    } finally {
-      _refreshing = false;
-    }
+    return operation.catchError(
+      (Object error, StackTrace stackTrace) {
+        debugPrint(
+          'Mumin Pro: notification coordinator failed: $error',
+        );
+        debugPrintStack(stackTrace: stackTrace);
+      },
+    );
   }
 
   Future<void> _performRefresh({required bool force}) async {
