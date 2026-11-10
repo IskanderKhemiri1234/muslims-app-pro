@@ -225,7 +225,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           content: Text(_text('quran_reader_download_complete')),
         ),
       );
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_text('quran_reader_download_failed'))),
@@ -454,6 +454,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
         itemCount: surah.verses.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
+            final verseCount = _text(
+              'quran_reader_verse_count',
+              parameters: {'count': surah.verses.length},
+            );
+            final languageLabels = _text('quran_reader_languages');
             return Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 15),
               child: Column(
@@ -469,7 +474,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '${_text('quran_reader_verse_count', parameters: {'count': surah.verses.length})}  •  ${_text('quran_reader_languages')}',
+                    '$verseCount  •  $languageLabels',
                     textDirection: TextDirection.ltr,
                     style: TextStyle(color: _secondaryText, fontSize: 11),
                   ),
@@ -485,6 +490,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   @override
   Widget build(BuildContext context) {
+    final arabicSource = _text('quran_reader_arabic_source');
+    final englishSource = _text('quran_reader_english_source');
+    final frenchSource = _text('quran_reader_french_source');
     return Scaffold(
       backgroundColor: _background,
       body: CustomPaint(
@@ -557,9 +565,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 9),
               child: Text(
-                '${_text('quran_reader_arabic_source')} • '
-                '${_text('quran_reader_english_source')} v${QuranTrilingualDataSource.englishVersion} • '
-                '${_text('quran_reader_french_source')} v${QuranTrilingualDataSource.frenchVersion}',
+                '$arabicSource • '
+                '$englishSource v${QuranTrilingualDataSource.englishVersion} • '
+                '$frenchSource v${QuranTrilingualDataSource.frenchVersion}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _secondaryText.withValues(alpha: 0.75), fontSize: 8),
               ),
