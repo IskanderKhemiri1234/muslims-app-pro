@@ -269,7 +269,15 @@ def crop_logo(image: Image.Image):
         mark,
         ((canvas_side - width) // 2, (canvas_side - height) // 2),
     )
-    return canvas.resize((1024, 1024), Image.Resampling.LANCZOS)
+    # Resize in premultiplied-alpha space. Resampling straight RGBA can
+    # blend transparent black RGB values into the visible edge and recreate
+    # the exact dark halo this pipeline is designed to remove.
+    premultiplied = canvas.convert("RGBa")
+    resized = premultiplied.resize(
+        (1024, 1024),
+        Image.Resampling.LANCZOS,
+    )
+    return resized.convert("RGBA")
 
 def verify(path: Path):
     with Image.open(path) as image:
