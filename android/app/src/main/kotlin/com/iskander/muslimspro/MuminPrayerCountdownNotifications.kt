@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import androidx.core.app.NotificationManagerCompat
 import android.widget.RemoteViews
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -182,12 +183,30 @@ object MuminPrayerCountdownNotifications {
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            throw SecurityException(
+                "Android notification permission is not granted for Mumin Pro."
+            )
         }
 
         val manager =
             context.getSystemService(Context.NOTIFICATION_SERVICE)
                 as NotificationManager
+
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            throw IllegalStateException(
+                "Android notifications are disabled for Mumin Pro."
+            )
+        }
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            manager.getNotificationChannel(CHANNEL_ID)?.importance ==
+                NotificationManager.IMPORTANCE_NONE
+        ) {
+            throw IllegalStateException(
+                "The Mumin Pro persistent countdown notification channel is blocked in Android settings."
+            )
+        }
 
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
