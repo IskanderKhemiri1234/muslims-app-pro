@@ -14,7 +14,11 @@ class QuranTrilingualDataSource {
       : _client = client ?? http.Client();
 
   static const String _baseUrl = 'https://quranenc.com/api/v1';
-  static const String arabicSource = 'QuranEnc.com / Uthmanic Hafs';
+  static const String arabicSource = 'QuranEnc.com / King Fahd Complex / Uthmanic Hafs v20';
+  static const String englishTranslationInfo =
+      'Translation of the meanings of the Noble Quran; Language: English; Translation ID: english_saheeh; Publisher: Saheeh International / Noor International Center; Source: QuranEnc.com; Version: 1.1.2.';
+  static const String frenchTranslationInfo =
+      'Traduction du sens des versets du Noble Coran; Language: French; Translation ID: french_rashid; Translator: Rachid Maach; Publisher: Rowwad Translation Center; Source: QuranEnc.com; Version: 1.0.3.';
   static const String englishKey = 'english_saheeh';
   static const String englishVersion = '1.1.2';
   static const String englishPublisher = 'Saheeh International / Noor International Center';
@@ -107,6 +111,8 @@ class QuranTrilingualDataSource {
       final frenchArabic = fr['arabic_text'];
       final english = en['translation'];
       final french = fr['translation'];
+      final englishFootnotes = en['footnotes'] ?? '';
+      final frenchFootnotes = fr['footnotes'] ?? '';
 
       if (enSurah != surahNumber ||
           frSurah != surahNumber ||
@@ -117,6 +123,8 @@ class QuranTrilingualDataSource {
           arabic != frenchArabic ||
           english is! String ||
           french is! String ||
+          englishFootnotes is! String ||
+          frenchFootnotes is! String ||
           english.trim().isEmpty ||
           french.trim().isEmpty) {
         throw FormatException(
@@ -130,6 +138,8 @@ class QuranTrilingualDataSource {
         arabic: arabic,
         english: english,
         french: french,
+        englishFootnotes: englishFootnotes,
+        frenchFootnotes: frenchFootnotes,
       ));
     }
 
@@ -257,6 +267,8 @@ class QuranTrilingualSurah {
         'arabicSource': QuranTrilingualDataSource.arabicSource,
         'englishPublisher': QuranTrilingualDataSource.englishPublisher,
         'frenchPublisher': QuranTrilingualDataSource.frenchPublisher,
+        'englishTranslationInfo': QuranTrilingualDataSource.englishTranslationInfo,
+        'frenchTranslationInfo': QuranTrilingualDataSource.frenchTranslationInfo,
         'verses': verses.map((verse) => verse.toJson()).toList(),
       };
 
@@ -298,6 +310,8 @@ class QuranTrilingualAyah {
     required this.arabic,
     required this.english,
     required this.french,
+    this.englishFootnotes = '',
+    this.frenchFootnotes = '',
   });
 
   final int surahNumber;
@@ -305,6 +319,8 @@ class QuranTrilingualAyah {
   final String arabic;
   final String english;
   final String french;
+  final String englishFootnotes;
+  final String frenchFootnotes;
 
   Map<String, dynamic> toJson() => {
         'surah': surahNumber,
@@ -312,6 +328,8 @@ class QuranTrilingualAyah {
         'arabic': arabic,
         'english': english,
         'french': french,
+        'englishFootnotes': englishFootnotes,
+        'frenchFootnotes': frenchFootnotes,
       };
 
   factory QuranTrilingualAyah.fromJson(Map<String, dynamic> json) {
@@ -320,11 +338,15 @@ class QuranTrilingualAyah {
     final arabic = json['arabic'];
     final english = json['english'];
     final french = json['french'];
+    final englishFootnotes = json['englishFootnotes'] ?? '';
+    final frenchFootnotes = json['frenchFootnotes'] ?? '';
     if (surah is! int ||
         ayah is! int ||
         arabic is! String ||
         english is! String ||
         french is! String ||
+        englishFootnotes is! String ||
+        frenchFootnotes is! String ||
         arabic.isEmpty ||
         english.isEmpty ||
         french.isEmpty) {
@@ -336,6 +358,8 @@ class QuranTrilingualAyah {
       arabic: arabic,
       english: english,
       french: french,
+      englishFootnotes: englishFootnotes,
+      frenchFootnotes: frenchFootnotes,
     );
   }
 }
