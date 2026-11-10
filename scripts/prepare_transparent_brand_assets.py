@@ -79,37 +79,58 @@ def remove_edge_background(image: Image.Image, backgrounds):
     return image
 
 def remove_qibla_bottom_white_residue(image: Image.Image):
-    """Clear only near-white background residue in the empty bottom safety margin.
+    """Remove only near-white components that touch the bottom image edge.
 
-    The compass ornament ends above this narrow strip. Restricting the cleanup
-    to neutral near-white pixels in the final 3.5% of the source prevents
-    touching the gold/teal artwork, its highlights, or its soft shadow.
+    Search is confined to the bottom 3.5% safety strip and starts only from
+    near-white pixels on the bottom row. White details that do not connect to
+    that edge are preserved. No color, alpha, or geometry outside the selected
+    connected components is changed.
     """
     image = image.convert("RGBA")
     pixels = image.load()
     width, height = image.size
-    first_row = int(height * 0.965)
-    removed = 0
+    first_row = max(0, int(height * 0.965))
+    visited = bytearray(width * (height - first_row))
+    queue = []
 
-    for y in range(first_row, height):
-        for x in range(width):
-            red, green, blue, alpha = pixels[x, y]
-            if alpha == 0:
-                continue
-            if (
-                min(red, green, blue) >= 238
-                and max(red, green, blue) - min(red, green, blue) <= 18
-            ):
-                pixels[x, y] = (red, green, blue, 0)
-                removed += 1
+    def is_target(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return (
+            alpha > 0
+            and min(red, green, blue) >= 238
+            and max(red, green, blue) - min(red, green, blue) <= 18
+        )
+
+    # Seed every pixel along the bottom edge, not just a few sampled points.
+    for x in range(width):
+        if is_target(x, height - 1):
+            queue.append((x, height - 1))
+            visited[(height - 1 - first_row) * width + x] = 1
+
+    removed = 0
+    cursor = 0
+    while cursor < len(queue):
+        x, y = queue[cursor]
+        cursor += 1
+        red, green, blue, alpha = pixels[x, y]
+        pixels[x, y] = (red, green, blue, 0)
+        removed += 1
+
+        for next_y in range(max(first_row, y - 1), min(height - 1, y + 1) + 1):
+            for next_x in range(max(0, x - 1), min(width - 1, x + 1) + 1):
+                index = (next_y - first_row) * width + next_x
+                if visited[index]:
+                    continue
+                visited[index] = 1
+                if is_target(next_x, next_y):
+                    queue.append((next_x, next_y))
 
     print(
-        "QIBLA bottom-margin cleanup: "
-        f"{removed} near-white pixels made transparent "
+        "QIBLA bottom-edge cleanup: "
+        f"{removed} connected near-white pixels made transparent "
         f"within rows {first_row}-{height - 1}"
     )
     return image
-
 
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
