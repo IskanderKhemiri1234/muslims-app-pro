@@ -11,7 +11,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
+import android.widget.RemoteViews
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
 import org.json.JSONObject
@@ -197,12 +199,10 @@ object MuminPrayerCountdownNotifications {
         val prayerName = nextEntry.optString("englishName")
             .ifBlank { nextEntry.optString("name") }
         val title = preferences.getString(TITLE_KEY, "Mumin Pro") ?: "Mumin Pro"
-        val description = preferences.getString(DESCRIPTION_KEY, "") ?: ""
-
         // Schedule the transition before posting UI. A notification rendering
         // failure must never prevent the next prayer refresh from being armed.
         scheduleNextTransition(context, nextTime)
-        showNotification(context, title, prayerName, description, nextTime)
+        showNotification(context, title, prayerName, nextTime)
     }
 
     private fun createNotificationChannel(context: Context) {
@@ -234,7 +234,6 @@ object MuminPrayerCountdownNotifications {
         context: Context,
         title: String,
         prayerName: String,
-        description: String,
         targetTime: Long
     ): Notification.Builder {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
@@ -257,9 +256,7 @@ object MuminPrayerCountdownNotifications {
         return builder.apply {
             setSmallIcon(R.drawable.ic_mumin_notification)
             setContentTitle(title)
-            setContentText(
-                if (description.isBlank()) prayerName else "$prayerName • $description"
-            )
+            setContentText(prayerName)
             setContentIntent(contentIntent)
             setCategory(Notification.CATEGORY_STATUS)
             setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -284,7 +281,6 @@ object MuminPrayerCountdownNotifications {
         context: Context,
         title: String,
         prayerName: String,
-        description: String,
         targetTime: Long
     ) {
         if (
@@ -319,12 +315,46 @@ object MuminPrayerCountdownNotifications {
         // Notification.Builder.setWhen() expects the event timestamp, unlike
         // Chronometer.setBase(), which uses the monotonic elapsed clock.
         val builder = createBaseBuilder(
-            context, title, prayerName, description, targetTime
+            context, title, prayerName, targetTime
         ).apply {
-            setUsesChronometer(true)
-            setShowWhen(true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                setChronometerCountDown(true)
+                val chronometerBase = SystemClock.elapsedRealtime() + remainingMillis
+                val collapsedView = RemoteViews(
+                    context.packageName,
+                    R.layout.mumin_prayer_countdown_collapsed
+                ).apply {
+                    setTextViewText(R.id.mumin_countdown_title, title)
+                    setTextViewText(R.id.mumin_countdown_prayer, prayerName)
+                    setChronometer(
+                        R.id.mumin_countdown_timer,
+                        chronometerBase,
+                        "%s",
+                        true
+                    )
+                    setChronometerCountDown(R.id.mumin_countdown_timer, true)
+                }
+                val expandedView = RemoteViews(
+                    context.packageName,
+                    R.layout.mumin_prayer_countdown_expanded
+                ).apply {
+                    setTextViewText(R.id.mumin_countdown_title, title)
+                    setTextViewText(R.id.mumin_countdown_prayer, prayerName)
+                    setChronometer(
+                        R.id.mumin_countdown_timer,
+                        chronometerBase,
+                        "%s",
+                        true
+                    )
+                    setChronometerCountDown(R.id.mumin_countdown_timer, true)
+                }
+                setUsesChronometer(false)
+                setShowWhen(false)
+                setCustomContentView(collapsedView)
+                setCustomBigContentView(expandedView)
+                setStyle(Notification.DecoratedCustomViewStyle())
+            } else {
+                setUsesChronometer(true)
+                setShowWhen(true)
             }
         }
 
