@@ -168,7 +168,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   }
 
   /// Serializes refresh operations and coalesces repeated requests.
-  Future<void> refresh({bool force = false}) async {
+  Future<void> refresh({bool force = false, bool rethrowErrors = false}) async {
     if (_disposed) return;
 
     _refreshRequested = true;
@@ -193,6 +193,7 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
         'Mumin Pro: notification coordinator failed: $error',
       );
       debugPrintStack(stackTrace: stackTrace);
+      if (rethrowErrors) rethrow;
     } finally {
       _refreshing = false;
     }
@@ -204,7 +205,9 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     if (!_prayerController.isInitialized ||
         !_prayerController.hasUsableSchedule ||
         _prayerController.timezoneLocation == null) {
-      return;
+      throw StateError(
+        'Prayer times and timezone must be ready before notifications can be synchronized.',
+      );
     }
 
     final enabledPrayers =
@@ -254,18 +257,8 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
       return;
     }
 
-    await _notificationService.reschedule(
-      controller: _prayerController,
-      prayerName: (prayer) => _resolvePrayerName(
-        prayer,
-        languageCode,
-      ),
-      notificationBody: _notificationBody(languageCode),
-      preferExact: preferExact,
-    );
-
-    if (_disposed) return;
-
+    // Synchronize the persistent countdown first so a failure in the
+    // separate scheduled-alert pipeline cannot prevent its creation.
     if (countdownEnabled && notificationsEnabled) {
       await _countdownNotificationService.synchronize(
         controller: _prayerController,
@@ -280,6 +273,18 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
     } else {
       await _countdownNotificationService.cancel();
     }
+
+    if (_disposed) return;
+
+    await _notificationService.reschedule(
+      controller: _prayerController,
+      prayerName: (prayer) => _resolvePrayerName(
+        prayer,
+        languageCode,
+      ),
+      notificationBody: _notificationBody(languageCode),
+      preferExact: preferExact,
+    );
 
     if (_disposed) return;
 
