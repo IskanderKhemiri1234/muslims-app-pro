@@ -146,7 +146,7 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
         )
 
     if removed == 0:
-        print("QIBLA lower-edge cleanup: no connected near-white residue found")
+        print("QIBLA lower-band cleanup: no near-white pixels found")
     else:
         print(
             "QIBLA lower-edge cleanup verified: "
