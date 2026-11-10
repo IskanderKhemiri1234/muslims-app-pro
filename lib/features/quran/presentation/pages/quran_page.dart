@@ -1324,7 +1324,7 @@ Future<int?> _goToPage() async {
         builder: (_) => QuranTrilingualReader(
           initialSurah: initialSurah,
           initialAyah: 1,
-          surahNames: _surahs.map((item) => item.name).toList(growable: false),
+          surahNames: QuranPageLocalization.surahNames(context),
           onClose: () => Navigator.of(_).pop(),
           onVerseBookmark: _saveTrilingualVerseBookmark,
         ),
