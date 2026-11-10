@@ -258,7 +258,13 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   Widget _buildVerse(QuranTrilingualAyah verse) {
     final number = verse.ayahNumber.toString();
-    return Container(
+    return InkWell(
+      onTap: () {
+        _currentAyah = verse.ayahNumber;
+        unawaited(_savePosition(_surahNumber, verse.ayahNumber));
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
       key: _verseKeys.putIfAbsent(verse.ayahNumber, GlobalKey.new),
       margin: const EdgeInsets.fromLTRB(12, 7, 12, 7),
       padding: const EdgeInsets.fromLTRB(16, 17, 16, 15),
@@ -332,6 +338,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           _translationBlock('ENGLISH', verse.english),
         ],
       ),
+      ),
     );
   }
 
@@ -396,20 +403,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     }
 
     final surah = _surah!;
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollUpdateNotification) {
-          final viewport = notification.metrics;
-          final estimated = (viewport.pixels / 360).floor() + 1;
-          final ayah = estimated.clamp(1, surah.verses.length);
-          if (ayah != _currentAyah) {
-            _currentAyah = ayah;
-            unawaited(_savePosition(_surahNumber, ayah));
-          }
-        }
-        return false;
-      },
-      child: ListView.builder(
+    return ListView.builder(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 8, bottom: 28),
@@ -441,7 +435,6 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           }
           return _buildVerse(surah.verses[index - 1]);
         },
-      ),
     );
   }
 
