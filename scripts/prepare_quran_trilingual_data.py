@@ -218,6 +218,7 @@ def build_surah(
 def main() -> None:
     if len(EXPECTED_COUNTS) != 114 or sum(EXPECTED_COUNTS) != EXPECTED_TOTAL:
         raise SystemExit("Internal Quran surah-count contract is invalid.")
+    verify_pinned_translation_versions()
     canonical = load_canonical_arabic()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
