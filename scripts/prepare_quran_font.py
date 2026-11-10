@@ -11,6 +11,7 @@ from pathlib import Path
 
 SOURCE_URL = "https://quranenc.com/downloads/assets/Hafs_20.zip"
 OUTPUT = Path("assets/quran_trilingual/fonts/Hafs_20.ttf")
+TEXT_OUTPUT = Path("assets/quran_trilingual/data/Quran_text.csv")
 
 
 def main() -> None:
@@ -41,10 +42,13 @@ def main() -> None:
             raise SystemExit("The matching Uthmanic Quran text is incomplete.")
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    TEXT_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_bytes(font_bytes)
+    TEXT_OUTPUT.write_bytes(quran_csv.encode("utf-8"))
     digest = hashlib.sha256(font_bytes).hexdigest()
     print(f"Prepared official Hafs v20 font: {OUTPUT}")
     print(f"Font SHA-256: {digest}")
+    print(f"Prepared matching Uthmanic Quran text: {TEXT_OUTPUT}")
     print("Verified matching QuranEnc Uthmanic text dataset: 6,236 rows or more.")
 
 
