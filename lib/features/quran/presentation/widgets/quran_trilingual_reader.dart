@@ -59,8 +59,6 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   int _surahNumber = 1;
   int _currentAyah = 1;
   bool _loading = true;
-  bool _downloading = false;
-  int _downloadedSurahs = 0;
   String? _error;
   String _languageCode = 'ar';
 
@@ -226,34 +224,6 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     setState(() => _theme = theme);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_themeKey, theme.name);
-  }
-
-  Future<void> _downloadAll() async {
-    if (_downloading) return;
-    setState(() {
-      _downloading = true;
-      _downloadedSurahs = 0;
-    });
-    try {
-      await _source.downloadCompleteQuran(
-        onProgress: (completed, total) {
-          if (mounted) setState(() => _downloadedSurahs = completed);
-        },
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_text('quran_reader_download_complete')),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_text('quran_reader_download_failed'))),
-      );
-    } finally {
-      if (mounted) setState(() => _downloading = false);
-    }
   }
 
   String _text(String key, {Map<String, Object?> parameters = const {}}) =>
@@ -605,7 +575,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                             child: Text('${number.toString()}  •  ${_surahName(number)}'),
                           );
                         }),
-                        onChanged: _loading || _downloading
+                        onChanged: _loading
                             ? null
                             : (value) {
                                 if (value != null) {
@@ -641,35 +611,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                       ),
                     ],
                   ),
-                  IconButton(
-                    tooltip: _text('quran_reader_download_all'),
-                    onPressed: _downloading ? null : _downloadAll,
-                    icon: Icon(Icons.download_for_offline_outlined, color: _accent),
-                  ),
                 ],
               ),
             ),
-            if (_downloading)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-                child: Column(
-                  children: [
-                    LinearProgressIndicator(
-                      value: _downloadedSurahs / 114,
-                      color: _accent,
-                      backgroundColor: _accent.withValues(alpha: 0.18),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _text('quran_reader_download_progress', parameters: {
-                        'completed': _downloadedSurahs,
-                        'total': 114,
-                      }),
-                      style: TextStyle(color: _secondaryText, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
             _buildThemePicker(),
             Expanded(child: _buildReaderBody()),
             Padding(
