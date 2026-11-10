@@ -289,7 +289,7 @@ class _AdhanNotificationSettingsPageState
 
       await context
           .read<MuminAdhanNotificationCoordinator>()
-          .refresh(force: true);
+          .refresh(force: true, rethrowErrors: true);
 
       if (!mounted) return;
       setState(() {
