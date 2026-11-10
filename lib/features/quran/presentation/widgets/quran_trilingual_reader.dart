@@ -290,20 +290,25 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     switch (action) {
       case 'bookmark':
         await widget.onTogglePageBookmark();
+        return;
       case 'mark_read':
         await widget.onMarkPageRead();
+        return;
       case 'undo_read':
         await widget.onUndoPageRead();
+        return;
       case 'index':
         final page = await widget.onOpenIndex();
         if (page != null && mounted) {
           await _loadSurah(_surahForPage(page));
         }
+        return;
       case 'go_to_page':
         final page = await widget.onGoToPage();
         if (page != null && mounted) {
           await _loadSurah(_surahForPage(page));
         }
+        return;
     }
   }
 
