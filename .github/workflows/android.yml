@@ -82,17 +82,12 @@ jobs:
       - name: Prepare and verify transparent brand artwork
         run: python3 scripts/prepare_transparent_brand_assets.py
 
+      - name: Prepare official Hafs v20 Quran font
+        run: python3 scripts/prepare_quran_font.py
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate Madina Quran assets
-        run: dart run quran_madina_flutter:bundle
-
-      - name: Verify Quran assets
-        run: |
-          test -d assets/quran_madina/assets/db/v2
-          test -d assets/quran_madina/assets/img
-          test -d assets/quran_madina/dist
 
       - name: Diagnose Android XML resources
         run: |

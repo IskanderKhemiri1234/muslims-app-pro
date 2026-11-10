@@ -17,8 +17,8 @@ quran-madina-html {
   --qmh-error-text: #1a1a1a;
   display: inline-flex;
   direction: rtl;
-  background-color:color-mix(in srgb, var(--qmh-background) 10%, transparent);
-  border-radius: 5px;
+  background-color: transparent;
+  border-radius: 0;
   overflow: hidden;
   /* Mobile Safari (and every iOS browser) enlarges text it finds too small on pages wider than
      the screen. The line geometry is pre-computed for the exact font size, so enlarged words

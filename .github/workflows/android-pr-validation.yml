@@ -48,17 +48,12 @@ jobs:
           test -f android/app/build.gradle
           test -f android/app/src/main/AndroidManifest.xml
 
+      - name: Prepare official Hafs v20 Quran font
+        run: python3 scripts/prepare_quran_font.py
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate offline Madina Quran assets
-        run: dart run quran_madina_flutter:bundle
-
-      - name: Verify offline Quran asset output
-        run: |
-          test -d assets/quran_madina/assets/db/v2
-          test -d assets/quran_madina/assets/img
-          test -d assets/quran_madina/dist
 
       - name: Validate Android XML resources
         run: |

@@ -16,7 +16,6 @@ dependencies:
     sdk: flutter
 
   # Core application
-  quran_madina_flutter: ^2.2.2
   cupertino_icons: ^1.0.8
   adhan: ^2.0.0
   provider: ^6.1.2
@@ -63,13 +62,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  fonts:
+    - family: MuminHafs
+      fonts:
+        - asset: assets/quran_trilingual/fonts/Hafs_20.ttf
+
   assets:
+    - assets/quran_trilingual/data/Quran_text.csv
     - assets/branding/
     - assets/branding/processed/
-    - assets/quran_madina/assets/db/v2/
-    - assets/quran_madina/assets/db/v2/Madina-1441H/
-    - assets/quran_madina/assets/img/
-    - assets/quran_madina/dist/
     - assets/images/adhan/mumin_adhan_hero.jpg
     - assets/images/home/mumin_reference_mosque.webp
     - assets/images/home/reference_ui/
