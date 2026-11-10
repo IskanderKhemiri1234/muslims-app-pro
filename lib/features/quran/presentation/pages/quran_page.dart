@@ -2000,7 +2000,7 @@ Widget _buildMushafPage({
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _textColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -2047,7 +2047,7 @@ Widget _buildMushafPage({
             'quran_back',
           ),
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_rounded,
             color: _textColor,
           ),
@@ -2063,7 +2063,7 @@ Widget _buildMushafPage({
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: _textColor,
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
@@ -2089,7 +2089,7 @@ Widget _buildMushafPage({
             'quran_index_title',
           ),
           onPressed: widget.onOpenIndex,
-          icon: const Icon(
+          icon: Icon(
             Icons.toc_rounded,
             color: _ornamentColor,
           ),
@@ -2100,7 +2100,7 @@ Widget _buildMushafPage({
             'quran_bookmarks_short',
           ),
           onPressed: widget.onOpenPageBookmarks,
-          icon: const Icon(
+          icon: Icon(
             Icons.bookmarks_outlined,
             color: _ornamentColor,
           ),
@@ -2111,7 +2111,7 @@ Widget _buildMushafPage({
             'quran_go_to_short',
           ),
           onPressed: _openGoToPage,
-          icon: const Icon(
+          icon: Icon(
             Icons.search_rounded,
             color: _ornamentColor,
           ),
@@ -2129,7 +2129,7 @@ Widget _buildMushafPage({
               builder: (_) => _buildBottomControls(),
             );
           },
-          icon: const Icon(
+          icon: Icon(
             Icons.tune_rounded,
             color: _ornamentColor,
           ),
@@ -2177,7 +2177,7 @@ Widget _buildMushafPage({
                               ? 'quran_page_read_completed'
                               : 'quran_page_read_question',
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _textColor,
                           fontSize: 11,
                         ),
@@ -2194,7 +2194,7 @@ Widget _buildMushafPage({
                               ? 'quran_undo'
                               : 'quran_mark_read',
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _ornamentColor,
                           fontWeight: FontWeight.bold,
                         ),
@@ -2211,7 +2211,7 @@ Widget _buildMushafPage({
                       ),
                       onPressed:
                           _currentPage > 1 ? _previousPage : null,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.chevron_right_rounded,
                         color: _ornamentColor,
                         size: 29,
@@ -2257,7 +2257,7 @@ Widget _buildMushafPage({
                       onPressed: _currentPage < _totalPages
                           ? _nextPage
                           : null,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.chevron_left_rounded,
                         color: _ornamentColor,
                         size: 29,
@@ -2268,7 +2268,7 @@ Widget _buildMushafPage({
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: DefaultTextStyle(
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _textColor,
                     ),
                     child: Row(
