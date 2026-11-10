@@ -117,7 +117,9 @@ class MuminPrayerCountdownNotificationService {
 
     if (entries.isEmpty) {
       await cancel();
-      return;
+      throw StateError(
+        'No future prayer times were generated for the persistent countdown.',
+      );
     }
 
     await _channel.invokeMethod<void>(
