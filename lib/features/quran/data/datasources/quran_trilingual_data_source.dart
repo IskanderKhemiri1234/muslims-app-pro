@@ -57,7 +57,14 @@ class QuranTrilingualDataSource {
     if (await file.exists()) {
       try {
         final decoded = jsonDecode(await file.readAsString());
-        return QuranTrilingualSurah.fromJson(decoded as Map<String, dynamic>);
+        final cached = QuranTrilingualSurah.fromJson(
+          decoded as Map<String, dynamic>,
+        );
+        if (cached.englishVersion == englishVersion &&
+            cached.frenchVersion == frenchVersion) {
+          return cached;
+        }
+        await file.delete();
       } catch (_) {
         // A damaged cache is removed and fetched again.
         await file.delete();
@@ -145,25 +152,39 @@ class QuranTrilingualDataSource {
     final uri = Uri.parse(
       '$_baseUrl/translation/sura/$translationKey/$surahNumber',
     );
-    final response = await _client
-        .get(uri, headers: const {'Accept': 'application/json'})
-        .timeout(const Duration(seconds: 30));
 
-    if (response.statusCode != 200) {
-      throw HttpException(
-        'QuranEnc request failed: HTTP ${response.statusCode}',
-        uri: uri,
-      );
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final response = await _client
+            .get(uri, headers: const {'Accept': 'application/json'})
+            .timeout(const Duration(seconds: 30));
+
+        if (response.statusCode != 200) {
+          throw HttpException(
+            'QuranEnc request failed: HTTP ${response.statusCode}',
+            uri: uri,
+          );
+        }
+
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is! Map<String, dynamic> ||
+            decoded['result'] is! List) {
+          throw const FormatException('Invalid QuranEnc response.');
+        }
+
+        return (decoded['result'] as List)
+            .whereType<Map<String, dynamic>>()
+            .toList(growable: false);
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) {
+          await Future.delayed(Duration(milliseconds: 450 * attempt));
+        }
+      }
     }
 
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    if (decoded is! Map<String, dynamic> || decoded['result'] is! List) {
-      throw const FormatException('Invalid QuranEnc response.');
-    }
-
-    return (decoded['result'] as List)
-        .whereType<Map<String, dynamic>>()
-        .toList(growable: false);
+    throw Exception('Unable to load verified Quran data: $lastError');
   }
 
   Future<bool> isCompleteOffline() async {
