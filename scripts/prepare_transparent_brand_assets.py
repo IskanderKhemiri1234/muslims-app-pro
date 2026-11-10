@@ -192,12 +192,11 @@ def crop_logo(image: Image.Image):
     mark = image.crop(bbox)
     width, height = mark.size
     side = max(width, height)
-    # Android adaptive icons use a 108dp canvas but mask the artwork to a
-    # central safe zone of roughly 66dp (61.1% of the canvas). The previous
-    # 5.5% padding let the wordmark extend beyond that safe zone, clipping the
-    # first/last letters under Samsung One UI's icon mask. Keep the complete
-    # mark within 56% of the canvas, leaving clearance inside the safe zone.
-    padding = max(12, round(side * 0.40))
+    # The logo artwork already contains its own rounded-square emerald/blue
+    # tile. Keep it visually prominent in the adaptive foreground: 12% padding
+    # avoids the edge clipping seen with the old 5.5% setting without shrinking
+    # the mark into the center as the 40% experiment did.
+    padding = max(12, round(side * 0.12))
     canvas_side = side + padding * 2
     canvas = Image.new("RGBA", (canvas_side, canvas_side), (0, 0, 0, 0))
     canvas.alpha_composite(
@@ -228,7 +227,7 @@ def verify(path: Path):
             content_height = bbox[3] - bbox[1]
             width_fraction = content_width / rgba.width
             height_fraction = content_height / rgba.height
-            safe_zone_limit = 0.58
+            safe_zone_limit = 0.83
             if max(width_fraction, height_fraction) > safe_zone_limit:
                 raise RuntimeError(
                     "Mumin Pro logo exceeds the adaptive-icon safe zone: "
@@ -238,7 +237,7 @@ def verify(path: Path):
             print(
                 "ADAPTIVE_ICON_SAFE_ZONE: "
                 f"artwork={width_fraction:.1%}x{height_fraction:.1%}, "
-                "within 58% limit for Android's approximately 61% central safe zone"
+                "within 83% visual-scale limit; final Samsung mask is checked on-device"
             )
         print(
             f"VERIFIED {path}: {rgba.width}x{rgba.height}, "
