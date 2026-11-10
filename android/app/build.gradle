@@ -77,31 +77,32 @@ android {
         multiDexEnabled true
     }
 
-    signingConfigs {
-        release {
-            def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
-            def storePasswordValue = System.getenv('ANDROID_KEYSTORE_PASSWORD')
-            def keyAliasValue = System.getenv('ANDROID_KEY_ALIAS')
-            def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
+    def releaseKeystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+    def releaseStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+    def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
+    def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+    def releaseSigningConfigured = [
+        releaseKeystorePath,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+    ].every { value -> value != null && !value.trim().isEmpty() }
 
-            if (!keystorePath || !storePasswordValue || !keyAliasValue || !keyPasswordValue) {
-                throw new GradleException(
-                    'Release signing is not configured. Provide ANDROID_KEYSTORE_PATH, ' +
-                    'ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD.'
-                )
+    if (releaseSigningConfigured) {
+        def releaseKeystoreFile = file(releaseKeystorePath)
+        if (!releaseKeystoreFile.isFile()) {
+            throw new GradleException(
+                "Release keystore file does not exist: ${releaseKeystorePath}"
+            )
+        }
+
+        signingConfigs {
+            release {
+                storeFile releaseKeystoreFile
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
-
-            def keystoreFile = file(keystorePath)
-            if (!keystoreFile.isFile()) {
-                throw new GradleException(
-                    "Release keystore file does not exist: ${keystorePath}"
-                )
-            }
-
-            storeFile keystoreFile
-            storePassword storePasswordValue
-            keyAlias keyAliasValue
-            keyPassword keyPasswordValue
         }
     }
 
@@ -111,9 +112,26 @@ android {
         }
 
         release {
-            signingConfig signingConfigs.release
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             shrinkResources false
+        }
+    }
+
+    // Debug builds must remain buildable without production signing secrets.
+    // Release packaging must never silently produce an unsigned deliverable.
+    tasks.configureEach { task ->
+        if (task.name in ['assembleRelease', 'bundleRelease', 'packageRelease']) {
+            task.doFirst {
+                if (!releaseSigningConfigured) {
+                    throw new GradleException(
+                        'Release signing is not configured. Provide ANDROID_KEYSTORE_PATH, ' +
+                        'ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD.'
+                    )
+                }
+            }
         }
     }
 }

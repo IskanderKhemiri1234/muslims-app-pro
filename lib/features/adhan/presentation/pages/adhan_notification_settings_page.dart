@@ -34,6 +34,9 @@ class _AdhanNotificationSettingsPageState
   bool _preferExact = false;
   bool _countdownEnabled = false;
 
+  bool get _allPrayersEnabled =>
+      _enabledPrayers.length == MuminAdhanNotificationService.supportedPrayers.length;
+
   String? _errorMessage;
 
   String _t(String ar, String en, String fr) {
@@ -108,6 +111,90 @@ class _AdhanNotificationSettingsPageState
     }
   }
 
+  Future<void> _toggleAllPrayers(bool enabled) async {
+    if (_saving) return;
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (enabled) {
+        final permission = await _service.requestNotificationPermission();
+        if (!permission || !await _service.areNotificationsEnabled()) {
+          throw StateError(
+            _t(
+              'لم يتم منح إذن الإشعارات. فعّله من إعدادات التطبيق.',
+              'Notification permission was not granted. Enable it in app settings.',
+              'L’autorisation des notifications n’a pas été accordée. Activez-la dans les paramètres.',
+            ),
+          );
+        }
+      }
+
+      final previousPrayers = Set<Prayer>.of(_enabledPrayers);
+      final requestedPrayers = enabled
+          ? Set<Prayer>.of(MuminAdhanNotificationService.supportedPrayers)
+          : <Prayer>{};
+
+      try {
+        for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
+          await _service.setPrayerEnabled(prayer, enabled: enabled);
+        }
+
+        await _refreshSchedule(enabledPrayers: requestedPrayers);
+      } catch (error) {
+        await _restorePrayerPreferences(previousPrayers);
+        try {
+          await _refreshSchedule(enabledPrayers: previousPrayers);
+        } catch (rollbackError) {
+          throw StateError(
+            'Prayer alert update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _enabledPrayers
+          ..clear()
+          ..addAll(requestedPrayers);
+      });
+
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage(
+        enabled
+            ? _t(
+                'تم تفعيل إشعارات الصلوات الخمس.',
+                'Notifications enabled for all five prayers.',
+                'Notifications activées pour les cinq prières.',
+              )
+            : _t(
+                'تم إيقاف إشعارات الصلوات الخمس.',
+                'Notifications disabled for all five prayers.',
+                'Notifications désactivées pour les cinq prières.',
+              ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = error.toString();
+      });
+      _showMessage(
+        _t(
+          'تعذر تحديث إشعارات الصلوات. تحقق من الإذن ومواقيت الصلاة.',
+          'Could not update prayer notifications. Check permission and prayer times.',
+          'Impossible de modifier les notifications. Vérifiez les autorisations et les horaires.',
+        ),
+      );
+    }
+  }
+
   Future<void> _togglePrayer(
     Prayer prayer,
     bool enabled,
@@ -135,18 +222,39 @@ class _AdhanNotificationSettingsPageState
         }
       }
 
-      await _service.setPrayerEnabled(
-        prayer,
-        enabled: enabled,
-      );
-
+      final previousPrayers = Set<Prayer>.of(_enabledPrayers);
+      final requestedPrayers = Set<Prayer>.of(previousPrayers);
       if (enabled) {
-        _enabledPrayers.add(prayer);
+        requestedPrayers.add(prayer);
       } else {
-        _enabledPrayers.remove(prayer);
+        requestedPrayers.remove(prayer);
       }
 
-      await _refreshSchedule();
+      await _service.setPrayerEnabled(prayer, enabled: enabled);
+      try {
+        await _refreshSchedule(enabledPrayers: requestedPrayers);
+      } catch (error) {
+        await _service.setPrayerEnabled(
+          prayer,
+          enabled: previousPrayers.contains(prayer),
+        );
+        try {
+          await _refreshSchedule(enabledPrayers: previousPrayers);
+        } catch (rollbackError) {
+          throw StateError(
+            'Prayer alert update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _enabledPrayers
+          ..clear()
+          ..addAll(requestedPrayers);
+      });
 
       if (!mounted) return;
 
@@ -218,7 +326,7 @@ class _AdhanNotificationSettingsPageState
 
       await context
           .read<MuminAdhanNotificationCoordinator>()
-          .refresh(force: true);
+          .refresh(force: true, rethrowErrors: true);
 
       if (!mounted) return;
       setState(() {
@@ -240,6 +348,16 @@ class _AdhanNotificationSettingsPageState
               ),
       );
     } catch (error) {
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setBool(
+          _countdownPreferenceKey,
+          _countdownEnabled,
+        );
+      } catch (_) {
+        // Preserve the original synchronization error for the user.
+      }
+
       if (!mounted) return;
       setState(() {
         _saving = false;
@@ -247,9 +365,9 @@ class _AdhanNotificationSettingsPageState
       });
       _showMessage(
         _t(
-          'تعذر تفعيل شريط الصلاة. تحقق من إذن الإشعارات.',
-          'Could not update the prayer countdown. Check notification permission.',
-          'Impossible de modifier le compte à rebours. Vérifiez l’autorisation des notifications.',
+          'تعذر تفعيل شريط الصلاة. تحقق من إذن الإشعارات أو قناة الإشعار الدائم في إعدادات Android.',
+          'Could not update the prayer countdown. Check notification permission or the persistent notification channel in Android settings.',
+          'Impossible de modifier le compte à rebours. Vérifiez l’autorisation ou le canal de notification permanent dans les paramètres Android.',
         ),
       );
     }
@@ -282,18 +400,38 @@ class _AdhanNotificationSettingsPageState
       final preferences =
           await SharedPreferences.getInstance();
 
-      await preferences.setBool(
+      final previousPreference =
+          preferences.getBool(_exactPreferenceKey) ?? false;
+      final saved = await preferences.setBool(
         _exactPreferenceKey,
         enabled,
       );
+      if (!saved) {
+        throw StateError('Could not save the exact-alarm preference.');
+      }
 
-      _preferExact = enabled;
-
-      await _refreshSchedule();
+      try {
+        await _refreshSchedule(preferExact: enabled);
+      } catch (error) {
+        await preferences.setBool(
+          _exactPreferenceKey,
+          previousPreference,
+        );
+        try {
+          await _refreshSchedule(preferExact: previousPreference);
+        } catch (rollbackError) {
+          throw StateError(
+            'Scheduling precision update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
+      }
 
       if (!mounted) return;
 
       setState(() {
+        _preferExact = enabled;
         _saving = false;
       });
 
@@ -320,8 +458,22 @@ class _AdhanNotificationSettingsPageState
     }
   }
 
-  Future<void> _refreshSchedule() async {
-    if (_enabledPrayers.isEmpty) {
+  Future<void> _restorePrayerPreferences(Set<Prayer> prayers) async {
+    for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
+      await _service.setPrayerEnabled(
+        prayer,
+        enabled: prayers.contains(prayer),
+      );
+    }
+  }
+
+  Future<void> _refreshSchedule({
+    Set<Prayer>? enabledPrayers,
+    bool? preferExact,
+  }) async {
+    final prayersToSchedule = enabledPrayers ?? _enabledPrayers;
+
+    if (prayersToSchedule.isEmpty) {
       await _service.cancelPreviouslyScheduled();
       return;
     }
@@ -345,7 +497,7 @@ class _AdhanNotificationSettingsPageState
         'It is now time to pray.',
         'C’est maintenant l’heure de la prière.',
       ),
-      preferExact: _preferExact,
+      preferExact: preferExact ?? _preferExact,
     );
   }
 
@@ -548,6 +700,38 @@ class _AdhanNotificationSettingsPageState
                   ),
 
                   const SizedBox(height: 20),
+
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    tileColor: theme.colorScheme.surface,
+                    secondary: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: Color(0xFFD8B66A),
+                    ),
+                    title: Text(
+                      _t(
+                        'تفعيل جميع إشعارات الصلوات',
+                        'Enable all prayer notifications',
+                        'Activer toutes les notifications de prière',
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      _t(
+                        'فعّل الصلوات الخمس معاً، ثم يمكنك إيقاف أي صلاة بشكل مستقل.',
+                        'Enable all five prayers, then switch off any prayer individually.',
+                        'Activez les cinq prières ensemble, puis désactivez chacune séparément.',
+                      ),
+                    ),
+                    value: _allPrayersEnabled,
+                    onChanged: _saving ? null : _toggleAllPrayers,
+                    activeThumbColor: const Color(0xFFD8B66A),
+                  ),
+
+                  const SizedBox(height: 12),
 
                   Text(
                     _t(
