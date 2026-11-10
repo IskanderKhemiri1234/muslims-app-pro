@@ -79,12 +79,13 @@ def remove_edge_background(image: Image.Image, backgrounds):
     return image
 
 def remove_qibla_bottom_white_residue(image: Image.Image):
-    """Remove near-white background components touching the lower image edges.
+    """Remove near-white pixels throughout the lower 18% of the Qibla icon.
 
-    The cleanup follows connected near-white pixels through the lower 18% of
-    the source and along both side edges. It removes the lower white fringe
-    even when the fringe does not reach the exact bottom row, while leaving
-    disconnected white highlights inside the compass artwork untouched.
+    The previous edge-seeded flood fill missed isolated white fragments that
+    were separated from the image border by transparent or dark pixels. Every
+    near-white pixel in the lower band is now seeded, so disconnected residue
+    is removed as well as edge-connected background. The verification checks
+    the complete lower band rather than only the outermost image edges.
     """
     image = image.convert("RGBA")
     pixels = image.load()
@@ -108,12 +109,11 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
             visited[index] = 1
             queue.append((x, y))
 
-    # Seed the complete bottom edge and the lower portions of both side edges.
-    for x in range(width):
-        add_seed(x, height - 1)
+    # Seed every near-white pixel in the lower band, not only pixels
+    # connected to the outer border. This catches isolated white fragments.
     for y in range(first_row, height):
-        add_seed(0, y)
-        add_seed(width - 1, y)
+        for x in range(width):
+            add_seed(x, y)
 
     cursor = 0
     removed = 0
@@ -133,23 +133,24 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
                 if is_target(next_x, next_y):
                     queue.append((next_x, next_y))
 
-    remaining_edge_pixels = sum(
-        1 for x in range(width) if is_target(x, height - 1)
-    ) + sum(
-        1 for y in range(first_row, height)
-        if is_target(0, y) or is_target(width - 1, y)
+    remaining_lower_band_pixels = sum(
+        1
+        for y in range(first_row, height)
+        for x in range(width)
+        if is_target(x, y)
     )
-    if remaining_edge_pixels:
+    if remaining_lower_band_pixels:
         raise RuntimeError(
-            f"Qibla icon still has {remaining_edge_pixels} near-white lower-edge pixels."
+            "Qibla icon still has "
+            f"{remaining_lower_band_pixels} near-white pixels in the lower band."
         )
 
     if removed == 0:
-        print("QIBLA lower-edge cleanup: no connected near-white residue found")
+        print("QIBLA lower-band cleanup: no near-white pixels found")
     else:
         print(
             "QIBLA lower-edge cleanup verified: "
-            f"removed {removed} connected near-white pixels in rows "
+            f"removed {removed} near-white pixels in rows "
             f"{first_row}-{height - 1}"
         )
     return image
