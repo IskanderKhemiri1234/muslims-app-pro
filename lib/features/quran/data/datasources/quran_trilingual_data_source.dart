@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -40,6 +41,7 @@ class QuranTrilingualDataSource {
   ];
 
   final http.Client _client;
+  Future<Map<String, String>>? _arabicTextFuture;
 
   Future<Directory> _cacheDirectory() async {
     final root = await getApplicationDocumentsDirectory();
@@ -98,6 +100,7 @@ class QuranTrilingualDataSource {
       throw const FormatException('Quran translation verse counts do not match.');
     }
 
+    final canonicalArabicText = await _loadCanonicalArabicText();
     final verses = <QuranTrilingualAyah>[];
     for (var index = 0; index < englishRows.length; index++) {
       final en = englishRows[index];
@@ -107,8 +110,9 @@ class QuranTrilingualDataSource {
       final frSurah = _asInt(fr['sura']);
       final enAyah = _asInt(en['aya']);
       final frAyah = _asInt(fr['aya']);
-      final arabic = en['arabic_text'];
+      final englishArabic = en['arabic_text'];
       final frenchArabic = fr['arabic_text'];
+      final arabic = canonicalArabicText['$surahNumber:${index + 1}'];
       final english = en['translation'];
       final french = fr['translation'];
       final englishFootnotes = en['footnotes'] ?? '';
@@ -119,7 +123,9 @@ class QuranTrilingualDataSource {
           enAyah != index + 1 ||
           frAyah != index + 1 ||
           arabic is! String ||
+          englishArabic is! String ||
           frenchArabic is! String ||
+          arabic != englishArabic ||
           arabic != frenchArabic ||
           english is! String ||
           french is! String ||
@@ -153,6 +159,99 @@ class QuranTrilingualDataSource {
       englishVersion: englishVersion,
       frenchVersion: frenchVersion,
     );
+  }
+
+  Future<Map<String, String>> _loadCanonicalArabicText() {
+    return _arabicTextFuture ??= _readCanonicalArabicText();
+  }
+
+  Future<Map<String, String>> _readCanonicalArabicText() async {
+    final raw = await rootBundle.loadString(
+      'assets/quran_trilingual/data/Quran_text.csv',
+    );
+    final lines = const LineSplitter()
+        .convert(raw.replaceFirst('\uFEFF', ''))
+        .where((line) => line.trim().isNotEmpty)
+        .toList(growable: false);
+    if (lines.isEmpty) {
+      throw const FormatException('The bundled canonical Quran text is empty.');
+    }
+
+    final firstRow = _parseCsvLine(lines.first);
+    final hasHeader = firstRow.isNotEmpty &&
+        firstRow.first.trim().toLowerCase() == 'id';
+    final firstDataRow = hasHeader ? 1 : 0;
+    final arabicByVerse = <String, String>{};
+
+    for (var rowIndex = firstDataRow; rowIndex < lines.length; rowIndex++) {
+      final fields = _parseCsvLine(lines[rowIndex]);
+      if (fields.length != 4) {
+        throw FormatException('Invalid canonical Quran CSV row: ${rowIndex + 1}.');
+      }
+      final surah = int.tryParse(fields[1].trim());
+      final ayah = int.tryParse(fields[2].trim());
+      final text = fields[3];
+      if (surah == null ||
+          ayah == null ||
+          surah < 1 ||
+          surah > 114 ||
+          ayah < 1 ||
+          ayah > expectedAyahCounts[surah - 1] ||
+          text.trim().isEmpty) {
+        throw FormatException('Invalid canonical Quran verse at CSV row ${rowIndex + 1}.');
+      }
+      final key = '$surah:$ayah';
+      if (arabicByVerse.containsKey(key)) {
+        throw FormatException('Duplicate canonical Quran verse $key.');
+      }
+      arabicByVerse[key] = text;
+    }
+
+    if (arabicByVerse.length != expectedTotalAyahs) {
+      throw FormatException(
+        'Canonical Quran text contains ${arabicByVerse.length} verses; '
+        'expected $expectedTotalAyahs.',
+      );
+    }
+
+    for (var surah = 1; surah <= 114; surah++) {
+      for (var ayah = 1; ayah <= expectedAyahCounts[surah - 1]; ayah++) {
+        if (!arabicByVerse.containsKey('$surah:$ayah')) {
+          throw FormatException('Canonical Quran text is missing $surah:$ayah.');
+        }
+      }
+    }
+
+    return Map<String, String>.unmodifiable(arabicByVerse);
+  }
+
+  List<String> _parseCsvLine(String line) {
+    final fields = <String>[];
+    final field = StringBuffer();
+    var quoted = false;
+
+    for (var index = 0; index < line.length; index++) {
+      final character = line[index];
+      if (character == '"') {
+        if (quoted && index + 1 < line.length && line[index + 1] == '"') {
+          field.write('"');
+          index++;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (character == ',' && !quoted) {
+        fields.add(field.toString());
+        field.clear();
+      } else {
+        field.write(character);
+      }
+    }
+
+    if (quoted) {
+      throw const FormatException('Unclosed quote in canonical Quran CSV.');
+    }
+    fields.add(field.toString());
+    return fields;
   }
 
   Future<List<Map<String, dynamic>>> _getTranslation(
