@@ -49,6 +49,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   bool _downloading = false;
   int _downloadedSurahs = 0;
   String? _error;
+  String _languageCode = 'ar';
 
   Color get _background => switch (_theme) {
         _TrilingualTheme.day => const Color(0xFF061D18),
@@ -236,7 +237,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   }
 
   String _text(String key, {Map<String, Object?> parameters = const {}}) =>
-      QuranPageLocalization.text(context, key, parameters: parameters);
+      QuranPageLocalization.textForLanguage(
+        _languageCode,
+        key,
+        parameters: parameters,
+      );
 
   String _surahName(int number) {
     if (number < 1 || number > widget.surahNames.length) {
@@ -507,11 +512,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   @override
   Widget build(BuildContext context) {
+    _languageCode = QuranPageLocalization.languageCodeOf(context);
     final arabicSource = _text('quran_reader_arabic_source');
     final englishSource = _text('quran_reader_english_source');
     final frenchSource = _text('quran_reader_french_source');
-    final translationDisclaimer =
-        QuranPageLocalization.text(context, 'quran_translation_disclaimer');
+    final translationDisclaimer = _text('quran_translation_disclaimer');
     return Scaffold(
       backgroundColor: _background,
       body: CustomPaint(
