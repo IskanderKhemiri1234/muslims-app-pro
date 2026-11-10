@@ -34,6 +34,9 @@ class _AdhanNotificationSettingsPageState
   bool _preferExact = false;
   bool _countdownEnabled = false;
 
+  bool get _allPrayersEnabled =>
+      _enabledPrayers.length == MuminAdhanNotificationService.supportedPrayers.length;
+
   String? _errorMessage;
 
   String _t(String ar, String en, String fr) {
@@ -105,6 +108,74 @@ class _AdhanNotificationSettingsPageState
         _loading = false;
         _errorMessage = error.toString();
       });
+    }
+  }
+
+  Future<void> _toggleAllPrayers(bool enabled) async {
+    if (_saving) return;
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (enabled) {
+        final permission = await _service.requestNotificationPermission();
+        if (!permission || !await _service.areNotificationsEnabled()) {
+          throw StateError(
+            _t(
+              'لم يتم منح إذن الإشعارات. فعّله من إعدادات التطبيق.',
+              'Notification permission was not granted. Enable it in app settings.',
+              'L’autorisation des notifications n’a pas été accordée. Activez-la dans les paramètres.',
+            ),
+          );
+        }
+      }
+
+      for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
+        await _service.setPrayerEnabled(prayer, enabled: enabled);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _enabledPrayers
+          ..clear()
+          ..addAll(enabled
+              ? MuminAdhanNotificationService.supportedPrayers
+              : const <Prayer>[]);
+      });
+
+      await _refreshSchedule();
+
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showMessage(
+        enabled
+            ? _t(
+                'تم تفعيل إشعارات الصلوات الخمس.',
+                'Notifications enabled for all five prayers.',
+                'Notifications activées pour les cinq prières.',
+              )
+            : _t(
+                'تم إيقاف إشعارات الصلوات الخمس.',
+                'Notifications disabled for all five prayers.',
+                'Notifications désactivées pour les cinq prières.',
+              ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = error.toString();
+      });
+      _showMessage(
+        _t(
+          'تعذر تحديث إشعارات الصلوات. تحقق من الإذن ومواقيت الصلاة.',
+          'Could not update prayer notifications. Check permission and prayer times.',
+          'Impossible de modifier les notifications. Vérifiez les autorisations et les horaires.',
+        ),
+      );
     }
   }
 
@@ -548,6 +619,38 @@ class _AdhanNotificationSettingsPageState
                   ),
 
                   const SizedBox(height: 20),
+
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    tileColor: theme.colorScheme.surface,
+                    secondary: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: Color(0xFFD8B66A),
+                    ),
+                    title: Text(
+                      _t(
+                        'تفعيل جميع إشعارات الصلوات',
+                        'Enable all prayer notifications',
+                        'Activer toutes les notifications de prière',
+                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      _t(
+                        'فعّل الصلوات الخمس معاً، ثم يمكنك إيقاف أي صلاة بشكل مستقل.',
+                        'Enable all five prayers, then switch off any prayer individually.',
+                        'Activez les cinq prières ensemble, puis désactivez chacune séparément.',
+                      ),
+                    ),
+                    value: _allPrayersEnabled,
+                    onChanged: _saving ? null : _toggleAllPrayers,
+                    activeThumbColor: const Color(0xFFD8B66A),
+                  ),
+
+                  const SizedBox(height: 12),
 
                   Text(
                     _t(
