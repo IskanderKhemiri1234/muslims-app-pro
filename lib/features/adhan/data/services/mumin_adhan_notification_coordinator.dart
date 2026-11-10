@@ -206,11 +206,22 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
   Future<void> _performRefresh({required bool force}) async {
     if (_disposed) return;
 
+    // The coordinator is created while the application is bootstrapping.
+    // Wait for the controller's in-flight initialization instead of failing
+    // the first synchronization before prayer times and timezone are ready.
+    if (!_prayerController.isInitialized ||
+        !_prayerController.hasUsableSchedule ||
+        _prayerController.timezoneLocation == null) {
+      await _prayerController.retryInitialization();
+    }
+
+    if (_disposed) return;
+
     if (!_prayerController.isInitialized ||
         !_prayerController.hasUsableSchedule ||
         _prayerController.timezoneLocation == null) {
       throw StateError(
-        'Prayer times and timezone must be ready before notifications can be synchronized.',
+        'Prayer schedule initialization completed without a usable schedule; notification synchronization was not sent.',
       );
     }
 
