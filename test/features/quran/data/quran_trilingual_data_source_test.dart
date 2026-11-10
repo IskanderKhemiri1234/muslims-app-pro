@@ -1,8 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muslims_app/core/localization/catalogs/mumin_quran_reader_catalog.dart';
 import 'package:muslims_app/features/quran/data/datasources/quran_trilingual_data_source.dart';
 
 void main() {
   group('QuranTrilingualDataSource integrity contract', () {
+    test('reader interface catalog is complete in all supported languages', () {
+      expect(MuminQuranReaderCatalog.launchCatalogIntegrity, {
+        'ar': true,
+        'en': true,
+        'fr': true,
+      });
+    });
     test('canonical surah ayah counts total exactly 6236', () {
       expect(QuranTrilingualDataSource.expectedAyahCounts, hasLength(114));
       expect(
