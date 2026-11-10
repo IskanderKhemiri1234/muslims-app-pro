@@ -1609,7 +1609,7 @@ class _QuranFullScreenReaderState
   static const String _themeStorageKey =
       'mumin_pro_quran_reader_theme_v1';
 
-  static const Color _gold = Color(0xFFD8B66A);
+  
 
   late int _currentPage;
   late final PageController _pageController;
@@ -1939,7 +1939,7 @@ Widget _buildMushafPage({
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Material(
                 color: selected
-                    ? _gold.withValues(alpha: 0.20)
+                    ? _ornamentColor.withValues(alpha: 0.20)
                     : Colors.white.withValues(alpha: 0.045),
                 borderRadius: BorderRadius.circular(13),
                 child: InkWell(
@@ -1954,7 +1954,7 @@ Widget _buildMushafPage({
                       borderRadius: BorderRadius.circular(13),
                       border: Border.all(
                         color: selected
-                            ? _gold
+                            ? _ornamentColor
                             : Colors.white.withValues(alpha: 0.16),
                         width: selected ? 1.4 : 0.8,
                       ),
@@ -1962,14 +1962,34 @@ Widget _buildMushafPage({
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          entry.key == _QuranReaderTheme.day
-                              ? Icons.wb_sunny_rounded
-                              : entry.key == _QuranReaderTheme.night
-                                  ? Icons.nightlight_round
-                                  : Icons.menu_book_rounded,
-                          color: _gold,
-                          size: 19,
+                        Container(
+                          width: 19,
+                          height: 19,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: entry.key == _QuranReaderTheme.day
+                                  ? const [
+                                      Color(0xFF0B6A50),
+                                      Color(0xFF031D18),
+                                    ]
+                                  : entry.key == _QuranReaderTheme.night
+                                      ? const [
+                                          Color(0xFF34577F),
+                                          Color(0xFF071326),
+                                        ]
+                                      : const [
+                                          Color(0xFFF1E5C9),
+                                          Color(0xFFB18B55),
+                                        ],
+                            ),
+                            border: Border.all(
+                              color: _ornamentColor.withValues(alpha: 0.8),
+                              width: 1,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -2009,7 +2029,7 @@ Widget _buildMushafPage({
       color: _background.withValues(alpha: 0.94),
       borderRadius: BorderRadius.circular(18),
       border: Border.all(
-        color: _gold.withValues(alpha: 0.42),
+        color: _ornamentColor.withValues(alpha: 0.42),
       ),
       boxShadow: [
         BoxShadow(
@@ -2071,7 +2091,7 @@ Widget _buildMushafPage({
           onPressed: widget.onOpenIndex,
           icon: const Icon(
             Icons.toc_rounded,
-            color: _gold,
+            color: _ornamentColor,
           ),
         ),
         IconButton(
@@ -2082,7 +2102,7 @@ Widget _buildMushafPage({
           onPressed: widget.onOpenPageBookmarks,
           icon: const Icon(
             Icons.bookmarks_outlined,
-            color: _gold,
+            color: _ornamentColor,
           ),
         ),
         IconButton(
@@ -2093,7 +2113,7 @@ Widget _buildMushafPage({
           onPressed: _openGoToPage,
           icon: const Icon(
             Icons.search_rounded,
-            color: _gold,
+            color: _ornamentColor,
           ),
         ),
         IconButton(
@@ -2111,7 +2131,7 @@ Widget _buildMushafPage({
           },
           icon: const Icon(
             Icons.tune_rounded,
-            color: _gold,
+            color: _ornamentColor,
           ),
         ),
       ],
@@ -2145,7 +2165,7 @@ Widget _buildMushafPage({
                       _isCompleted
                           ? Icons.check_circle_rounded
                           : Icons.radio_button_unchecked_rounded,
-                      color: _isCompleted ? _gold : Colors.white70,
+                      color: _isCompleted ? _ornamentColor : Colors.white70,
                       size: 19,
                     ),
                     const SizedBox(width: 7),
@@ -2175,7 +2195,7 @@ Widget _buildMushafPage({
                               : 'quran_mark_read',
                         ),
                         style: const TextStyle(
-                          color: _gold,
+                          color: _ornamentColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -2193,19 +2213,19 @@ Widget _buildMushafPage({
                           _currentPage > 1 ? _previousPage : null,
                       icon: const Icon(
                         Icons.chevron_right_rounded,
-                        color: _gold,
+                        color: _ornamentColor,
                         size: 29,
                       ),
                     ),
                     Expanded(
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: _gold,
+                          activeTrackColor: _ornamentColor,
                           inactiveTrackColor:
                               Colors.white.withValues(alpha: 0.22),
                           thumbColor: Colors.white,
                           overlayColor:
-                              _gold.withValues(alpha: 0.15),
+                              _ornamentColor.withValues(alpha: 0.15),
                           trackHeight: 3,
                         ),
                         child: Slider(
@@ -2239,7 +2259,7 @@ Widget _buildMushafPage({
                           : null,
                       icon: const Icon(
                         Icons.chevron_left_rounded,
-                        color: _gold,
+                        color: _ornamentColor,
                         size: 29,
                       ),
                     ),
@@ -2322,7 +2342,7 @@ Widget build(BuildContext context) {
       backgroundColor: _background,
       body: Center(
         child: CircularProgressIndicator(
-          color: _gold,
+          color: _ornamentColor,
         ),
       ),
     );
