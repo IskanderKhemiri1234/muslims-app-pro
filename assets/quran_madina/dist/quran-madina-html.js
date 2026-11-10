@@ -627,7 +627,7 @@
     if(madina_data.font_family === "me_quran"){
       tag.style.setProperty('line-height', madina_data.font_size*2+"px", '');
     }
-    if(isV2()) tag.style.setProperty('line-height', "2.3", ''); // expanded full-page Mushaf pitch
+    if(isV2()) tag.style.setProperty('line-height', "2.7", ''); // adaptive full-viewport Mushaf pitch
     tag.style.width = (madina_data.line_width+10)+"px";
     if(!headless){
       tag.style.setProperty('box-shadow', 'inset '+(page%2==1?"":"-")+'8px 0 7px -7px #333', '');
@@ -649,7 +649,7 @@
     // the line keeps its width, measured in its own (smaller) em.
     if(row.z){
       line.style.setProperty('font-size', row.z + "em", '');
-      line.style.setProperty('line-height', String(2.3 / row.z), ''); // keep the expanded page pitch across dense rows
+      line.style.setProperty('line-height', String(2.7 / row.z), ''); // keep adaptive viewport pitch across dense rows
     }
     line.style.setProperty('width', (row.w / (row.z || 1)) + "em", '');
     line.style.setProperty('margin', "0 auto", '');
