@@ -199,7 +199,12 @@ object MuminPrayerCountdownNotifications {
             setCategory(Notification.CATEGORY_STATUS)
             setVisibility(Notification.VISIBILITY_PUBLIC)
             setShowWhen(true)
-            setWhen(targetTime)
+            // Notification chronometers use elapsedRealtime(), not
+            // wall-clock epoch milliseconds. Passing targetTime directly
+            // makes Android calculate an invalid countdown base.
+            val remainingMillis =
+                (targetTime - System.currentTimeMillis()).coerceAtLeast(0L)
+            setWhen(SystemClock.elapsedRealtime() + remainingMillis)
             setUsesChronometer(true)
             setOngoing(true)
             setAutoCancel(false)
