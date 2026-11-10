@@ -74,6 +74,13 @@ class MuminPrayerCountdownNotificationService {
     int? nextPrayerTimeMillis,
   }) async {
     final preferences = await SharedPreferences.getInstance();
+    if (status == 'generating') {
+      await preferences.remove(diagnosticsGeneratedEntriesKey);
+      await preferences.remove(diagnosticsTimezoneKey);
+      await preferences.remove(diagnosticsNextPrayerKey);
+      await preferences.remove(diagnosticsNextPrayerTimeKey);
+      await preferences.remove(diagnosticsErrorKey);
+    }
     await preferences.setString(diagnosticsStatusKey, status);
     if (error == null || error.isEmpty) {
       await preferences.remove(diagnosticsErrorKey);
