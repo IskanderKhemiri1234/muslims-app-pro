@@ -57,6 +57,51 @@ EXPECTED_COUNTS = [
 EXPECTED_TOTAL = 6236
 
 
+def verify_pinned_translation_versions() -> None:
+    expected = {
+        ENGLISH_KEY: ENGLISH_VERSION,
+        FRENCH_KEY: FRENCH_VERSION,
+    }
+    for language in ("en", "fr"):
+        url = (
+            f"https://quranenc.com/api/v1/translations/list/{language}"
+            f"?localization={language}"
+        )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "Mumin-Pro-Offline-Quran-Builder/1.0",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        entries = payload.get("translations") if isinstance(payload, dict) else None
+        if not isinstance(entries, list):
+            raise RuntimeError(
+                f"QuranEnc {language} translation catalogue is malformed."
+            )
+        for key, pinned_version in expected.items():
+            if (key.startswith("english_") and language != "en") or (
+                key.startswith("french_") and language != "fr"
+            ):
+                continue
+            matches = [
+                item for item in entries
+                if isinstance(item, dict) and item.get("key") == key
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"Pinned QuranEnc translation {key} is unavailable."
+                )
+            current_version = str(matches[0].get("version", ""))
+            if current_version != pinned_version:
+                raise RuntimeError(
+                    f"QuranEnc {key} version changed from {pinned_version} "
+                    f"to {current_version}; review source/version before packaging."
+                )
+
+
 def load_canonical_arabic() -> dict[tuple[int, int], str]:
     if not CSV_PATH.is_file():
         raise SystemExit(f"Missing official Hafs v20 text file: {CSV_PATH}")
