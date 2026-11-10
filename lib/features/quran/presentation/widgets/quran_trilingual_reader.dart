@@ -157,14 +157,48 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   }
 
   void _revealAyah(int ayah) {
-    final context = _verseKeys[ayah]?.currentContext;
-    if (context == null) return;
+    final verseContext = _verseKeys[ayah]?.currentContext;
+    if (verseContext == null) {
+      if (!_scrollController.hasClients) return;
+      final estimatedOffset = (ayah - 1) * 390.0;
+      final target = estimatedOffset.clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.jumpTo(target);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _verseKeys[ayah]?.currentContext != null) {
+          _revealAyah(ayah);
+        }
+      });
+      return;
+    }
     Scrollable.ensureVisible(
-      context,
+      verseContext,
       alignment: 0.08,
       duration: const Duration(milliseconds: 360),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _recordVisibleAyah() {
+    if (!_scrollController.hasClients || _verseKeys.isEmpty) return;
+    var nearestAyah = _currentAyah;
+    var nearestDistance = double.infinity;
+    for (final entry in _verseKeys.entries) {
+      final renderObject = entry.value.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+      final top = renderObject.localToGlobal(Offset.zero).dy;
+      final distance = (top - 150).abs();
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestAyah = entry.key;
+      }
+    }
+    if (nearestAyah != _currentAyah) {
+      _currentAyah = nearestAyah;
+      unawaited(_savePosition(_surahNumber, nearestAyah));
+    }
   }
 
   Future<void> _selectTheme(_TrilingualTheme theme) async {
@@ -403,7 +437,12 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     }
 
     final surah = _surah!;
-    return ListView.builder(
+    return NotificationListener<ScrollEndNotification>(
+      onNotification: (_) {
+        _recordVisibleAyah();
+        return false;
+      },
+      child: ListView.builder(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 8, bottom: 28),
@@ -435,6 +474,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           }
           return _buildVerse(surah.verses[index - 1]);
         },
+      ),
     );
   }
 
