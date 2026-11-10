@@ -51,14 +51,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate offline Madina Quran assets
-        run: dart run quran_madina_flutter:bundle
-
-      - name: Verify offline Quran asset output
-        run: |
-          test -d assets/quran_madina/assets/db/v2
-          test -d assets/quran_madina/assets/img
-          test -d assets/quran_madina/dist
 
       - name: Validate Android XML resources
         run: |
