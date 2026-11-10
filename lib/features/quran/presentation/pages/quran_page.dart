@@ -1827,13 +1827,19 @@ Widget _buildMushafPage({
   // platform WebView in FittedBox/Transform: that scales its native surface
   // incorrectly and can make the Mushaf appear clipped or miniature.
   //
-  // The 1441H Madina layout declares a 15.4376-em line width. Calculate the
-  // font size from BOTH viewport dimensions: width fills the reading area,
-  // while height prevents the complete printed page from being clipped on
-  // short phones or landscape displays.
+  // The bundled 1441H page has exactly 15 printed lines and a 15.4376-em
+  // line width. The local renderer's line pitch is tuned to 2.3em so all
+  // fifteen lines use the portrait viewport instead of leaving a large
+  // unused lower band. Keep a 44dp total horizontal inset so the first and
+  // last glyphs never sit against the screen edges.
+  const lineWidthEm = 15.4376;
+  const pageLineCount = 15.0;
+  const linePitchEm = 2.3;
+  const horizontalInset = 44.0;
   final pageHeight = height > 0 ? height : 1.0;
-  final widthFit = width / 15.4376;
-  final heightFit = pageHeight / 32.0;
+  final usableWidth = (width - horizontalInset).clamp(1.0, width);
+  final widthFit = usableWidth / lineWidthEm;
+  final heightFit = pageHeight / (pageLineCount * linePitchEm);
   final fontSize = (widthFit < heightFit ? widthFit : heightFit)
       .clamp(10.0, 32.0)
       .toDouble();

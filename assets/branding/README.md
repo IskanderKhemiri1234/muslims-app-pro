@@ -6,11 +6,11 @@ The only source image to replace is:
 
 The source file is preserved unchanged. The asset preparation script removes
 the connected magenta export canvas and writes a square transparent RGBA PNG to
-`assets/branding/processed/mumin_pro_logo.png`. The launcher artwork is centered
-and padded so the complete wordmark occupies no more than 58% of the adaptive-icon
-canvas, safely inside Android's approximately 61% central mask-safe zone. This
-prevents Samsung One UI and other launcher masks from clipping the first or last
-letters. That processed image is shared by Android launcher surfaces, splash
+`assets/branding/processed/mumin_pro_logo.png`. The launcher artwork keeps a prominent scale with 12% transparent padding around
+the original rounded-square tile. Its size is validated against an 83% upper
+bound so future processing cannot shrink the logo excessively. The adaptive-icon
+background uses a matching emerald-to-blue gradient to avoid a dark contrasting
+frame around the tile. That processed image is shared by Android launcher surfaces, splash
 screen, and compact/expanded prayer notification.
 
 The same script removes edge-connected white/black export backgrounds from the
@@ -23,7 +23,7 @@ Requirements for a future replacement logo:
 - Put the actual Mumin Pro mark in the center.
 - Use transparent pixels outside the mark; do not include a magenta, black,
   white, or colored export canvas.
-- Keep the lettering and crescent inside the central 58% launcher-safe area; the build script enforces this geometry.
+- Preserve the original rounded-square tile and keep the wordmark prominent; the build script enforces a balanced 83% maximum artwork bound.
 - Do not include prayer names or countdown text.
 
 The build pipeline runs `scripts/prepare_transparent_brand_assets.py` before

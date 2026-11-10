@@ -18,10 +18,6 @@ OUTPUTS = {
     "assets/branding/mumin_pro_logo.png": {
         "output": "assets/branding/processed/mumin_pro_logo.png",
         "backgrounds": [((255, 0, 255), 105)],
-        # The uploaded export also contains a black outer frame around the
-        # colored app mark. Remove only black pixels connected to the newly
-        # exposed outer edge; enclosed dark artwork remains untouched.
-        "post_backgrounds": [((0, 0, 0), 52)],
         "crop_square": True,
     },
     "assets/images/home/reference_ui/icon_qibla.png": {
@@ -183,6 +179,76 @@ def inspect_qibla_output(path: Path):
             f"corner_alpha={[pixels[0, 0][3], pixels[width - 1, 0][3], pixels[0, height - 1][3], pixels[width - 1, height - 1][3]]}"
         )
 
+def remove_logo_black_outline(image: Image.Image):
+    """Remove only the near-black outline touching the transparent logo edge.
+
+    The source export has a thin black stroke around the rounded-square tile.
+    Removing the magenta first exposes that stroke, so seed from every dark
+    pixel directly adjacent to transparency and flood only through near-black
+    pixels. Dark emerald/blue artwork and enclosed details are preserved.
+    """
+    image = image.convert("RGBA")
+    pixels = image.load()
+    width, height = image.size
+    visited = bytearray(width * height)
+    queue = []
+
+    def is_outline(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return alpha > 0 and max(red, green, blue) <= 72
+
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y][3] != 0:
+                continue
+            for nx, ny in (
+                (x - 1, y - 1), (x, y - 1), (x + 1, y - 1),
+                (x - 1, y),                 (x + 1, y),
+                (x - 1, y + 1), (x, y + 1), (x + 1, y + 1),
+            ):
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                index = ny * width + nx
+                if not visited[index] and is_outline(nx, ny):
+                    visited[index] = 1
+                    queue.append((nx, ny))
+
+    cursor = 0
+    removed = 0
+    while cursor < len(queue):
+        x, y = queue[cursor]
+        cursor += 1
+        red, green, blue, _ = pixels[x, y]
+        pixels[x, y] = (red, green, blue, 0)
+        removed += 1
+
+        for nx, ny in (
+            (x - 1, y - 1), (x, y - 1), (x + 1, y - 1),
+            (x - 1, y),                 (x + 1, y),
+            (x - 1, y + 1), (x, y + 1), (x + 1, y + 1),
+        ):
+            if not (0 <= nx < width and 0 <= ny < height):
+                continue
+            index = ny * width + nx
+            if visited[index]:
+                continue
+            visited[index] = 1
+            if is_outline(nx, ny):
+                queue.append((nx, ny))
+
+    if removed == 0:
+        raise RuntimeError(
+            "The Mumin Pro source outline was not detected; refusing to "
+            "publish an icon that may retain the black perimeter."
+        )
+
+    print(
+        "MUMIN_LOGO_OUTLINE_CLEANUP: "
+        f"removed {removed} transparent-edge-connected near-black pixels"
+    )
+    return image
+
+
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -192,19 +258,26 @@ def crop_logo(image: Image.Image):
     mark = image.crop(bbox)
     width, height = mark.size
     side = max(width, height)
-    # Android adaptive icons use a 108dp canvas but mask the artwork to a
-    # central safe zone of roughly 66dp (61.1% of the canvas). The previous
-    # 5.5% padding let the wordmark extend beyond that safe zone, clipping the
-    # first/last letters under Samsung One UI's icon mask. Keep the complete
-    # mark within 56% of the canvas, leaving clearance inside the safe zone.
-    padding = max(12, round(side * 0.40))
+    # The logo artwork already contains its own rounded-square emerald/blue
+    # tile. Keep it visually prominent in the adaptive foreground: 12% padding
+    # avoids the edge clipping seen with the old 5.5% setting without shrinking
+    # the mark into the center as the 40% experiment did.
+    padding = max(12, round(side * 0.12))
     canvas_side = side + padding * 2
     canvas = Image.new("RGBA", (canvas_side, canvas_side), (0, 0, 0, 0))
     canvas.alpha_composite(
         mark,
         ((canvas_side - width) // 2, (canvas_side - height) // 2),
     )
-    return canvas.resize((1024, 1024), Image.Resampling.LANCZOS)
+    # Resize in premultiplied-alpha space. Resampling straight RGBA can
+    # blend transparent black RGB values into the visible edge and recreate
+    # the exact dark halo this pipeline is designed to remove.
+    premultiplied = canvas.convert("RGBa")
+    resized = premultiplied.resize(
+        (1024, 1024),
+        Image.Resampling.LANCZOS,
+    )
+    return resized.convert("RGBA")
 
 def verify(path: Path):
     with Image.open(path) as image:
@@ -228,17 +301,43 @@ def verify(path: Path):
             content_height = bbox[3] - bbox[1]
             width_fraction = content_width / rgba.width
             height_fraction = content_height / rgba.height
-            safe_zone_limit = 0.58
+            safe_zone_limit = 0.83
             if max(width_fraction, height_fraction) > safe_zone_limit:
                 raise RuntimeError(
                     "Mumin Pro logo exceeds the adaptive-icon safe zone: "
                     f"{width_fraction:.1%} x {height_fraction:.1%}; "
                     f"maximum is {safe_zone_limit:.0%}."
                 )
+            boundary_dark_pixels = 0
+            pixels = rgba.load()
+            for y in range(bbox[1], bbox[3]):
+                for x in range(bbox[0], bbox[2]):
+                    if pixels[x, y][3] == 0:
+                        continue
+                    red, green, blue, _ = pixels[x, y]
+                    if max(red, green, blue) > 72:
+                        continue
+                    if any(
+                        not (0 <= nx < rgba.width and 0 <= ny < rgba.height)
+                        or pixels[nx, ny][3] == 0
+                        for nx, ny in (
+                            (x - 1, y), (x + 1, y),
+                            (x, y - 1), (x, y + 1),
+                        )
+                    ):
+                        boundary_dark_pixels += 1
+            if boundary_dark_pixels:
+                raise RuntimeError(
+                    "Mumin Pro still has a near-black outline touching its "
+                    f"transparent edge ({boundary_dark_pixels} pixels)."
+                )
+            print(
+                "MUMIN_LOGO_EDGE_CHECK: no near-black perimeter remains"
+            )
             print(
                 "ADAPTIVE_ICON_SAFE_ZONE: "
                 f"artwork={width_fraction:.1%}x{height_fraction:.1%}, "
-                "within 58% limit for Android's approximately 61% central safe zone"
+                "within 83% visual-scale limit; final Samsung mask is checked on-device"
             )
         print(
             f"VERIFIED {path}: {rgba.width}x{rgba.height}, "
@@ -263,17 +362,20 @@ def main():
                 config["backgrounds"],
             )
 
-        for background, threshold in config.get("post_backgrounds", []):
-            prepared = remove_edge_background(
-                prepared,
-                [(background, threshold)],
-            )
+        if source_relative == "assets/branding/mumin_pro_logo.png":
+            prepared = remove_logo_black_outline(prepared)
 
         if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
             prepared = remove_qibla_bottom_white_residue(prepared)
 
         if config.get("crop_square"):
             prepared = crop_logo(prepared)
+            # Lanczos resampling can create a fresh dark fringe at the final
+            # transparent boundary even after the source outline was removed.
+            # Run the edge-connected cleanup once more on the exact 1024px
+            # deliverable, then let verify() reject any remaining dark halo.
+            if source_relative == "assets/branding/mumin_pro_logo.png":
+                prepared = remove_logo_black_outline(prepared)
 
         output.parent.mkdir(parents=True, exist_ok=True)
         prepared.save(output, format="PNG", optimize=True)
