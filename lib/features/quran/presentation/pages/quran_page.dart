@@ -1160,8 +1160,8 @@ Future<int?> _goToPage() async {
    return selectedPage;
   }
   
-  Future<void> _openIndex() async {
-    if (_isLoading || !mounted) return;
+  Future<int?> _openIndex() async {
+    if (_isLoading || !mounted) return null;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1309,6 +1309,7 @@ Future<int?> _goToPage() async {
     if (selectedPage != null && mounted) {
       _selectPage(selectedPage, saveImmediately: true);
     }
+    return selectedPage;
   }
 
   Future<void> _openFullReader() async {
@@ -1325,12 +1326,19 @@ Future<int?> _goToPage() async {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => QuranTrilingualReader(
+        builder: (readerContext) => QuranTrilingualReader(
           initialSurah: initialSurah,
           initialAyah: 1,
           surahNames: QuranPageLocalization.surahNames(context),
-          onClose: () => Navigator.of(_).pop(),
+          surahStartPages: _surahs.map((item) => item.page).toList(growable: false),
+          onClose: () => Navigator.of(readerContext).pop(),
           onVerseBookmark: _saveTrilingualVerseBookmark,
+          onPageChanged: (page) => _selectPage(page, saveImmediately: true),
+          onTogglePageBookmark: _toggleBookmark,
+          onMarkPageRead: _markCurrentPageRead,
+          onUndoPageRead: _undoCurrentPageRead,
+          onOpenIndex: _openIndex,
+          onGoToPage: _goToPage,
         ),
       ),
     );
@@ -1534,11 +1542,7 @@ Widget build(BuildContext context) {
 }
 }
 
-enum _QuranReaderTheme {
-  day,
-  night,
-  warmPaper,
-}
+
 
 class _BottomSheetShell extends StatelessWidget {
   final String title;
