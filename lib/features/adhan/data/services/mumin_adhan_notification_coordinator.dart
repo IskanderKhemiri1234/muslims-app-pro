@@ -178,7 +178,18 @@ class MuminAdhanNotificationCoordinator with WidgetsBindingObserver {
 
     final operation = _refreshTail.then((_) async {
       if (_disposed) return;
-      await _performRefresh(force: force);
+      try {
+        await _performRefresh(force: force);
+      } catch (error) {
+        try {
+          await _countdownNotificationService.saveDiagnosticFailure(error);
+        } catch (diagnosticError) {
+          debugPrint(
+            'Mumin Pro: could not persist countdown diagnostics: $diagnosticError',
+          );
+        }
+        rethrow;
+      }
     });
 
     _refreshTail = operation.then<void>(
