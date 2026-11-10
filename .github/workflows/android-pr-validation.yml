@@ -89,5 +89,13 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
+      - name: Set up Python for brand asset processing
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install brand asset processing dependency
+        run: python -m pip install --disable-pip-version-check Pillow
+
       - name: Compile Android debug APK
         run: flutter build apk --debug
