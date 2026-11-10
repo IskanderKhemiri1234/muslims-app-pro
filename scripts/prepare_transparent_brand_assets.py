@@ -78,6 +78,63 @@ def remove_edge_background(image: Image.Image, backgrounds):
 
     return image
 
+def remove_qibla_bottom_white_residue(image: Image.Image):
+    """Remove near-white pixels connected to the bottom edge only.
+
+    The search is limited to the bottom 3.5% of the source image. It does not
+    erase isolated white highlights or pixels disconnected from the bottom
+    edge, preserving the compass artwork, gold details and soft shadows.
+    """
+    image = image.convert("RGBA")
+    pixels = image.load()
+    width, height = image.size
+    first_row = max(0, int(height * 0.965))
+    visited = bytearray(width * (height - first_row))
+    queue = []
+
+    def is_target(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return (
+            alpha > 0
+            and min(red, green, blue) >= 238
+            and max(red, green, blue) - min(red, green, blue) <= 18
+        )
+
+    for x in range(width):
+        if is_target(x, height - 1):
+            queue.append((x, height - 1))
+            visited[(height - 1 - first_row) * width + x] = 1
+
+    cursor = 0
+    while cursor < len(queue):
+        x, y = queue[cursor]
+        cursor += 1
+        red, green, blue, _ = pixels[x, y]
+        pixels[x, y] = (red, green, blue, 0)
+
+        for next_y in range(max(first_row, y - 1), min(height - 1, y + 1) + 1):
+            for next_x in range(max(0, x - 1), min(width - 1, x + 1) + 1):
+                index = (next_y - first_row) * width + next_x
+                if visited[index]:
+                    continue
+                visited[index] = 1
+                if is_target(next_x, next_y):
+                    queue.append((next_x, next_y))
+
+    remaining_edge_pixels = sum(
+        1 for x in range(width) if is_target(x, height - 1)
+    )
+    if remaining_edge_pixels:
+        raise RuntimeError(
+            f"Qibla icon still has {remaining_edge_pixels} near-white bottom-edge pixels."
+        )
+
+    print(
+        "QIBLA bottom-edge cleanup verified: "
+        f"transparent near-white components in rows {first_row}-{height - 1}"
+    )
+    return image
+
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -133,6 +190,9 @@ def main():
                 prepared,
                 [(background, threshold)],
             )
+
+        if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
+            prepared = remove_qibla_bottom_white_residue(prepared)
 
         if config.get("crop_square"):
             prepared = crop_logo(prepared)

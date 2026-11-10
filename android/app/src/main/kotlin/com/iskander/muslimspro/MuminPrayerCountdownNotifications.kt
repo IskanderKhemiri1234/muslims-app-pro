@@ -21,7 +21,7 @@ import org.json.JSONObject
 object MuminPrayerCountdownNotifications {
 
     private const val TAG = "MuminPrayerCountdown"
-    private const val CHANNEL_ID = "mumin_next_prayer_countdown"
+    private const val CHANNEL_ID = "mumin_next_prayer_countdown_v2"
     private const val NOTIFICATION_ID = 73104
     private const val PREFERENCES = "mumin_prayer_countdown"
     private const val ENTRIES_KEY = "entries"
@@ -63,7 +63,7 @@ object MuminPrayerCountdownNotifications {
             "No valid future prayer entries reached Android."
         }
 
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
             .putString(ENTRIES_KEY, jsonEntries.toString())
             .putString(TITLE_KEY, title)
@@ -71,7 +71,11 @@ object MuminPrayerCountdownNotifications {
             .putString(TIMEZONE_KEY, timezone)
             .commit()
 
-        Log.i(TAG, "SYNC accepted entries=${jsonEntries.length()} timezone=$timezone")
+        check(saved) {
+            "Android could not persist the next-prayer schedule."
+        }
+
+        Log.i(TAG, "SYNC persisted entries=${jsonEntries.length()} timezone=$timezone")
         refresh(context)
     }
 
@@ -150,6 +154,15 @@ object MuminPrayerCountdownNotifications {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
+        val createdChannel = manager.getNotificationChannel(CHANNEL_ID)
+        check(createdChannel != null &&
+            createdChannel.importance != NotificationManager.IMPORTANCE_NONE) {
+            "The new Mumin Pro persistent-countdown notification channel is blocked."
+        }
+        Log.i(
+            TAG,
+            "CHANNEL_READY id=$CHANNEL_ID importance=${createdChannel.importance}"
+        )
     }
 
     private fun createBaseBuilder(
