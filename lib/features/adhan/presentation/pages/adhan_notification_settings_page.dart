@@ -400,18 +400,38 @@ class _AdhanNotificationSettingsPageState
       final preferences =
           await SharedPreferences.getInstance();
 
-      await preferences.setBool(
+      final previousPreference =
+          preferences.getBool(_exactPreferenceKey) ?? false;
+      final saved = await preferences.setBool(
         _exactPreferenceKey,
         enabled,
       );
+      if (!saved) {
+        throw StateError('Could not save the exact-alarm preference.');
+      }
 
-      _preferExact = enabled;
-
-      await _refreshSchedule();
+      try {
+        await _refreshSchedule(preferExact: enabled);
+      } catch (error) {
+        await preferences.setBool(
+          _exactPreferenceKey,
+          previousPreference,
+        );
+        try {
+          await _refreshSchedule(preferExact: previousPreference);
+        } catch (rollbackError) {
+          throw StateError(
+            'Scheduling precision update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
+      }
 
       if (!mounted) return;
 
       setState(() {
+        _preferExact = enabled;
         _saving = false;
       });
 
