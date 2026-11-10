@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Prepare clean transparent Mumin Pro logo and home shortcut artwork.
 
-The uploaded source files are intentionally preserved. This script removes only
-background regions connected to image edges, using the known background color
-for each source image, then writes real RGBA PNG assets for Flutter and Android.
+The uploaded source files are intentionally preserved. This script removes
+edge-connected background regions using each source's known background color.
+The Qibla asset also receives a narrowly scoped near-white cleanup in its lower
+18% band. The generated RGBA output is inspected and reported without changing
+the artwork during that inspection.
 """
 from __future__ import annotations
 
@@ -183,8 +185,8 @@ def inspect_qibla_output(path: Path):
         print(
             "QIBLA_OUTPUT_INSPECTION: "
             f"size={width}x{height}, alpha_bbox={alpha_bbox}, "
-            f"opaque_outer_edge_pixels={edge_opaque}, "
-            f"opaque_near_white_lower_pixels={lower_near_white}, "
+            f"nontransparent_outer_edge_pixels={edge_opaque}, "
+            f"visible_near_white_lower_pixels={lower_near_white}, "
             f"corner_alpha={[pixels[0, 0][3], pixels[width - 1, 0][3], pixels[0, height - 1][3], pixels[width - 1, height - 1][3]]}"
         )
 
