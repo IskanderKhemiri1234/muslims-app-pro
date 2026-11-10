@@ -133,20 +133,36 @@ class _AdhanNotificationSettingsPageState
         }
       }
 
-      for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
-        await _service.setPrayerEnabled(prayer, enabled: enabled);
+      final previousPrayers = Set<Prayer>.of(_enabledPrayers);
+      final requestedPrayers = enabled
+          ? Set<Prayer>.of(MuminAdhanNotificationService.supportedPrayers)
+          : <Prayer>{};
+
+      try {
+        for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
+          await _service.setPrayerEnabled(prayer, enabled: enabled);
+        }
+
+        await _refreshSchedule(enabledPrayers: requestedPrayers);
+      } catch (error) {
+        await _restorePrayerPreferences(previousPrayers);
+        try {
+          await _refreshSchedule(enabledPrayers: previousPrayers);
+        } catch (rollbackError) {
+          throw StateError(
+            'Prayer alert update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
       }
 
       if (!mounted) return;
       setState(() {
         _enabledPrayers
           ..clear()
-          ..addAll(enabled
-              ? MuminAdhanNotificationService.supportedPrayers
-              : const <Prayer>[]);
+          ..addAll(requestedPrayers);
       });
-
-      await _refreshSchedule();
 
       if (!mounted) return;
       setState(() => _saving = false);
@@ -206,18 +222,39 @@ class _AdhanNotificationSettingsPageState
         }
       }
 
-      await _service.setPrayerEnabled(
-        prayer,
-        enabled: enabled,
-      );
-
+      final previousPrayers = Set<Prayer>.of(_enabledPrayers);
+      final requestedPrayers = Set<Prayer>.of(previousPrayers);
       if (enabled) {
-        _enabledPrayers.add(prayer);
+        requestedPrayers.add(prayer);
       } else {
-        _enabledPrayers.remove(prayer);
+        requestedPrayers.remove(prayer);
       }
 
-      await _refreshSchedule();
+      await _service.setPrayerEnabled(prayer, enabled: enabled);
+      try {
+        await _refreshSchedule(enabledPrayers: requestedPrayers);
+      } catch (error) {
+        await _service.setPrayerEnabled(
+          prayer,
+          enabled: previousPrayers.contains(prayer),
+        );
+        try {
+          await _refreshSchedule(enabledPrayers: previousPrayers);
+        } catch (rollbackError) {
+          throw StateError(
+            'Prayer alert update failed: $error. '
+            'Restoring the previous schedule also failed: $rollbackError',
+          );
+        }
+        rethrow;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _enabledPrayers
+          ..clear()
+          ..addAll(requestedPrayers);
+      });
 
       if (!mounted) return;
 
@@ -401,8 +438,22 @@ class _AdhanNotificationSettingsPageState
     }
   }
 
-  Future<void> _refreshSchedule() async {
-    if (_enabledPrayers.isEmpty) {
+  Future<void> _restorePrayerPreferences(Set<Prayer> prayers) async {
+    for (final prayer in MuminAdhanNotificationService.supportedPrayers) {
+      await _service.setPrayerEnabled(
+        prayer,
+        enabled: prayers.contains(prayer),
+      );
+    }
+  }
+
+  Future<void> _refreshSchedule({
+    Set<Prayer>? enabledPrayers,
+    bool? preferExact,
+  }) async {
+    final prayersToSchedule = enabledPrayers ?? _enabledPrayers;
+
+    if (prayersToSchedule.isEmpty) {
       await _service.cancelPreviouslyScheduled();
       return;
     }
@@ -426,7 +477,7 @@ class _AdhanNotificationSettingsPageState
         'It is now time to pray.',
         'C’est maintenant l’heure de la prière.',
       ),
-      preferExact: _preferExact,
+      preferExact: preferExact ?? _preferExact,
     );
   }
 
