@@ -69,6 +69,7 @@ flutter:
 
   assets:
     - assets/quran_trilingual/data/Quran_text.csv
+    - assets/quran_trilingual/data/surahs/
     - assets/branding/
     - assets/branding/processed/
     - assets/images/adhan/mumin_adhan_hero.jpg

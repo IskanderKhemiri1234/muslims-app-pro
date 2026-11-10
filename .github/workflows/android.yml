@@ -85,6 +85,9 @@ jobs:
       - name: Prepare official Hafs v20 Quran font
         run: python3 scripts/prepare_quran_font.py
 
+      - name: Prepare and verify complete offline Quran translations
+        run: python3 scripts/prepare_quran_trilingual_data.py
+
       - name: Install dependencies
         run: flutter pub get
 

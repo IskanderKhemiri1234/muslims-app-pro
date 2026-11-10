@@ -75,5 +75,31 @@ void main() {
         throwsFormatException,
       );
     });
+    test('ships every verified surah and all 6236 ayahs offline', () async {
+      const source = QuranTrilingualDataSource();
+      expect(await source.isCompleteOffline(), isTrue);
+
+      var total = 0;
+      for (var number = 1; number <= 114; number++) {
+        final surah = await source.getSurah(number);
+        expect(surah.number, number);
+        expect(
+          surah.verses,
+          hasLength(QuranTrilingualDataSource.expectedAyahCounts[number - 1]),
+        );
+        for (var index = 0; index < surah.verses.length; index++) {
+          final ayah = surah.verses[index];
+          expect(ayah.surahNumber, number);
+          expect(ayah.ayahNumber, index + 1);
+          expect(ayah.arabic, isNotEmpty);
+          expect(ayah.english, isNotEmpty);
+          expect(ayah.french, isNotEmpty);
+        }
+        total += surah.verses.length;
+      }
+      expect(total, QuranTrilingualDataSource.expectedTotalAyahs);
+      await source.dispose();
+    });
+
   });
 }
