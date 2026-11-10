@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
@@ -480,7 +481,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      body: SafeArea(
+      body: CustomPaint(
+        painter: _TrilingualBackgroundPainter(theme: _theme),
+        child: SafeArea(
         child: Column(
           children: [
             Padding(
@@ -554,7 +557,125 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
+}
+
+
+class _TrilingualBackgroundPainter extends CustomPainter {
+  const _TrilingualBackgroundPainter({required this.theme});
+
+  final _TrilingualTheme theme;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final palette = switch (theme) {
+      _TrilingualTheme.day => (
+          base: const Color(0xFF061D18),
+          middle: const Color(0xFF0B382D),
+          deep: const Color(0xFF031510),
+          accent: const Color(0xFFD9BA75),
+          glow: const Color(0xFF8DB5A3),
+        ),
+      _TrilingualTheme.night => (
+          base: const Color(0xFF050D1B),
+          middle: const Color(0xFF142641),
+          deep: const Color(0xFF07111F),
+          accent: const Color(0xFFC6D4E8),
+          glow: const Color(0xFF7795B5),
+        ),
+      _TrilingualTheme.warmPaper => (
+          base: const Color(0xFFF1E5C9),
+          middle: const Color(0xFFE3D0A7),
+          deep: const Color(0xFFC9AE7B),
+          accent: const Color(0xFF806039),
+          glow: const Color(0xFFB18B55),
+        ),
+    };
+
+    final bounds = Offset.zero & size;
+    final basePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [palette.base, palette.middle, palette.deep],
+        stops: const [0, 0.56, 1],
+      ).createShader(bounds);
+    canvas.drawRect(bounds, basePaint);
+
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          palette.glow.withValues(alpha: 0.16),
+          palette.glow.withValues(alpha: 0.035),
+          Colors.transparent,
+        ],
+        stops: const [0, 0.5, 1],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.5, size.height * 0.35),
+          radius: size.longestSide * 0.78,
+        ),
+      );
+    canvas.drawRect(bounds, glowPaint);
+
+    final borderPaint = Paint()
+      ..color = palette.accent.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.75;
+    final innerPaint = Paint()
+      ..color = palette.glow.withValues(alpha: 0.14)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.55;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(8, 8, size.width - 16, size.height - 16),
+        const Radius.circular(20),
+      ),
+      borderPaint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(13, 13, size.width - 26, size.height - 26),
+        const Radius.circular(16),
+      ),
+      innerPaint,
+    );
+
+    final motifPaint = Paint()
+      ..color = palette.accent.withValues(alpha: 0.13)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
+
+    void drawStar(Offset center, double radius) {
+      final path = Path();
+      for (var point = 0; point < 16; point++) {
+        final angle = -math.pi / 2 + point * math.pi / 8;
+        final currentRadius = point.isEven ? radius : radius * 0.48;
+        final position = Offset(
+          center.dx + math.cos(angle) * currentRadius,
+          center.dy + math.sin(angle) * currentRadius,
+        );
+        if (point == 0) {
+          path.moveTo(position.dx, position.dy);
+        } else {
+          path.lineTo(position.dx, position.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(path, motifPaint);
+    }
+
+    for (var y = 80.0; y < size.height - 70; y += 138) {
+      drawStar(Offset(25, y), 10);
+      drawStar(Offset(size.width - 25, y), 10);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrilingualBackgroundPainter oldDelegate) =>
+      oldDelegate.theme != theme;
 }
