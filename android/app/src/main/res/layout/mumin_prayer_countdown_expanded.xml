@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="142dp"
+    android:layout_height="150dp"
     android:orientation="vertical"
     android:gravity="center_vertical"
     android:paddingStart="20dp"
@@ -18,8 +18,8 @@
 
         <ImageView
             android:id="@+id/mumin_countdown_logo"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/mumin_pro_brand"
@@ -30,30 +30,19 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Mumin Pro"
+            android:text="الصلاة القادمة"
             android:textColor="#E8CE91"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:letterSpacing="0.12"
             android:maxLines="1"
             android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/mumin_countdown_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="NEXT PRAYER"
-            android:textColor="#B8D8CE91"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.12" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/mumin_countdown_prayer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="6dp"
         android:textColor="#FFFFFCF5"
         android:textSize="18sp"
         android:textStyle="bold"
@@ -67,9 +56,9 @@
         android:layout_marginTop="1dp"
         android:format="%s"
         android:textColor="#E8CE91"
-        android:textSize="38sp"
+        android:textSize="40sp"
         android:textStyle="bold"
         android:fontFamily="sans"
         android:gravity="start"
-        android:contentDescription="Time remaining until next prayer" />
+        android:contentDescription="Countdown to next prayer" />
 </LinearLayout>
