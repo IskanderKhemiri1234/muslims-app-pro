@@ -155,6 +155,39 @@ def remove_qibla_bottom_white_residue(image: Image.Image):
         )
     return image
 
+def inspect_qibla_output(path: Path):
+    """Report source-edge and lower-fringe evidence without altering artwork."""
+    with Image.open(path) as opened:
+        image = opened.convert("RGBA")
+        width, height = image.size
+        pixels = image.load()
+        alpha = image.getchannel("A")
+        alpha_bbox = alpha.getbbox()
+        edge_opaque = 0
+        for x in range(width):
+            edge_opaque += int(pixels[x, 0][3] > 0)
+            edge_opaque += int(pixels[x, height - 1][3] > 0)
+        for y in range(1, height - 1):
+            edge_opaque += int(pixels[0, y][3] > 0)
+            edge_opaque += int(pixels[width - 1, y][3] > 0)
+
+        first_lower_row = max(0, int(height * 0.82))
+        lower_near_white = sum(
+            1
+            for y in range(first_lower_row, height)
+            for x in range(width)
+            if pixels[x, y][3] > 0
+            and min(pixels[x, y][:3]) >= 220
+            and max(pixels[x, y][:3]) - min(pixels[x, y][:3]) <= 28
+        )
+        print(
+            "QIBLA_OUTPUT_INSPECTION: "
+            f"size={width}x{height}, alpha_bbox={alpha_bbox}, "
+            f"opaque_outer_edge_pixels={edge_opaque}, "
+            f"opaque_near_white_lower_pixels={lower_near_white}, "
+            f"corner_alpha={[pixels[0, 0][3], pixels[width - 1, 0][3], pixels[0, height - 1][3], pixels[width - 1, height - 1][3]]}"
+        )
+
 def crop_logo(image: Image.Image):
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -200,6 +233,11 @@ def main():
             raise FileNotFoundError(f"Required source artwork is missing: {source}")
 
         with Image.open(source) as original:
+            if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
+                print(
+                    "QIBLA_SOURCE_INSPECTION: "
+                    f"format={original.format}, size={original.size}, mode={original.mode}"
+                )
             prepared = remove_edge_background(
                 original,
                 config["backgrounds"],
@@ -220,6 +258,8 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         prepared.save(output, format="PNG", optimize=True)
         verify(output)
+        if source_relative == "assets/images/home/reference_ui/icon_qibla.png":
+            inspect_qibla_output(output)
 
     print("All Mumin Pro brand and shortcut images are ready.")
 
