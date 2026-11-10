@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +18,13 @@ class QuranTrilingualReader extends StatefulWidget {
     required this.surahNames,
     required this.onClose,
     required this.onVerseBookmark,
+    required this.surahStartPages,
+    required this.onPageChanged,
+    required this.onTogglePageBookmark,
+    required this.onMarkPageRead,
+    required this.onUndoPageRead,
+    required this.onOpenIndex,
+    required this.onGoToPage,
   });
 
   final int initialSurah;
@@ -27,6 +33,13 @@ class QuranTrilingualReader extends StatefulWidget {
   final VoidCallback onClose;
   final Future<void> Function(QuranTrilingualAyah verse, String surahName)
       onVerseBookmark;
+  final List<int> surahStartPages;
+  final ValueChanged<int> onPageChanged;
+  final Future<void> Function() onTogglePageBookmark;
+  final Future<void> Function() onMarkPageRead;
+  final Future<void> Function() onUndoPageRead;
+  final Future<int?> Function() onOpenIndex;
+  final Future<int?> Function() onGoToPage;
 
   @override
   State<QuranTrilingualReader> createState() => _QuranTrilingualReaderState();
@@ -114,7 +127,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     await _loadSurah(_surahNumber, targetAyah: _currentAyah);
   }
 
-  Future<void> _loadSurah(int number, {int targetAyah = 1}) async {
+  Future<void> _loadSurah(
+    int number, {
+    int targetAyah = 1,
+    bool updateParentPage = false,
+  }) async {
     if (!mounted) return;
     setState(() {
       _loading = true;
@@ -135,6 +152,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
         _currentAyah = safeAyah;
       });
       await _savePosition(number, safeAyah);
+      if (updateParentPage && number <= widget.surahStartPages.length) {
+        widget.onPageChanged(widget.surahStartPages[number - 1]);
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _revealAyah(safeAyah);
       });
@@ -252,6 +272,39 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   Future<void> _bookmark(QuranTrilingualAyah verse) async {
     await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+  }
+
+  int _surahForPage(int page) {
+    var selected = 1;
+    for (var index = 0; index < widget.surahStartPages.length; index++) {
+      if (widget.surahStartPages[index] <= page) {
+        selected = index + 1;
+      } else {
+        break;
+      }
+    }
+    return selected;
+  }
+
+  Future<void> _handleReaderAction(String action) async {
+    switch (action) {
+      case 'bookmark':
+        await widget.onTogglePageBookmark();
+      case 'mark_read':
+        await widget.onMarkPageRead();
+      case 'undo_read':
+        await widget.onUndoPageRead();
+      case 'index':
+        final page = await widget.onOpenIndex();
+        if (page != null && mounted) {
+          await _loadSurah(_surahForPage(page));
+        }
+      case 'go_to_page':
+        final page = await widget.onGoToPage();
+        if (page != null && mounted) {
+          await _loadSurah(_surahForPage(page));
+        }
+    }
   }
 
   Widget _buildThemePicker() {
@@ -550,10 +603,38 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                         onChanged: _loading || _downloading
                             ? null
                             : (value) {
-                                if (value != null) _loadSurah(value);
+                                if (value != null) {
+                                  _loadSurah(value, updateParentPage: true);
+                                }
                               },
                       ),
                     ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert_rounded, color: _accent),
+                    onSelected: (value) => unawaited(_handleReaderAction(value)),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'bookmark',
+                        child: Text(_text('quran_save_page_bookmark')),
+                      ),
+                      PopupMenuItem(
+                        value: 'mark_read',
+                        child: Text(_text('quran_mark_read')),
+                      ),
+                      PopupMenuItem(
+                        value: 'undo_read',
+                        child: Text(_text('quran_undo')),
+                      ),
+                      PopupMenuItem(
+                        value: 'index',
+                        child: Text(_text('quran_index_title')),
+                      ),
+                      PopupMenuItem(
+                        value: 'go_to_page',
+                        child: Text(_text('quran_go_to_short')),
+                      ),
+                    ],
                   ),
                   IconButton(
                     tooltip: _text('quran_reader_download_all'),
@@ -588,18 +669,29 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
             Expanded(child: _buildReaderBody()),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 9),
-              child: Text(
-                '$arabicSource • '
-                '$englishSource v${QuranTrilingualDataSource.englishVersion} • '
-                '$frenchSource v${QuranTrilingualDataSource.frenchVersion}',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: _secondaryText.withValues(alpha: 0.75), fontSize: 8),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                translationDisclaimer,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: _secondaryText.withValues(alpha: 0.68), fontSize: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$arabicSource • '
+                    '$englishSource v${QuranTrilingualDataSource.englishVersion} • '
+                    '$frenchSource v${QuranTrilingualDataSource.frenchVersion}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _secondaryText.withValues(alpha: 0.75),
+                      fontSize: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    translationDisclaimer,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _secondaryText.withValues(alpha: 0.68),
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
