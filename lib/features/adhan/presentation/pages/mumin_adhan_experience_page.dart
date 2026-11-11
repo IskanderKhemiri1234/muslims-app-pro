@@ -378,11 +378,11 @@ class _MuminAdhanExperiencePageState
               'Faites glisser la goutte pour continuer l’Adhan complet',
             ),
             child: SizedBox(
-              width: 150,
-              height: 132,
+              width: 160,
+              height: 160,
               child: Center(
                 child: CustomPaint(
-                  size: const Size(96, 112),
+                  size: const Size(160, 160),
                   painter: _WaterDropPainter(progress: progress),
                 ),
               ),
@@ -421,7 +421,7 @@ class _WaterDropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.53);
+    final center = Offset(size.width / 2, size.height / 2);
     final radius = 25 + (progress * 5);
 
     for (var ring = 2; ring >= 0; ring--) {
