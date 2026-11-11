@@ -145,7 +145,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _startSelectedAdhan() async {
-    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted) return;
+    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted || _audioMuted) return;
     _selectedAdhanStarted = true;
 
     try {
@@ -160,7 +160,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _replaySelectedAdhan() async {
-    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
+    if (_fullAdhanStarted || _isClosing || _audioMuted || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
 
     setState(() {
       _fullAdhanStarted = true;
