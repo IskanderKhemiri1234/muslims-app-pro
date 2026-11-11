@@ -223,9 +223,11 @@ class _AdhanBackgroundLibraryPageState
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 128),
-              children: [
+          : SafeArea(
+              bottom: true,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 180),
+                children: [
                 Text(
                   _t(
                     'اختر المشهد الذي يرافق الأذان. ستظهر الخلفية المختارة على كامل الشاشة عند كل أذان.',
@@ -391,7 +393,8 @@ class _AdhanBackgroundLibraryPageState
                     'Ajouter une image',
                   )),
                 ),
-              ],
+                ],
+              ),
             ),
     );
   }
