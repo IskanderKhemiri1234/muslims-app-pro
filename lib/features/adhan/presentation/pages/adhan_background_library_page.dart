@@ -284,7 +284,7 @@ class _AdhanBackgroundLibraryPageState
                               ),
                               Positioned(
                                 top: 10,
-                                left: 10,
+                                right: 10,
                                 child: Semantics(
                                   button: true,
                                   label: _t(
@@ -293,26 +293,20 @@ class _AdhanBackgroundLibraryPageState
                                     'Aperçu du fond en plein écran',
                                   ),
                                   child: Material(
-                                    color: const Color(0xB8071C17),
+                                    color: const Color(0xFFF0D28A),
                                     shape: const CircleBorder(),
+                                    elevation: 8,
+                                    shadowColor: Colors.black87,
                                     child: InkWell(
                                       customBorder: const CircleBorder(),
                                       onTap: () => _preview(path),
-                                      child: Container(
-                                        width: 34,
-                                        height: 34,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0x99D8B66A),
-                                            width: 1,
-                                          ),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: const Icon(
+                                      child: const SizedBox(
+                                        width: 46,
+                                        height: 46,
+                                        child: Icon(
                                           Icons.visibility_rounded,
-                                          color: Color(0xFFF4F0E6),
-                                          size: 18,
+                                          color: Color(0xFF071C17),
+                                          size: 24,
                                         ),
                                       ),
                                     ),
@@ -322,7 +316,7 @@ class _AdhanBackgroundLibraryPageState
                               if (selected)
                                 Positioned(
                                   top: 10,
-                                  right: 10,
+                                  left: 10,
                                   child: Container(
                                     width: 31,
                                     height: 31,
