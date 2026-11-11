@@ -79,6 +79,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
 
   Future<void> _setAudioMode(String mode) async {
     if (mode != 'short' && mode != 'full') return;
+    await context.read<MuminAdhanAudioHandler>().stop();
     final prefs = await SharedPreferences.getInstance();
     final modeSaved = await prefs.setString(_modeKey, mode);
     final shortSaved = await prefs.setBool(_shortEnabledKey, mode == 'short');
@@ -107,7 +108,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
             ? _t('اختبار التكبير القصير', 'Short takbeer test', 'Test du takbir court')
             : _t('اختبار الأذان الكامل', 'Full Adhan test', 'Test de l’Adhan complet'),
       );
-    } catch (error) {
+    } catch (_) {
       _message(
         _t('تعذر تشغيل التسجيل. تحقق من ملف الصوت.', 'Could not play the recording. Check the audio asset.', 'Impossible de lire l’enregistrement. Vérifiez le fichier audio.'),
       );
