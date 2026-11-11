@@ -1312,16 +1312,9 @@ Future<int?> _goToPage() async {
     return selectedPage;
   }
 
-  Future<void> _openFullReader() async {
-    if (_isLoading || !mounted) return;
-
-    var initialSurah = 1;
-    for (var index = 0; index < _surahs.length; index++) {
-      if (_surahs[index].page <= _currentPage) {
-        initialSurah = index + 1;
-      } else {
-        break;
-      }
+  Future<void> _openFullReader({required int initialSurah}) async {
+    if (_isLoading || !mounted || initialSurah < 1 || initialSurah > 114) {
+      return;
     }
 
     await Navigator.of(context).push<void>(
@@ -1348,16 +1341,21 @@ Future<int?> _goToPage() async {
     }
   }
 
-  void _openSurahFromNavigation(int page) {
-  if (_isLoading || !_isValidPage(page)) return;
+  void _openSurahFromNavigation(int surahNumber) {
+    if (_isLoading || surahNumber < 1 || surahNumber > _surahs.length) {
+      return;
+    }
 
-  _selectPage(
-    page,
-    saveImmediately: true,
-  );
+    final surahStartPage = _surahs[surahNumber - 1].page;
+    if (!_isValidPage(surahStartPage)) return;
 
-  _openFullReader();
-}
+    _selectPage(
+      surahStartPage,
+      saveImmediately: true,
+    );
+
+    _openFullReader(initialSurah: surahNumber);
+  }
   
 @override
 Widget build(BuildContext context) {
@@ -1412,131 +1410,54 @@ Widget build(BuildContext context) {
             )
           : ListView.separated(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+              padding: const EdgeInsetsDirectional.fromSTEB(18, 10, 18, 24),
               itemCount: _surahs.length,
               separatorBuilder: (_, index) => Divider(
                 height: 1,
-                indent: 72,
+                indent: 12,
+                endIndent: 12,
                 color: _gold.withValues(alpha: 0.20),
               ),
               itemBuilder: (itemContext, index) {
+                final number = index + 1;
                 final surah = _surahs[index];
-                final localizedName =
-                    QuranPageLocalization.surahName(
+                final localizedName = QuranPageLocalization.surahName(
                   context,
-                  index + 1,
+                  number,
                 );
+                final displayName = isArabic ? surah.name : localizedName;
 
-                return Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(17),
-                    onTap: () => _openSurahFromNavigation(
-                      surah.page,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 13,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 43,
-                            height: 43,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _gold.withValues(
-                                alpha: isDark ? 0.13 : 0.17,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: _gold.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                color: _gold,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isArabic
-                                      ? surah.name
-                                      : localizedName,
-                                  textDirection: isArabic
-                                      ? TextDirection.rtl
-                                      : TextDirection.ltr,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: foreground,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                if (!isArabic) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    surah.name,
-                                    textDirection: TextDirection.rtl,
-                                    style: TextStyle(
-                                      color: foreground.withValues(
-                                        alpha: 0.65,
-                                      ),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.end,
-                            children: [
-                              Icon(
-                                Icons.menu_book_rounded,
-                                color: _gold.withValues(alpha: 0.9),
-                                size: 19,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                QuranPageLocalization.text(
-                                  context,
-                                  'quran_juz_page',
-                                  parameters: {
-                                    'page': surah.page,
-                                  },
-                                ),
-                                style: TextStyle(
-                                  color: foreground.withValues(
-                                    alpha: 0.62,
-                                  ),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                // This is the same compact "number • surah name" entry
+                // previously shown inside the reader's dropdown selector.
+                return ListTile(
+                  contentPadding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: 12,
+                    vertical: 3,
+                  ),
+                  minVerticalPadding: 10,
+                  title: Text(
+                    '${number.toString()}  •  $displayName',
+                    textDirection: isArabic
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
+                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
+                  trailing: Icon(
+                    Icons.menu_book_rounded,
+                    color: _gold.withValues(alpha: 0.9),
+                    size: 19,
+                  ),
+                  onTap: _isLoading
+                      ? null
+                      : () => _openSurahFromNavigation(number),
                 );
               },
-            ),
+            )
     ),
   );
 }

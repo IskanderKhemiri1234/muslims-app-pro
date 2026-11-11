@@ -113,10 +113,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           orElse: () => _TrilingualTheme.day,
         );
       }
-      if (savedSurah != null && savedSurah >= 1 && savedSurah <= 114) {
-        _surahNumber = savedSurah;
-      }
-      if (savedAyah != null && savedAyah > 0) {
+      // The caller's selected surah is authoritative. Restore the saved
+      // ayah only when it belongs to that same surah; otherwise a previous
+      // reading position would override a surah explicitly chosen from the
+      // opening index.
+      if (savedSurah == _surahNumber && savedAyah != null && savedAyah > 0) {
         _currentAyah = savedAyah;
       }
     } catch (_) {
@@ -561,27 +562,18 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                     icon: Icon(Icons.arrow_back_rounded, color: _primaryText),
                   ),
                   Expanded(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: _surahNumber,
-                        isExpanded: true,
-                        dropdownColor: _background,
-                        iconEnabledColor: _accent,
-                        style: TextStyle(color: _primaryText, fontSize: 15, fontWeight: FontWeight.w800),
-                        items: List.generate(114, (index) {
-                          final number = index + 1;
-                          return DropdownMenuItem<int>(
-                            value: number,
-                            child: Text('${number.toString()}  •  ${_surahName(number)}'),
-                          );
-                        }),
-                        onChanged: _loading
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  _loadSurah(value, updateParentPage: true);
-                                }
-                              },
+                    child: Text(
+                      _surahName(_surahNumber),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      textDirection: _languageCode == 'ar'
+                          ? TextDirection.rtl
+                          : TextDirection.ltr,
+                      style: TextStyle(
+                        color: _primaryText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
