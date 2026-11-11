@@ -1312,16 +1312,9 @@ Future<int?> _goToPage() async {
     return selectedPage;
   }
 
-  Future<void> _openFullReader() async {
-    if (_isLoading || !mounted) return;
-
-    var initialSurah = 1;
-    for (var index = 0; index < _surahs.length; index++) {
-      if (_surahs[index].page <= _currentPage) {
-        initialSurah = index + 1;
-      } else {
-        break;
-      }
+  Future<void> _openFullReader({required int initialSurah}) async {
+    if (_isLoading || !mounted || initialSurah < 1 || initialSurah > 114) {
+      return;
     }
 
     await Navigator.of(context).push<void>(
@@ -1348,16 +1341,21 @@ Future<int?> _goToPage() async {
     }
   }
 
-  void _openSurahFromNavigation(int page) {
-  if (_isLoading || !_isValidPage(page)) return;
+  void _openSurahFromNavigation(int surahNumber) {
+    if (_isLoading || surahNumber < 1 || surahNumber > _surahs.length) {
+      return;
+    }
 
-  _selectPage(
-    page,
-    saveImmediately: true,
-  );
+    final surahStartPage = _surahs[surahNumber - 1].page;
+    if (!_isValidPage(surahStartPage)) return;
 
-  _openFullReader();
-}
+    _selectPage(
+      surahStartPage,
+      saveImmediately: true,
+    );
+
+    _openFullReader(initialSurah: surahNumber);
+  }
   
 @override
 Widget build(BuildContext context) {
@@ -1432,7 +1430,7 @@ Widget build(BuildContext context) {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(17),
                     onTap: () => _openSurahFromNavigation(
-                      surah.page,
+                      index + 1,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
