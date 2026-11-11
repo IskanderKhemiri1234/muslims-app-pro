@@ -425,9 +425,9 @@ class _MuminAdhanExperiencePageState
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPanStart: _onDropPanStart,
-          onPanUpdate: _onDropPanUpdate,
-          onPanEnd: _onDropPanEnd,
+          onPanStart: _fullAudioEnabled ? _onDropPanStart : null,
+          onPanUpdate: _fullAudioEnabled ? _onDropPanUpdate : null,
+          onPanEnd: _fullAudioEnabled ? _onDropPanEnd : null,
           child: Semantics(
             button: true,
             label: _text(
