@@ -14,6 +14,7 @@ import '../../domain/models/quran_reading_progress.dart';
 import '../../domain/repositories/quran_bookmark_repository.dart';
 import '../../domain/repositories/quran_reading_progress_repository.dart';
 import '../localization/quran_page_localization.dart';
+import '../../../../core/localization/catalogs/mumin_quran_surah_catalog.dart';
 import '../../data/datasources/quran_trilingual_data_source.dart';
 import '../widgets/quran_trilingual_reader.dart';
 
@@ -1360,21 +1361,22 @@ Future<int?> _goToPage() async {
 @override
 Widget build(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final isArabic = QuranPageLocalization.isArabic(context);
-  final background = isDark
-      ? const Color(0xFF101B16)
-      : const Color(0xFFF5F4ED);
-  final foreground = isDark
-      ? const Color(0xFFE8DFC9)
-      : _deepGreen;
   final direction = QuranPageLocalization.textDirectionOf(context);
+  final background = isDark
+      ? const Color(0xFF071C17)
+      : const Color(0xFFF4F0E6);
+  final foreground = isDark
+      ? const Color(0xFFF4F0E6)
+      : const Color(0xFF063E31);
 
   return Directionality(
     textDirection: direction,
     child: Scaffold(
       backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: background,
+        backgroundColor: isDark
+            ? const Color(0xFF0A241C)
+            : const Color(0xFFFBF8EF),
         foregroundColor: foreground,
         elevation: 0,
         centerTitle: true,
@@ -1408,59 +1410,351 @@ Widget build(BuildContext context) {
           ? const Center(
               child: CircularProgressIndicator(color: _gold),
             )
-          : ListView.separated(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsetsDirectional.fromSTEB(18, 10, 18, 24),
-              itemCount: _surahs.length,
-              separatorBuilder: (_, index) => Divider(
-                height: 1,
-                indent: 12,
-                endIndent: 12,
-                color: _gold.withValues(alpha: 0.20),
-              ),
-              itemBuilder: (itemContext, index) {
-                final number = index + 1;
-                final surah = _surahs[index];
-                final localizedName = QuranPageLocalization.surahName(
-                  context,
-                  number,
-                );
-                final displayName = isArabic ? surah.name : localizedName;
-
-                // This is the same compact "number • surah name" entry
-                // previously shown inside the reader's dropdown selector.
-                return ListTile(
-                  contentPadding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: 12,
-                    vertical: 3,
-                  ),
-                  minVerticalPadding: 10,
-                  title: Text(
-                    '${number.toString()}  •  $displayName',
-                    textDirection: isArabic
-                        ? TextDirection.rtl
-                        : TextDirection.ltr,
-                    textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                    style: TextStyle(
-                      color: foreground,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+          : Stack(
+              children: [
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _QuranIndexBackdropPainter(isDark: isDark),
                     ),
                   ),
-                  trailing: Icon(
-                    Icons.menu_book_rounded,
-                    color: _gold.withValues(alpha: 0.9),
-                    size: 19,
+                ),
+                ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    16,
+                    14,
+                    16,
+                    28,
                   ),
-                  onTap: _isLoading
-                      ? null
-                      : () => _openSurahFromNavigation(number),
-                );
-              },
-            )
+                  itemCount: _surahs.length + 1,
+                  itemBuilder: (itemContext, listIndex) {
+                    if (listIndex == 0) {
+                      return _QuranIndexHeader(
+                        isDark: isDark,
+                        title: QuranPageLocalization.text(
+                          context,
+                          'quran_surahs_tab',
+                        ),
+                      );
+                    }
+
+                    final index = listIndex - 1;
+                    final number = index + 1;
+                    final arabicName = _surahs[index].name;
+                    final englishName =
+                        MuminQuranSurahCatalog.transliteratedNames[index];
+                    final frenchName = MuminQuranSurahCatalog.frenchNames[index];
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 9),
+                      child: _PremiumSurahTile(
+                        number: number,
+                        arabicName: arabicName,
+                        englishName: englishName,
+                        frenchName: frenchName,
+                        isDark: isDark,
+                        onTap: _isLoading
+                            ? null
+                            : () => _openSurahFromNavigation(number),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
     ),
   );
 }
+}
+
+class _QuranIndexHeader extends StatelessWidget {
+  const _QuranIndexHeader({
+    required this.isDark,
+    required this.title,
+  });
+
+  final bool isDark;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = isDark
+        ? const Color(0xFFF4F0E6)
+        : const Color(0xFF063E31);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xFF164B3A),
+                  Color(0xFF0A2A20),
+                  Color(0xFF071C17),
+                ]
+              : const [
+                  Color(0xFF17634B),
+                  Color(0xFF0B4938),
+                  Color(0xFF073729),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFD8B66A).withValues(alpha: 0.62),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: Color(0xFFE8CE91),
+            size: 28,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFFFF7E6),
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '114  •  SURAH INDEX',
+            textDirection: TextDirection.ltr,
+            style: TextStyle(
+              color: const Color(0xFFE8CE91).withValues(alpha: 0.96),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: 76,
+            height: 1,
+            color: const Color(0xFFD8B66A).withValues(alpha: 0.72),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'ARABIC  •  ENGLISH  •  FRANÇAIS',
+            textDirection: TextDirection.ltr,
+            style: TextStyle(
+              color: foreground.withValues(alpha: 0.88),
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumSurahTile extends StatelessWidget {
+  const _PremiumSurahTile({
+    required this.number,
+    required this.arabicName,
+    required this.englishName,
+    required this.frenchName,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final int number;
+  final String arabicName;
+  final String englishName;
+  final String frenchName;
+  final bool isDark;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = isDark
+        ? const Color(0xFFF4F0E6)
+        : const Color(0xFF123A2D);
+    final secondary = isDark
+        ? const Color(0xFFB7C9BD)
+        : const Color(0xFF63776C);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? const [
+                      Color(0xE615382B),
+                      Color(0xE60B261E),
+                    ]
+                  : const [
+                      Color(0xFDFCF8EE),
+                      Color(0xFFF0EBDD),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: const Color(0xFFD8B66A).withValues(
+                alpha: isDark ? 0.34 : 0.48,
+              ),
+              width: 0.8,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(13, 13, 13, 13),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFD8B66A).withValues(
+                      alpha: isDark ? 0.15 : 0.22,
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFD8B66A).withValues(alpha: 0.78),
+                    ),
+                  ),
+                  child: Text(
+                    number.toString(),
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFFE8CE91)
+                          : const Color(0xFF8A692B),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text(
+                          arabicName,
+                          textAlign: TextAlign.start,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'MuminHafs',
+                            fontSize: 25,
+                            height: 1.45,
+                            color: isDark
+                                ? const Color(0xFFE8CE91)
+                                : const Color(0xFF805F28),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          englishName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          frenchName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: secondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  textDirection: TextDirection.ltr,
+                  color: const Color(0xFFD8B66A).withValues(alpha: 0.95),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuranIndexBackdropPainter extends CustomPainter {
+  const _QuranIndexBackdropPainter({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = (isDark
+          ? const Color(0xFFD8B66A)
+          : const Color(0xFF9D7B3E)).withValues(alpha: isDark ? 0.055 : 0.075)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    const spacing = 112.0;
+    for (var y = 28.0; y < size.height + spacing; y += spacing) {
+      for (var x = 24.0; x < size.width + spacing; x += spacing) {
+        final path = Path()
+          ..moveTo(x, y - 11)
+          ..lineTo(x + 11, y)
+          ..lineTo(x, y + 11)
+          ..lineTo(x - 11, y)
+          ..close();
+        canvas.drawPath(path, linePaint);
+        canvas.drawCircle(Offset(x, y), 18, linePaint);
+        canvas.drawLine(
+          Offset(x - 24, y),
+          Offset(x + 24, y),
+          linePaint,
+        );
+        canvas.drawLine(
+          Offset(x, y - 24),
+          Offset(x, y + 24),
+          linePaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _QuranIndexBackdropPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
+  }
 }
 
 
