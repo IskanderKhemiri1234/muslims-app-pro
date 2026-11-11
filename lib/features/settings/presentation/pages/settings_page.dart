@@ -95,11 +95,11 @@ class SettingsPage extends StatelessWidget {
                 const _GroupDivider(),
                 _SettingsTile(
                   icon: Icons.graphic_eq_rounded,
-                  title: _copy('الصوت وخلفية الأذان', 'Adhan sound & background', 'Son et arrière-plan de l’Adhan'),
+                  title: _copy('تخصيص تجربة الأذان', 'Adhan experience', 'Expérience Adhan'),
                   subtitle: _copy(
-                    'اختر تسجيلاً واحداً، اختبره، وخصص صورة شاشة الأذان',
-                    'Choose one recording, test it and personalize the Adhan screen',
-                    'Choisissez un enregistrement, testez-le et personnalisez l’écran',
+                    'مكتبتان مستقلتان للصوت والخلفية مع معاينة فورية',
+                    'Separate sound and background libraries with instant preview',
+                    'Bibliothèques séparées pour le son et l’image avec aperçu immédiat',
                   ),
                   onTap: () => _open(
                     context,
