@@ -420,7 +420,7 @@ class _SettingsTile extends StatelessWidget {
                         title,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: colors.onSurface,
-                          fontWeight: FontWeight.w850,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 4),
