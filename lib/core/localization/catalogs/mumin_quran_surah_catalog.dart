@@ -241,6 +241,125 @@ abstract final class MuminQuranSurahCatalog {
     'An-Nas',
   ];
 
+  /// French meanings of the surah titles, kept separate from transliteration.
+  /// These are title translations, not Quranic verse text.
+  static const List<String> frenchNames = [
+    "L'Ouverture",
+    "La Vache",
+    "La Famille d'Imran",
+    "Les Femmes",
+    "La Table Servie",
+    "Les Bestiaux",
+    "Les Hauteurs",
+    "Le Butin",
+    "Le Repentir",
+    "Jonas",
+    "Hûd",
+    "Joseph",
+    "Le Tonnerre",
+    "Abraham",
+    "Al-Hijr",
+    "Les Abeilles",
+    "Le Voyage Nocturne",
+    "La Caverne",
+    "Marie",
+    "Tâ-Hâ",
+    "Les Prophètes",
+    "Le Pèlerinage",
+    "Les Croyants",
+    "La Lumière",
+    "Le Discernement",
+    "Les Poètes",
+    "Les Fourmis",
+    "Le Récit",
+    "L'Araignée",
+    "Les Romains",
+    "Luqmân",
+    "La Prosternation",
+    "Les Coalisés",
+    "Saba",
+    "Le Créateur",
+    "Yâ-Sîn",
+    "Les Rangées",
+    "Sâd",
+    "Les Groupes",
+    "Le Pardonneur",
+    "Expliquées en détail",
+    "La Consultation",
+    "L'Ornement",
+    "La Fumée",
+    "L'Agenouillement",
+    "Les Dunes",
+    "Muhammad",
+    "La Victoire",
+    "Les Appartements",
+    "Qâf",
+    "Les Vents dispersants",
+    "Le Mont",
+    "L'Étoile",
+    "La Lune",
+    "Le Tout Miséricordieux",
+    "L'Événement",
+    "Le Fer",
+    "La Discussion",
+    "L'Exode",
+    "L'Éprouvée",
+    "Le Rang",
+    "Le Vendredi",
+    "Les Hypocrites",
+    "La Trahison manifeste",
+    "Le Divorce",
+    "L'Interdiction",
+    "La Royauté",
+    "Le Calame",
+    "L'Inévitable",
+    "Les Voies d'Ascension",
+    "Noé",
+    "Les Djinns",
+    "L'Enveloppé",
+    "Le Revêtu",
+    "La Résurrection",
+    "L'Homme",
+    "Les Envoyés",
+    "La Nouvelle",
+    "Les Arracheurs",
+    "Il a froncé les sourcils",
+    "L'Obscurcissement",
+    "La Déchirure",
+    "Les Fraudeurs",
+    "La Fissure",
+    "Les Constellations",
+    "L'Astre nocturne",
+    "Le Très-Haut",
+    "L'Enveloppante",
+    "L'Aube",
+    "La Cité",
+    "Le Soleil",
+    "La Nuit",
+    "Le Matin",
+    "L'Expansion",
+    "Le Figuier",
+    "L'Adhérence",
+    "La Destinée",
+    "La Preuve",
+    "Le Tremblement de terre",
+    "Les Coursiers",
+    "La Calamité",
+    "La Course aux richesses",
+    "Le Temps",
+    "Le Calomniateur",
+    "L'Éléphant",
+    "Quraysh",
+    "Les Ustensiles",
+    "L'Abondance",
+    "Les Infidèles",
+    "Le Secours",
+    "La Corde de fibres",
+    "La Sincérité",
+    "L'Aube naissante",
+    "Les Hommes",
+  ];
+
   static const int surahCount = 114;
 
   static String nameFor(
@@ -260,20 +379,28 @@ abstract final class MuminQuranSurahCatalog {
       return arabicNames[index];
     }
 
-    // Transliteration is intentionally shared by English and French.
+    if (normalized == 'fr') {
+      return frenchNames[index];
+    }
+
     return transliteratedNames[index];
   }
 
   static bool get hasValidData =>
       arabicNames.length == surahCount &&
-      transliteratedNames.length == surahCount;
+      transliteratedNames.length == surahCount &&
+      frenchNames.length == surahCount;
 
   static List<String> namesFor(String languageCode) {
     final normalized =
         MuminLanguageRegistry.normalizeLanguageCode(languageCode);
 
     return List.unmodifiable(
-      normalized == 'ar' ? arabicNames : transliteratedNames,
+      normalized == 'ar'
+          ? arabicNames
+          : normalized == 'fr'
+              ? frenchNames
+              : transliteratedNames,
     );
   }
 }
