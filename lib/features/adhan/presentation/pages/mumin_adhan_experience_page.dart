@@ -13,8 +13,8 @@ import '../../data/services/mumin_adhan_audio_handler.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
 ///
-/// The short takbeer and full Adhan are serialized through the one shared
-/// audio handler, so two recordings can never overlap.
+/// Exactly one selected complete Adhan recording is played through the
+/// shared audio handler; a user can replay that same selection from the UI.
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
@@ -47,14 +47,11 @@ class _MuminAdhanExperiencePageState
   late MuminLanguageController _languages;
 
   bool _audioHandlerReady = false;
-  bool _shortAudioEnabled = true;
-  bool _fullAudioEnabled = false;
-  String _audioMode = 'short';
   String? _selectedBackgroundPath;
   String _selectedAudioAsset = _shortAdhanAsset;
   String _selectedAudioTitle = 'Adhan recording 1';
-  bool _shortAdhanStarted = false;
-  bool _shortAdhanScheduled = false;
+  bool _selectedAdhanStarted = false;
+  bool _preferencesLoadScheduled = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
   double _dragDistance = 0;
@@ -74,7 +71,7 @@ class _MuminAdhanExperiencePageState
     _languages = context.read<MuminLanguageController>();
     _audioHandlerReady = true;
 
-    if (!_shortAdhanScheduled) {
+    if (!_preferencesLoadScheduled) {
       _shortAdhanScheduled = true;
       unawaited(_loadMediaPreferencesAndStart());
     }
@@ -91,9 +88,6 @@ class _MuminAdhanExperiencePageState
           : _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
       // Both library entries are complete Adhan recordings. Exactly one
       // selected file is played; the legacy short/full switches are ignored.
-      _audioMode = 'short';
-      _shortAudioEnabled = true;
-      _fullAudioEnabled = false;
       _selectedBackgroundPath =
           preferences.getString('mumin_adhan_selected_mosque_image_v1');
 
@@ -102,7 +96,7 @@ class _MuminAdhanExperiencePageState
       // dedicated test action in Adhan settings.
       if (!widget.previewMode && _shortAudioEnabled && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) unawaited(_startShortAdhan());
+          if (mounted) unawaited(_startSelectedAdhan());
         });
       }
     } catch (error, stackTrace) {
@@ -111,9 +105,6 @@ class _MuminAdhanExperiencePageState
       // Safe fallback: play only the first complete Adhan recording.
       _selectedAudioAsset = _shortAdhanAsset;
       _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
-      _audioMode = 'short';
-      _shortAudioEnabled = true;
-      _fullAudioEnabled = false;
       if (mounted) setState(() {});
       if (!widget.previewMode && mounted) {
         unawaited(_startShortAdhan());
@@ -152,7 +143,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _startShortAdhan() async {
-    if (!mounted || !_audioHandlerReady || _shortAdhanStarted || !_shortAudioEnabled || _audioMode != 'short') return;
+    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted) return;
     _shortAdhanStarted = true;
 
     try {
@@ -166,7 +157,7 @@ class _MuminAdhanExperiencePageState
     }
   }
 
-  Future<void> _continueWithFullAdhan() async {
+  Future<void> _replaySelectedAdhan() async {
     if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
 
     setState(() {
@@ -197,9 +188,9 @@ class _MuminAdhanExperiencePageState
         SnackBar(
           content: Text(
             _text(
-              'تعذر تشغيل الأذان الكامل. تحقق من ملف التسجيل.',
-              'The complete Adhan could not be played. Check the audio file.',
-              'Impossible de lire l’Adhan complet. Vérifiez le fichier audio.',
+              'تعذر تشغيل التسجيل المختار. تحقق من ملف الصوت.',
+              'The selected recording could not be played. Check the audio file.',
+              'Impossible de lire l’enregistrement sélectionné. Vérifiez le fichier audio.',
             ),
           ),
         ),
@@ -446,9 +437,9 @@ class _MuminAdhanExperiencePageState
           )
         : _fullAdhanStarted
         ? _text(
-            'الأذان الكامل قيد التشغيل',
-            'Complete Adhan is playing',
-            'L’Adhan complet est en cours',
+            'التسجيل المختار قيد التشغيل',
+            'Selected recording is playing',
+            'L’enregistrement sélectionné est en cours',
           )
         : !canContinue
             ? _text(
