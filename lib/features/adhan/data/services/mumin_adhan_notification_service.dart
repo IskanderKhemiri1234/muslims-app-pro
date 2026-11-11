@@ -1,4 +1,5 @@
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:adhan/adhan.dart';
@@ -21,6 +22,28 @@ class MuminAdhanNotificationService {
   })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
         _calculationService =
             calculationService ?? const GlobalPrayerCalculationService();
+
+  static final StreamController<Prayer> _prayerAlertController =
+      StreamController<Prayer>.broadcast();
+
+  /// Emits a prayer when Android launches the app from its full-screen alert.
+  static Stream<Prayer> get prayerAlerts => _prayerAlertController.stream;
+
+  static void _handleNotificationResponse(
+    NotificationResponse response,
+  ) {
+    const prefix = 'mumin_adhan:';
+    final payload = response.payload;
+    if (payload == null || !payload.startsWith(prefix)) return;
+
+    final prayerName = payload.substring(prefix.length);
+    for (final prayer in supportedPrayers) {
+      if (prayer.name == prayerName) {
+        _prayerAlertController.add(prayer);
+        return;
+      }
+    }
+  }
 
   static const String _enabledPrefix = 'mumin_adhan_enabled_';
 
@@ -66,7 +89,21 @@ class MuminAdhanNotificationService {
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
 
-    await _plugin.initialize(settings: settings);
+    await _plugin.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
+    );
+
+    // A full-screen notification that starts a terminated app is not
+    // delivered through onDidReceiveNotificationResponse. Recover its
+    // payload from the launch details and dispatch it through the same route.
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      final response = launchDetails?.notificationResponse;
+      if (response != null) {
+        _handleNotificationResponse(response);
+      }
+    }
   }
 
   
@@ -114,6 +151,18 @@ class MuminAdhanNotificationService {
     if (android == null) return false;
 
     return await android.canScheduleExactNotifications() ?? false;
+  }
+
+  /// Opens Android's special-access screen for full-screen Adhan alerts.
+  Future<bool> requestFullScreenIntentPermission() async {
+    await initialize();
+
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    if (android == null) return false;
+
+    return await android.requestFullScreenIntentPermission() ?? false;
   }
 
   Future<Set<Prayer>> getEnabledPrayers() async {
@@ -217,6 +266,7 @@ class MuminAdhanNotificationService {
         playSound: true,
         enableVibration: true,
         visibility: NotificationVisibility.public,
+        fullScreenIntent: true,
       ),
     );
 
