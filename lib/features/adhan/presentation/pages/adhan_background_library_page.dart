@@ -224,7 +224,7 @@ class _AdhanBackgroundLibraryPageState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 128),
               children: [
                 Text(
                   _t(
