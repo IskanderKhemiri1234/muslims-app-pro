@@ -123,23 +123,20 @@ class _AdhanNotificationSettingsPageState
 
     try {
       final granted = await _service.requestFullScreenIntentPermission();
-      if (!granted) {
-        throw StateError(
-          _t(
-            'لم يتم تفعيل إذن عرض شاشة الأذان الكاملة. يمكنك السماح به من إعدادات الوصول الخاص.',
-            'Full-screen Adhan access was not enabled. You can allow it in special app access settings.',
-            'L’accès plein écran à l’Adhan n’a pas été activé. Autorisez-le dans les accès spéciaux.',
-          ),
-        );
-      }
 
       if (!mounted) return;
       _showMessage(
-        _t(
-          'تم فتح إعداد السماح بشاشة الأذان الكاملة.',
-          'Full-screen Adhan access settings opened.',
-          'Les paramètres d’accès plein écran de l’Adhan sont ouverts.',
-        ),
+        granted
+            ? _t(
+                'إذن شاشة الأذان الكاملة مفعّل.',
+                'Full-screen Adhan access is enabled.',
+                'L’accès plein écran à l’Adhan est activé.',
+              )
+            : _t(
+                'افتح إعدادات الوصول الخاص وفعّل السماح بعرض ملء الشاشة لتطبيق Mumin Pro.',
+                'In special app access, allow Mumin Pro to use full-screen notifications.',
+                'Dans les accès spéciaux, autorisez Mumin Pro à afficher les notifications en plein écran.',
+              ),
       );
     } catch (error) {
       if (!mounted) return;
