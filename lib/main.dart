@@ -317,7 +317,7 @@ class _MuminAppState extends State<MuminApp>
   DateTime? _lastUpdateCheckAt;
   bool _isCheckingForUpdates = false;
   bool _isUpdateDialogVisible = false;
-  StreamSubscription<Prayer>? _prayerAlertSubscription;
+  StreamSubscription<MuminPrayerAlert>? _prayerAlertSubscription;
   bool _isPrayerAlertVisible = false;
 
   @override
@@ -340,7 +340,7 @@ class _MuminAppState extends State<MuminApp>
     }
   }
 
-  void _openPrayerAlert(Prayer prayer) {
+  void _openPrayerAlert(MuminPrayerAlert alert) {
     if (!mounted ||
         widget.audioHandler == null ||
         _isPrayerAlertVisible) {
@@ -355,7 +355,10 @@ class _MuminAppState extends State<MuminApp>
       navigator.push<void>(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
-          builder: (_) => MuminAdhanExperiencePage(prayer: prayer),
+          builder: (_) => MuminAdhanExperiencePage(
+            prayer: alert.prayer,
+            prayerTime: alert.prayerTime,
+          ),
         ),
       ).then<void>((_) {
         _isPrayerAlertVisible = false;
@@ -733,7 +736,7 @@ class _MuminForegroundPrayerAlertWatcher extends StatefulWidget {
     required this.child,
   });
 
-  final ValueChanged<Prayer> onPrayerTime;
+  final ValueChanged<MuminPrayerAlert> onPrayerTime;
   final Widget child;
 
   @override
@@ -772,15 +775,23 @@ class _MuminForegroundPrayerAlertWatcherState
     }
 
     _lastProcessedPrayerTime = target;
-    unawaited(_openIfEnabled(prayer));
+    unawaited(_openIfEnabled(prayer, target));
   }
 
-  Future<void> _openIfEnabled(Prayer prayer) async {
+  Future<void> _openIfEnabled(
+    Prayer prayer,
+    DateTime prayerTime,
+  ) async {
     try {
       final enabled =
           await _notificationService!.getEnabledPrayers();
       if (!mounted || !enabled.contains(prayer)) return;
-      widget.onPrayerTime(prayer);
+      widget.onPrayerTime(
+        MuminPrayerAlert(
+          prayer: prayer,
+          prayerTime: prayerTime,
+        ),
+      );
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: foreground Adhan alert failed: $error');
       debugPrintStack(stackTrace: stackTrace);
