@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/services/mumin_adhan_audio_handler.dart';
+import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
 ///
@@ -18,6 +19,7 @@ import '../../data/services/mumin_adhan_audio_handler.dart';
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
+    this.prayerTime,
     this.previewMode = false,
     this.audioHandlerOverride,
     this.backgroundImageOverride,
@@ -25,6 +27,7 @@ class MuminAdhanExperiencePage extends StatefulWidget {
   });
 
   final Prayer prayer;
+  final DateTime? prayerTime;
   final bool previewMode;
   final MuminAdhanAudioHandler? audioHandlerOverride;
   final String? backgroundImageOverride;
@@ -127,6 +130,34 @@ class _MuminAdhanExperiencePageState
       default:
         return ar;
     }
+  }
+
+  String? get _prayerTimeLabel {
+    DateTime? prayerTime = widget.prayerTime;
+
+    if (prayerTime == null) {
+      try {
+        prayerTime = context
+            .read<PrayerController>()
+            .globalSchedule
+            ?.timeForPrayer(widget.prayer);
+      } catch (_) {
+        prayerTime = null;
+      }
+    }
+
+    if (prayerTime == null) return null;
+
+    final timeOfDay = TimeOfDay(
+      hour: prayerTime.hour,
+      minute: prayerTime.minute,
+    );
+
+    return MaterialLocalizations.of(context).formatTimeOfDay(
+      timeOfDay,
+      alwaysUse24HourFormat:
+          MediaQuery.of(context).alwaysUse24HourFormat,
+    );
   }
 
   String get _prayerName {
@@ -449,6 +480,8 @@ class _MuminAdhanExperiencePageState
   }
 
   Widget _buildPrayerHeading() {
+    final prayerTimeLabel = _prayerTimeLabel;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -477,6 +510,33 @@ class _MuminAdhanExperiencePageState
             ],
           ),
         ),
+        if (prayerTimeLabel != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _text('وقت الصلاة', 'PRAYER TIME', 'HEURE DE PRIÈRE'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _gold.withValues(alpha: 0.94),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            prayerTimeLabel,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: _gold,
+              fontSize: 31,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              shadows: [
+                Shadow(color: Colors.black54, blurRadius: 16),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 15),
         Text(
           _text('الله أكبر • الله أكبر', 'Allahu Akbar • Allahu Akbar', 'Allahou Akbar • Allahou Akbar'),
