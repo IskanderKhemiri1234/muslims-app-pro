@@ -51,6 +51,8 @@ class _MuminAdhanExperiencePageState
   bool _fullAudioEnabled = false;
   String _audioMode = 'short';
   String? _selectedBackgroundPath;
+  String _selectedAudioAsset = _shortAdhanAsset;
+  String _selectedAudioTitle = 'Adhan recording 1';
   bool _shortAdhanStarted = false;
   bool _shortAdhanScheduled = false;
   bool _fullAdhanStarted = false;
@@ -81,31 +83,19 @@ class _MuminAdhanExperiencePageState
   Future<void> _loadMediaPreferencesAndStart() async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      final savedMode = preferences.getString('mumin_adhan_audio_mode_v1');
-      final legacyShort =
-          preferences.getBool('mumin_adhan_short_audio_enabled_v1') ?? true;
-      final legacyFull =
-          preferences.getBool('mumin_adhan_full_audio_enabled_v1') ?? false;
-      _audioMode = savedMode == 'full' ||
-              (savedMode == null && legacyFull && !legacyShort)
-          ? 'full'
-          : 'short';
-      _shortAudioEnabled = _audioMode == 'short';
-      _fullAudioEnabled = _audioMode == 'full';
+      final selectedAudioId = preferences.getString('mumin_adhan_selected_audio_id_v1') ?? 'adhan_recording_1';
+      final useSecondRecording = selectedAudioId == 'adhan_recording_2';
+      _selectedAudioAsset = useSecondRecording ? _fullAdhanAsset : _shortAdhanAsset;
+      _selectedAudioTitle = useSecondRecording
+          ? _text('تسجيل الأذان الثاني', 'Adhan recording 2', 'Enregistrement Adhan 2')
+          : _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
+      // Both library entries are complete Adhan recordings. Exactly one
+      // selected file is played; the legacy short/full switches are ignored.
+      _audioMode = 'short';
+      _shortAudioEnabled = true;
+      _fullAudioEnabled = false;
       _selectedBackgroundPath =
           preferences.getString('mumin_adhan_selected_mosque_image_v1');
-
-      if (savedMode == null) {
-        await preferences.setString('mumin_adhan_audio_mode_v1', _audioMode);
-        await preferences.setBool(
-          'mumin_adhan_short_audio_enabled_v1',
-          _shortAudioEnabled,
-        );
-        await preferences.setBool(
-          'mumin_adhan_full_audio_enabled_v1',
-          _fullAudioEnabled,
-        );
-      }
 
       if (mounted) setState(() {});
       // The preview is deliberately silent. Each recording has its own
@@ -118,7 +108,9 @@ class _MuminAdhanExperiencePageState
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: Adhan media preferences could not be loaded: $error');
       debugPrintStack(stackTrace: stackTrace);
-      // Keep the safe single-recording default; never start both recordings.
+      // Safe fallback: play only the first complete Adhan recording.
+      _selectedAudioAsset = _shortAdhanAsset;
+      _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
       _audioMode = 'short';
       _shortAudioEnabled = true;
       _fullAudioEnabled = false;
@@ -165,12 +157,8 @@ class _MuminAdhanExperiencePageState
 
     try {
       await _audioHandler.playAsset(
-        _shortAdhanAsset,
-        title: _text(
-          'الله أكبر مرتين',
-          'Takbeer twice',
-          'Takbir deux fois',
-        ),
+        _selectedAudioAsset,
+        title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: short Adhan playback failed: $error');
@@ -179,7 +167,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _continueWithFullAdhan() async {
-    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || !_fullAudioEnabled || _audioMode != 'full') return;
+    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
 
     setState(() {
       _fullAdhanStarted = true;
@@ -192,12 +180,8 @@ class _MuminAdhanExperiencePageState
       if (!mounted || _isClosing) return;
 
       await _audioHandler.playAsset(
-        _fullAdhanAsset,
-        title: _text(
-          'الأذان الكامل',
-          'Complete Adhan',
-          'Adhan complet',
-        ),
+        _selectedAudioAsset,
+        title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: full Adhan playback failed: $error');
@@ -452,8 +436,7 @@ class _MuminAdhanExperiencePageState
 
   Widget _buildWaterDropControl() {
     final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
-    final canContinue = !widget.previewMode &&
-        _fullAudioEnabled && _audioMode == 'full';
+    final canContinue = !widget.previewMode && _selectedAudioAsset.isNotEmpty;
 
     final instruction = widget.previewMode
         ? _text(
@@ -469,14 +452,14 @@ class _MuminAdhanExperiencePageState
           )
         : !canContinue
             ? _text(
-                'اختر الأذان الكامل من إعدادات الصوت لاستخدام هذه الدائرة',
-                'Select Full Adhan in audio settings to use this control',
-                'Choisissez Adhan complet dans les réglages audio',
+                'اسحب دائرة البصمة لإعادة تشغيل التسجيل المختار',
+                'Swipe the fingerprint circle to replay the selected recording',
+                'Faites glisser le cercle pour relancer le son sélectionné',
               )
             : _text(
-                'اسحب دائرة البصمة لمواصلة الأذان الكامل',
-                'Swipe the fingerprint circle to continue the full Adhan',
-                'Faites glisser le cercle empreinte pour continuer l’Adhan',
+                'اسحب دائرة البصمة لإعادة تشغيل الأذان المختار',
+                'Swipe the fingerprint circle to replay the selected Adhan',
+                'Faites glisser le cercle pour relancer l’Adhan sélectionné',
               );
 
     return Column(
