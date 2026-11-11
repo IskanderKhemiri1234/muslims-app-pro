@@ -1443,12 +1443,8 @@ Widget build(BuildContext context) {
                     final index = listIndex - 1;
                     final number = index + 1;
                     final arabicName = _surahs[index].name;
-                    final englishName = QuranPageLocalization.textDirectionOf(
-                              context,
-                            ) ==
-                            TextDirection.rtl
-                        ? MuminQuranSurahCatalog.transliteratedNames[index]
-                        : MuminQuranSurahCatalog.transliteratedNames[index];
+                    final englishName =
+                        MuminQuranSurahCatalog.transliteratedNames[index];
                     final frenchName = MuminQuranSurahCatalog.frenchNames[index];
 
                     return Padding(
@@ -1459,7 +1455,6 @@ Widget build(BuildContext context) {
                         englishName: englishName,
                         frenchName: frenchName,
                         isDark: isDark,
-                        isArabic: isArabic,
                         onTap: _isLoading
                             ? null
                             : () => _openSurahFromNavigation(number),
@@ -1572,7 +1567,6 @@ class _PremiumSurahTile extends StatelessWidget {
     required this.englishName,
     required this.frenchName,
     required this.isDark,
-    required this.isArabic,
     required this.onTap,
   });
 
@@ -1581,7 +1575,6 @@ class _PremiumSurahTile extends StatelessWidget {
   final String englishName;
   final String frenchName;
   final bool isDark;
-  final bool isArabic;
   final VoidCallback? onTap;
 
   @override
