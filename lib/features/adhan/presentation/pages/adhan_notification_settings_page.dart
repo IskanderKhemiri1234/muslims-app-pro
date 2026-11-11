@@ -9,6 +9,7 @@ import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../data/services/mumin_adhan_notification_service.dart';
 import '../../data/services/mumin_adhan_notification_coordinator.dart';
 import 'prayer_countdown_diagnostics_page.dart';
+import 'adhan_media_settings_page.dart';
 
 class AdhanNotificationSettingsPage extends StatefulWidget {
   const AdhanNotificationSettingsPage({super.key});
@@ -752,6 +753,49 @@ class _AdhanNotificationSettingsPageState
                                 _t('تفعيل', 'Enable', 'Activer'),
                               ),
                             ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFD8B66A).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.tune_rounded,
+                        color: Color(0xFFD8B66A),
+                      ),
+                      title: Text(
+                        _t(
+                          'إعدادات صوت وصورة الأذان',
+                          'Adhan audio and image settings',
+                          'Réglages audio et image de l’Adhan',
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        _t(
+                          'تحكم منفصل في التكبير القصير والأذان الكامل، واختر صورة المسجد وعاين الواجهة فوراً.',
+                          'Control short and full Adhan separately, choose a mosque image and preview the screen instantly.',
+                          'Contrôlez séparément le takbir court et l’Adhan complet, choisissez une image et prévisualisez l’écran.',
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _saving
+                          ? null
+                          : () {
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const AdhanMediaSettingsPage(),
+                                ),
+                              );
+                            },
                     ),
                   ),
 
