@@ -146,7 +146,7 @@ class _AdhanBackgroundLibraryPageState
     }
   }
 
-  Future<void> _preview() async {
+  Future<void> _preview(String imagePath) async {
     final audio = context.read<MuminAdhanAudioHandler>();
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -154,6 +154,7 @@ class _AdhanBackgroundLibraryPageState
         builder: (_) => MuminAdhanExperiencePage(
           prayer: Prayer.fajr,
           previewMode: true,
+          backgroundImageOverride: imagePath,
           audioHandlerOverride: audio,
         ),
       ),
@@ -281,6 +282,43 @@ class _AdhanBackgroundLibraryPageState
                                   ),
                                 ),
                               ),
+                              Positioned(
+                                top: 10,
+                                left: 10,
+                                child: Semantics(
+                                  button: true,
+                                  label: _t(
+                                    'معاينة الخلفية بملء الشاشة',
+                                    'Preview background full screen',
+                                    'Aperçu du fond en plein écran',
+                                  ),
+                                  child: Material(
+                                    color: const Color(0xB8071C17),
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () => _preview(path),
+                                      child: Container(
+                                        width: 34,
+                                        height: 34,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: const Color(0x99D8B66A),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const Icon(
+                                          Icons.visibility_rounded,
+                                          color: Color(0xFFF4F0E6),
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               if (selected)
                                 Positioned(
                                   top: 10,
@@ -358,21 +396,6 @@ class _AdhanBackgroundLibraryPageState
                     'Add image from phone',
                     'Ajouter une image',
                   )),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  onPressed: _preview,
-                  icon: const Icon(Icons.visibility_rounded),
-                  label: Text(_t(
-                    'معاينة شاشة الأذان الآن',
-                    'Preview Adhan screen now',
-                    'Prévisualiser maintenant',
-                  )),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF075B46),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
                 ),
               ],
             ),

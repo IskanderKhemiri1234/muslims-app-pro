@@ -20,12 +20,14 @@ class MuminAdhanExperiencePage extends StatefulWidget {
     required this.prayer,
     this.previewMode = false,
     this.audioHandlerOverride,
+    this.backgroundImageOverride,
     super.key,
   });
 
   final Prayer prayer;
   final bool previewMode;
   final MuminAdhanAudioHandler? audioHandlerOverride;
+  final String? backgroundImageOverride;
 
   @override
   State<MuminAdhanExperiencePage> createState() =>
@@ -90,7 +92,7 @@ class _MuminAdhanExperiencePageState
           : _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
       // Both library entries are complete Adhan recordings. Exactly one
       // selected file is played; the legacy short/full switches are ignored.
-      _selectedBackgroundPath =
+      _selectedBackgroundPath = widget.backgroundImageOverride ??
           preferences.getString('mumin_adhan_selected_mosque_image_v1');
 
       if (mounted) setState(() {});
