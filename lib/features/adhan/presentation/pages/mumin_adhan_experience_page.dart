@@ -42,6 +42,7 @@ class _MuminAdhanExperiencePageState
 
   bool _audioHandlerReady = false;
   bool _shortAdhanStarted = false;
+  bool _shortAdhanScheduled = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
   double _dragDistance = 0;
@@ -61,7 +62,8 @@ class _MuminAdhanExperiencePageState
     _languages = context.read<MuminLanguageController>();
     _audioHandlerReady = true;
 
-    if (!_shortAdhanStarted) {
+    if (!_shortAdhanScheduled && !_shortAdhanStarted) {
+      _shortAdhanScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_startShortAdhan());
       });
@@ -189,7 +191,7 @@ class _MuminAdhanExperiencePageState
     if (_fullAdhanStarted || _isClosing) return;
 
     final nextDistance =
-        (_dragDistance + details.delta.distance).clamp(0.0, 110.0);
+        (_dragDistance + details.delta.distance).clamp(0.0, 110.0).toDouble();
 
     setState(() => _dragDistance = nextDistance);
 
