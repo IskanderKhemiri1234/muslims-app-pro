@@ -150,6 +150,7 @@ jobs:
           PY
 
       - name: Analyze Dart code
+        # Keep informational deprecations non-fatal; warnings and errors remain fatal.
         run: flutter analyze --no-fatal-infos
 
       - name: Run Flutter tests
