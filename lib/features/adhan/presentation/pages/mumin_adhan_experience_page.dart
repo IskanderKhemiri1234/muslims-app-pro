@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:io';
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/services/mumin_adhan_audio_handler.dart';
@@ -16,10 +18,14 @@ import '../../data/services/mumin_adhan_audio_handler.dart';
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
+    this.previewMode = false,
+    this.audioHandlerOverride,
     super.key,
   });
 
   final Prayer prayer;
+  final bool previewMode;
+  final MuminAdhanAudioHandler? audioHandlerOverride;
 
   @override
   State<MuminAdhanExperiencePage> createState() =>
@@ -41,6 +47,9 @@ class _MuminAdhanExperiencePageState
   late MuminLanguageController _languages;
 
   bool _audioHandlerReady = false;
+  bool _shortAudioEnabled = true;
+  bool _fullAudioEnabled = true;
+  String? _selectedBackgroundPath;
   bool _shortAdhanStarted = false;
   bool _shortAdhanScheduled = false;
   bool _fullAdhanStarted = false;
@@ -58,15 +67,32 @@ class _MuminAdhanExperiencePageState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _audioHandler = context.read<MuminAdhanAudioHandler>();
+    _audioHandler = widget.audioHandlerOverride ?? context.read<MuminAdhanAudioHandler>();
     _languages = context.read<MuminLanguageController>();
     _audioHandlerReady = true;
 
-    if (!_shortAdhanScheduled && !_shortAdhanStarted) {
+    if (!_shortAdhanScheduled) {
       _shortAdhanScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_startShortAdhan());
-      });
+      unawaited(_loadMediaPreferencesAndStart());
+    }
+  }
+
+  Future<void> _loadMediaPreferencesAndStart() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      _shortAudioEnabled = preferences.getBool('mumin_adhan_short_audio_enabled_v1') ?? true;
+      _fullAudioEnabled = preferences.getBool('mumin_adhan_full_audio_enabled_v1') ?? true;
+      _selectedBackgroundPath = preferences.getString('mumin_adhan_selected_mosque_image_v1');
+      if (mounted) setState(() {});
+      if (_shortAudioEnabled && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_startShortAdhan());
+        });
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: Adhan media preferences could not be loaded: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) unawaited(_startShortAdhan());
     }
   }
 
@@ -101,7 +127,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _startShortAdhan() async {
-    if (!mounted || !_audioHandlerReady || _shortAdhanStarted) return;
+    if (!mounted || !_audioHandlerReady || _shortAdhanStarted || !_shortAudioEnabled) return;
     _shortAdhanStarted = true;
 
     try {
@@ -120,7 +146,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _continueWithFullAdhan() async {
-    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady) return;
+    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || !_fullAudioEnabled) return;
 
     setState(() {
       _fullAdhanStarted = true;
@@ -231,15 +257,7 @@ class _MuminAdhanExperiencePageState
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/images/mosques/mumin_mosque.jpg',
-            fit: BoxFit.cover,
-            cacheWidth: cacheWidth,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (context, error, stackTrace) {
-              return const ColoredBox(color: _emerald);
-            },
-          ),
+          _buildBackgroundImage(cacheWidth),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -283,6 +301,44 @@ class _MuminAdhanExperiencePageState
     );
   }
 
+  Widget _buildBackgroundImage(int cacheWidth) {
+    final path = _selectedBackgroundPath;
+    if (path == null || path.isEmpty) {
+      return Image.asset(
+        'assets/images/mosques/mumin_mosque.jpg',
+        fit: BoxFit.cover,
+        cacheWidth: cacheWidth,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => const ColoredBox(color: _emerald),
+      );
+    }
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        cacheWidth: cacheWidth,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => const ColoredBox(color: _emerald),
+      );
+    }
+    final file = File(path);
+    if (!file.existsSync()) {
+      return Image.asset(
+        'assets/images/mosques/mumin_mosque.jpg',
+        fit: BoxFit.cover,
+        cacheWidth: cacheWidth,
+        filterQuality: FilterQuality.medium,
+      );
+    }
+    return Image.file(
+      file,
+      fit: BoxFit.cover,
+      cacheWidth: cacheWidth,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (_, __, ___) => const ColoredBox(color: _emerald),
+    );
+  }
+
   Widget _buildCloseButton() {
     return Semantics(
       button: true,
@@ -320,7 +376,9 @@ class _MuminAdhanExperiencePageState
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          _text('حَانَ وَقْتُ الصَّلَاة', 'IT IS TIME TO PRAY', 'C’EST L’HEURE DE LA PRIÈRE'),
+          widget.previewMode
+              ? _text('مُعَايَنَةُ وَاجِهَةِ الأَذَان', 'ADHAN SCREEN PREVIEW', 'APERÇU DE L’ÉCRAN ADHAN')
+              : _text('حَانَ وَقْتُ الصَّلَاة', 'IT IS TIME TO PRAY', 'C’EST L’HEURE DE LA PRIÈRE'),
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: _gold,
@@ -367,9 +425,9 @@ class _MuminAdhanExperiencePageState
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPanStart: _onDropPanStart,
-          onPanUpdate: _onDropPanUpdate,
-          onPanEnd: _onDropPanEnd,
+          onPanStart: _fullAudioEnabled ? _onDropPanStart : null,
+          onPanUpdate: _fullAudioEnabled ? _onDropPanUpdate : null,
+          onPanEnd: _fullAudioEnabled ? _onDropPanEnd : null,
           child: Semantics(
             button: true,
             label: _text(
@@ -396,7 +454,9 @@ class _MuminAdhanExperiencePageState
           child: Text(
             _fullAdhanStarted
                 ? _text('الأذان الكامل قيد التشغيل', 'Complete Adhan is playing', 'L’Adhan complet est en cours')
-                : _text('اسحب القطرة لمواصلة الأذان الكامل', 'Swipe the drop to continue the full Adhan', 'Glissez la goutte pour continuer l’Adhan complet'),
+                : !_fullAudioEnabled
+                    ? _text('الأذان الكامل متوقف من الإعدادات', 'Full Adhan is disabled in settings', 'L’Adhan complet est désactivé dans les réglages')
+                    : _text('اسحب القطرة لمواصلة الأذان الكامل', 'Swipe the drop to continue the full Adhan', 'Glissez la goutte pour continuer l’Adhan complet'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: _ivory.withValues(alpha: 0.9),
