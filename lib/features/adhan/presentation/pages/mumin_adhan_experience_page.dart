@@ -54,11 +54,13 @@ class _MuminAdhanExperiencePageState
   bool _preferencesLoadScheduled = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
+  bool _audioMuted = false;
   double _dragDistance = 0;
 
   @override
   void initState() {
     super.initState();
+    _audioMuted = widget.previewMode;
     unawaited(
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
     );
@@ -143,7 +145,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _startSelectedAdhan() async {
-    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted) return;
+    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted || _audioMuted) return;
     _selectedAdhanStarted = true;
 
     try {
@@ -158,7 +160,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _replaySelectedAdhan() async {
-    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
+    if (_fullAdhanStarted || _isClosing || _audioMuted || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
 
     setState(() {
       _fullAdhanStarted = true;
@@ -256,8 +258,8 @@ class _MuminAdhanExperiencePageState
     final size = MediaQuery.sizeOf(context);
     final cacheWidth =
         (size.width * MediaQuery.devicePixelRatioOf(context))
-            .round()
-            .clamp(720, 1440)
+            .ceil()
+            .clamp(720, 2160)
             .toInt();
 
     return Scaffold(
@@ -288,6 +290,11 @@ class _MuminAdhanExperiencePageState
                   top: 8,
                   right: 14,
                   child: _buildCloseButton(),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 14,
+                  child: _buildAudioButton(),
                 ),
                 Positioned(
                   top: size.height * 0.19,
@@ -344,6 +351,66 @@ class _MuminAdhanExperiencePageState
       cacheWidth: cacheWidth,
       filterQuality: FilterQuality.medium,
       errorBuilder: (_, __, ___) => const ColoredBox(color: _emerald),
+    );
+  }
+
+  Future<void> _toggleAdhanAudio() async {
+    if (_isClosing || !_audioHandlerReady) return;
+
+    final shouldMute = !_audioMuted;
+    setState(() => _audioMuted = shouldMute);
+
+    try {
+      if (shouldMute) {
+        await _audioHandler.pause();
+      } else if (_audioHandler.hasSource) {
+        await _audioHandler.play();
+      } else {
+        await _startSelectedAdhan();
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: Adhan audio toggle failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() => _audioMuted = true);
+    }
+  }
+
+  Widget _buildAudioButton() {
+    final label = _audioMuted
+        ? _text('تفعيل صوت الأذان', 'Enable Adhan sound', 'Activer le son Adhan')
+        : _text('كتم صوت الأذان', 'Mute Adhan sound', 'Couper le son Adhan');
+
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.24),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _toggleAdhanAudio,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.42),
+                width: 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              _audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: _audioMuted
+                  ? Colors.white.withValues(alpha: 0.72)
+                  : _gold,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
