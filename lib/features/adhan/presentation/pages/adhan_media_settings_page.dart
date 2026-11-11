@@ -21,6 +21,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
   static const _shortEnabledKey = 'mumin_adhan_short_audio_enabled_v1';
   static const _fullEnabledKey = 'mumin_adhan_full_audio_enabled_v1';
   static const _selectedImageKey = 'mumin_adhan_selected_mosque_image_v1';
+  static const _galleryImagesKey = 'mumin_adhan_mosque_gallery_v1';
 
   static const _mosqueAssets = <String>[
     'assets/images/mosques/mumin_mosque.jpg',
@@ -32,6 +33,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
   bool _fullEnabled = true;
   bool _pickingImage = false;
   String? _selectedImagePath;
+  List<String> _galleryImages = List<String>.of(_mosqueAssets);
 
   String _t(String ar, String en, String fr) {
     final code = Localizations.localeOf(context).languageCode;
@@ -53,6 +55,10 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
       _shortEnabled = prefs.getBool(_shortEnabledKey) ?? true;
       _fullEnabled = prefs.getBool(_fullEnabledKey) ?? true;
       _selectedImagePath = prefs.getString(_selectedImageKey);
+      _galleryImages = <String>{
+        ..._mosqueAssets,
+        ...?prefs.getStringList(_galleryImagesKey),
+      }.toList(growable: true);
       _loading = false;
     });
   }
@@ -99,9 +105,14 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
 
       final prefs = await SharedPreferences.getInstance();
       final saved = await prefs.setString(_selectedImageKey, destination.path);
-      if (!saved) throw StateError('Could not save the selected mosque image.');
+      final gallery = <String>{..._galleryImages, destination.path}.toList();
+      final gallerySaved = await prefs.setStringList(_galleryImagesKey, gallery);
+      if (!saved || !gallerySaved) throw StateError('Could not save the selected mosque image.');
       if (!mounted) return;
-      setState(() => _selectedImagePath = destination.path);
+      setState(() {
+        _selectedImagePath = destination.path;
+        _galleryImages = gallery;
+      });
       _message(_t('تم حفظ صورة المسجد واختيارها.', 'Mosque image saved and selected.', 'Image de mosquée enregistrée et sélectionnée.'));
     } catch (error) {
       _message('${_t('تعذر اختيار الصورة', 'Could not select the image', 'Impossible de sélectionner l’image')}: $error');
@@ -198,7 +209,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _mosqueAssets.length + (_selectedImagePath != null && !_mosqueAssets.contains(_selectedImagePath) ? 1 : 0),
+                  itemCount: _galleryImages.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
@@ -206,9 +217,7 @@ class _AdhanMediaSettingsPageState extends State<AdhanMediaSettingsPage> {
                     childAspectRatio: 1.2,
                   ),
                   itemBuilder: (context, index) {
-                    final path = index < _mosqueAssets.length
-                        ? _mosqueAssets[index]
-                        : _selectedImagePath!;
+                    final path = _galleryImages[index];
                     final selected = path == _selectedImagePath ||
                         (_selectedImagePath == null && path == _mosqueAssets.first);
                     return InkWell(
