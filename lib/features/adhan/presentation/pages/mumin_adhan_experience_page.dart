@@ -223,7 +223,8 @@ class _MuminAdhanExperiencePageState
     final cacheWidth =
         (size.width * MediaQuery.devicePixelRatioOf(context))
             .round()
-            .clamp(720, 1440);
+            .clamp(720, 1440)
+            .toInt();
 
     return Scaffold(
       backgroundColor: _emerald,
@@ -359,7 +360,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Widget _buildWaterDropControl() {
-    final progress = (_dragDistance / 110).clamp(0.0, 1.0);
+    final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
