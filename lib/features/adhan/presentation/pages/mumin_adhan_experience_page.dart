@@ -72,7 +72,7 @@ class _MuminAdhanExperiencePageState
     _audioHandlerReady = true;
 
     if (!_preferencesLoadScheduled) {
-      _shortAdhanScheduled = true;
+      _preferencesLoadScheduled = true;
       unawaited(_loadMediaPreferencesAndStart());
     }
   }
@@ -94,7 +94,7 @@ class _MuminAdhanExperiencePageState
       if (mounted) setState(() {});
       // The preview is deliberately silent. Each recording has its own
       // dedicated test action in Adhan settings.
-      if (!widget.previewMode && _shortAudioEnabled && mounted) {
+      if (!widget.previewMode && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) unawaited(_startSelectedAdhan());
         });
@@ -107,7 +107,7 @@ class _MuminAdhanExperiencePageState
       _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
       if (mounted) setState(() {});
       if (!widget.previewMode && mounted) {
-        unawaited(_startShortAdhan());
+        unawaited(_startSelectedAdhan());
       }
     }
   }
@@ -142,9 +142,9 @@ class _MuminAdhanExperiencePageState
     }
   }
 
-  Future<void> _startShortAdhan() async {
+  Future<void> _startSelectedAdhan() async {
     if (!mounted || !_audioHandlerReady || _selectedAdhanStarted) return;
-    _shortAdhanStarted = true;
+    _selectedAdhanStarted = true;
 
     try {
       await _audioHandler.playAsset(
@@ -152,7 +152,7 @@ class _MuminAdhanExperiencePageState
         title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
-      debugPrint('Mumin Pro: short Adhan playback failed: $error');
+      debugPrint('Mumin Pro: selected Adhan playback failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
