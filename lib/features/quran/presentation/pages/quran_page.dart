@@ -14,6 +14,7 @@ import '../../domain/models/quran_reading_progress.dart';
 import '../../domain/repositories/quran_bookmark_repository.dart';
 import '../../domain/repositories/quran_reading_progress_repository.dart';
 import '../localization/quran_page_localization.dart';
+import '../../../../core/localization/catalogs/mumin_quran_surah_catalog.dart';
 import '../../data/datasources/quran_trilingual_data_source.dart';
 import '../widgets/quran_trilingual_reader.dart';
 
@@ -1360,8 +1361,6 @@ Future<int?> _goToPage() async {
 @override
 Widget build(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final languageCode = QuranPageLocalization.languageCodeOf(context);
-  final isArabic = languageCode == 'ar';
   final direction = QuranPageLocalization.textDirectionOf(context);
   final background = isDark
       ? const Color(0xFF071C17)
