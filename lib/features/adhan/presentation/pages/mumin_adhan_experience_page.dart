@@ -452,9 +452,16 @@ class _MuminAdhanExperiencePageState
 
   Widget _buildWaterDropControl() {
     final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
-    final canContinue = _fullAudioEnabled && _audioMode == 'full';
+    final canContinue = !widget.previewMode &&
+        _fullAudioEnabled && _audioMode == 'full';
 
-    final instruction = _fullAdhanStarted
+    final instruction = widget.previewMode
+        ? _text(
+            'المعاينة صامتة. اختبر كل تسجيل من إعدادات الأذان.',
+            'Preview is silent. Test each recording in Adhan settings.',
+            'L’aperçu est silencieux. Testez les sons dans les réglages Adhan.',
+          )
+        : _fullAdhanStarted
         ? _text(
             'الأذان الكامل قيد التشغيل',
             'Complete Adhan is playing',
