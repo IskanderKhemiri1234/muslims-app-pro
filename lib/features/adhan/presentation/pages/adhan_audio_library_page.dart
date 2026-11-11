@@ -11,7 +11,8 @@ class AdhanAudioLibraryPage extends StatefulWidget {
 class _AdhanAudioLibraryPageState extends State<AdhanAudioLibraryPage> {
   static const _selectionKey = 'mumin_adhan_selected_audio_id_v1';
   static const _legacyModeKey = 'mumin_adhan_audio_mode_v1';
-  // Register future complete Adhan recordings here; only the selected id is played.\n  static const _items = <_Recording>[
+  // Register future complete Adhan recordings here; only the selected id is played.
+  static const _items = <_Recording>[
     _Recording('adhan_recording_1','assets/audio/notifications/adhan_takbeer_twice.mp3','تسجيل الأذان الأول','Adhan recording 1','Enregistrement Adhan 1'),
     _Recording('adhan_recording_2','assets/audio/adhan/adhan_full.mp3','تسجيل الأذان الثاني','Adhan recording 2','Enregistrement Adhan 2'),
   ];
