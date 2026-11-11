@@ -68,7 +68,6 @@ flutter:
         - asset: assets/quran_trilingual/fonts/Hafs_20.ttf
 
   assets:
-    - assets/quran_trilingual/data/Quran_text.csv
     - assets/quran_trilingual/data/surahs/
     - assets/branding/
     - assets/branding/processed/

@@ -3,6 +3,7 @@ import 'package:muslims_app/core/localization/catalogs/mumin_quran_reader_catalo
 import 'package:muslims_app/features/quran/data/datasources/quran_trilingual_data_source.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('QuranTrilingualDataSource integrity contract', () {
     test('reader interface catalog is complete in all supported languages', () {
       expect(MuminQuranReaderCatalog.launchCatalogIntegrity, {
