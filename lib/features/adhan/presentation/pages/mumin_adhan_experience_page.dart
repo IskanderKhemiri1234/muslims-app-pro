@@ -376,7 +376,7 @@ class _MuminAdhanExperiencePageState
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          previewMode
+          widget.previewMode
               ? _text('مُعَايَنَةُ وَاجِهَةِ الأَذَان', 'ADHAN SCREEN PREVIEW', 'APERÇU DE L’ÉCRAN ADHAN')
               : _text('حَانَ وَقْتُ الصَّلَاة', 'IT IS TIME TO PRAY', 'C’EST L’HEURE DE LA PRIÈRE'),
           textAlign: TextAlign.center,
