@@ -72,6 +72,9 @@ flutter:
     - assets/branding/
     - assets/branding/processed/
     - assets/images/adhan/mumin_adhan_hero.jpg
+    - assets/audio/adhan/
+    - assets/audio/notifications/
+    - assets/images/mosques/
     - assets/images/home/mumin_reference_mosque.webp
     - assets/images/home/reference_ui/
     - assets/images/home/reference_ui/processed/
