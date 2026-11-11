@@ -230,7 +230,7 @@ class _MuminAdhanExperiencePageState
     setState(() => _dragDistance = nextDistance);
 
     if (nextDistance >= 110) {
-      unawaited(_continueWithFullAdhan());
+      unawaited(_replaySelectedAdhan());
     }
   }
 
