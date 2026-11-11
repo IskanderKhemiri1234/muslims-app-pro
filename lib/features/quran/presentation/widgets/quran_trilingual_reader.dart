@@ -113,10 +113,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
           orElse: () => _TrilingualTheme.day,
         );
       }
-      if (savedSurah != null && savedSurah >= 1 && savedSurah <= 114) {
-        _surahNumber = savedSurah;
-      }
-      if (savedAyah != null && savedAyah > 0) {
+      // The caller's selected surah is authoritative. Restore the saved
+      // ayah only when it belongs to that same surah; otherwise a previous
+      // reading position would override a surah explicitly chosen from the
+      // opening index.
+      if (savedSurah == _surahNumber && savedAyah != null && savedAyah > 0) {
         _currentAyah = savedAyah;
       }
     } catch (_) {
