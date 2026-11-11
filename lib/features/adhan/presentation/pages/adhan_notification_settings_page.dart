@@ -34,6 +34,7 @@ class _AdhanNotificationSettingsPageState
   bool _saving = false;
   bool _preferExact = false;
   bool _countdownEnabled = false;
+  bool _requestingFullScreenPermission = false;
 
   bool get _allPrayersEnabled =>
       _enabledPrayers.length == MuminAdhanNotificationService.supportedPrayers.length;
@@ -109,6 +110,44 @@ class _AdhanNotificationSettingsPageState
         _loading = false;
         _errorMessage = error.toString();
       });
+    }
+  }
+
+  Future<void> _requestFullScreenPermission() async {
+    if (_saving || _requestingFullScreenPermission) return;
+
+    setState(() {
+      _requestingFullScreenPermission = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final granted = await _service.requestFullScreenIntentPermission();
+      if (!granted) {
+        throw StateError(
+          _t(
+            'لم يتم تفعيل إذن عرض شاشة الأذان الكاملة. يمكنك السماح به من إعدادات الوصول الخاص.',
+            'Full-screen Adhan access was not enabled. You can allow it in special app access settings.',
+            'L’accès plein écran à l’Adhan n’a pas été activé. Autorisez-le dans les accès spéciaux.',
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      _showMessage(
+        _t(
+          'تم فتح إعداد السماح بشاشة الأذان الكاملة.',
+          'Full-screen Adhan access settings opened.',
+          'Les paramètres d’accès plein écran de l’Adhan sont ouverts.',
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _errorMessage = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _requestingFullScreenPermission = false);
+      }
     }
   }
 
@@ -668,7 +707,58 @@ class _AdhanNotificationSettingsPageState
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFD8B66A).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 4,
+                      ),
+                      leading: const Icon(
+                        Icons.fullscreen_rounded,
+                        color: Color(0xFFD8B66A),
+                      ),
+                      title: Text(
+                        _t(
+                          'واجهة الأذان بكامل الشاشة',
+                          'Full-screen Adhan experience',
+                          'Adhan en plein écran',
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        _t(
+                          'اسمح لـ Android بإظهار واجهة المسجد عند قفل الشاشة. قد يعرض النظام تنبيهاً علوياً أثناء استعمال الهاتف.',
+                          'Allow Android to show the mosque screen when locked. While the phone is in use, Android may show a heads-up alert instead.',
+                          'Autorisez Android à afficher l’écran de la mosquée lorsque le téléphone est verrouillé. En cours d’utilisation, Android peut afficher une alerte en haut.',
+                        ),
+                      ),
+                      trailing: _requestingFullScreenPermission
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : TextButton(
+                              onPressed: _saving
+                                  ? null
+                                  : _requestFullScreenPermission,
+                              child: Text(
+                                _t('تفعيل', 'Enable', 'Activer'),
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
 
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14),
@@ -863,9 +953,9 @@ class _AdhanNotificationSettingsPageState
 
                   Text(
                     _t(
-                      'ملاحظة: هذه الإعدادات تتحكم في إشعارات دخول وقت الصلاة، ولا تشغّل تسجيل الأذان تلقائياً.',
-                      'Note: These settings control prayer-time notifications and do not automatically play an Adhan recording.',
-                      'Remarque : ces réglages contrôlent les notifications de prière et ne lancent pas automatiquement un enregistrement de l’Adhan.',
+                      'تُفتح واجهة الأذان عند وصول التنبيه إذا سمح Android بذلك؛ ويبدأ التكبير القصير ثم يمكنك سحب القطرة لمواصلة الأذان الكامل.',
+                      'The Adhan screen opens when Android allows the alert; the short takbeer starts first, and you can swipe the drop to continue the full Adhan.',
+                      'L’écran Adhan s’ouvre lorsque Android l’autorise ; le takbir court démarre d’abord, puis faites glisser la goutte pour continuer l’Adhan complet.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       height: 1.5,
