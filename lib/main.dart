@@ -612,9 +612,12 @@ Provider<MuminAdhanNotificationCoordinator>(
               );
             },
             builder: (context, child) {
-              return Directionality(
-                textDirection: languages.textDirection,
-                child: child ?? const SizedBox.shrink(),
+              return _MuminForegroundPrayerAlertWatcher(
+                onPrayerTime: _openPrayerAlert,
+                child: Directionality(
+                  textDirection: languages.textDirection,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               );
             },
 
@@ -720,6 +723,80 @@ class _LanguageOption extends StatelessWidget {
 }
 
 /// Branded startup screen displayed while preferences are restored.
+
+/// Opens the immersive Adhan automatically when a scheduled prayer time is
+/// reached while Mumin Pro is already in the foreground. Android's scheduled
+/// full-screen notification handles background/locked-device delivery.
+class _MuminForegroundPrayerAlertWatcher extends StatefulWidget {
+  const _MuminForegroundPrayerAlertWatcher({
+    required this.onPrayerTime,
+    required this.child,
+  });
+
+  final ValueChanged<Prayer> onPrayerTime;
+  final Widget child;
+
+  @override
+  State<_MuminForegroundPrayerAlertWatcher> createState() =>
+      _MuminForegroundPrayerAlertWatcherState();
+}
+
+class _MuminForegroundPrayerAlertWatcherState
+    extends State<_MuminForegroundPrayerAlertWatcher> {
+  PrayerController? _controller;
+  MuminAdhanNotificationService? _notificationService;
+  DateTime? _lastProcessedPrayerTime;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controller != null) return;
+
+    _controller = context.read<PrayerController>();
+    _notificationService = context.read<MuminAdhanNotificationService>();
+    _controller!.clock.addListener(_checkPrayerTime);
+    _checkPrayerTime();
+  }
+
+  void _checkPrayerTime() {
+    final controller = _controller;
+    if (controller == null || !controller.hasUsableSchedule) return;
+
+    final target = controller.nextPrayerTime;
+    final prayer = controller.nextPrayer;
+    if (target == null ||
+        prayer == Prayer.none ||
+        controller.clock.value.isBefore(target) ||
+        _lastProcessedPrayerTime == target) {
+      return;
+    }
+
+    _lastProcessedPrayerTime = target;
+    unawaited(_openIfEnabled(prayer));
+  }
+
+  Future<void> _openIfEnabled(Prayer prayer) async {
+    try {
+      final enabled =
+          await _notificationService!.getEnabledPrayers();
+      if (!mounted || !enabled.contains(prayer)) return;
+      widget.onPrayerTime(prayer);
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: foreground Adhan alert failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.clock.removeListener(_checkPrayerTime);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
 
