@@ -153,6 +153,18 @@ class MuminAdhanNotificationService {
     return await android.canScheduleExactNotifications() ?? false;
   }
 
+  /// Opens Android's special-access screen for full-screen Adhan alerts.
+  Future<bool> requestFullScreenIntentPermission() async {
+    await initialize();
+
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    if (android == null) return false;
+
+    return await android.requestFullScreenIntentPermission() ?? false;
+  }
+
   Future<Set<Prayer>> getEnabledPrayers() async {
     final preferences = await SharedPreferences.getInstance();
 
