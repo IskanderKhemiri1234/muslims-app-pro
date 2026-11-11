@@ -13,8 +13,8 @@ import '../../data/services/mumin_adhan_audio_handler.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
 ///
-/// The short takbeer and full Adhan are serialized through the one shared
-/// audio handler, so two recordings can never overlap.
+/// Exactly one selected complete Adhan recording is played through the
+/// shared audio handler; a user can replay that same selection from the UI.
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
@@ -47,11 +47,11 @@ class _MuminAdhanExperiencePageState
   late MuminLanguageController _languages;
 
   bool _audioHandlerReady = false;
-  bool _shortAudioEnabled = true;
-  bool _fullAudioEnabled = true;
   String? _selectedBackgroundPath;
-  bool _shortAdhanStarted = false;
-  bool _shortAdhanScheduled = false;
+  String _selectedAudioAsset = _shortAdhanAsset;
+  String _selectedAudioTitle = 'Adhan recording 1';
+  bool _selectedAdhanStarted = false;
+  bool _preferencesLoadScheduled = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
   double _dragDistance = 0;
@@ -71,8 +71,8 @@ class _MuminAdhanExperiencePageState
     _languages = context.read<MuminLanguageController>();
     _audioHandlerReady = true;
 
-    if (!_shortAdhanScheduled) {
-      _shortAdhanScheduled = true;
+    if (!_preferencesLoadScheduled) {
+      _preferencesLoadScheduled = true;
       unawaited(_loadMediaPreferencesAndStart());
     }
   }
@@ -80,19 +80,35 @@ class _MuminAdhanExperiencePageState
   Future<void> _loadMediaPreferencesAndStart() async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      _shortAudioEnabled = preferences.getBool('mumin_adhan_short_audio_enabled_v1') ?? true;
-      _fullAudioEnabled = preferences.getBool('mumin_adhan_full_audio_enabled_v1') ?? true;
-      _selectedBackgroundPath = preferences.getString('mumin_adhan_selected_mosque_image_v1');
+      final selectedAudioId = preferences.getString('mumin_adhan_selected_audio_id_v1') ?? 'adhan_recording_1';
+      final useSecondRecording = selectedAudioId == 'adhan_recording_2';
+      _selectedAudioAsset = useSecondRecording ? _fullAdhanAsset : _shortAdhanAsset;
+      _selectedAudioTitle = useSecondRecording
+          ? _text('تسجيل الأذان الثاني', 'Adhan recording 2', 'Enregistrement Adhan 2')
+          : _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
+      // Both library entries are complete Adhan recordings. Exactly one
+      // selected file is played; the legacy short/full switches are ignored.
+      _selectedBackgroundPath =
+          preferences.getString('mumin_adhan_selected_mosque_image_v1');
+
       if (mounted) setState(() {});
-      if (_shortAudioEnabled && mounted) {
+      // The preview is deliberately silent. Each recording has its own
+      // dedicated test action in Adhan settings.
+      if (!widget.previewMode && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) unawaited(_startShortAdhan());
+          if (mounted) unawaited(_startSelectedAdhan());
         });
       }
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: Adhan media preferences could not be loaded: $error');
       debugPrintStack(stackTrace: stackTrace);
-      if (mounted) unawaited(_startShortAdhan());
+      // Safe fallback: play only the first complete Adhan recording.
+      _selectedAudioAsset = _shortAdhanAsset;
+      _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
+      if (mounted) setState(() {});
+      if (!widget.previewMode && mounted) {
+        unawaited(_startSelectedAdhan());
+      }
     }
   }
 
@@ -126,27 +142,23 @@ class _MuminAdhanExperiencePageState
     }
   }
 
-  Future<void> _startShortAdhan() async {
-    if (!mounted || !_audioHandlerReady || _shortAdhanStarted || !_shortAudioEnabled) return;
-    _shortAdhanStarted = true;
+  Future<void> _startSelectedAdhan() async {
+    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted) return;
+    _selectedAdhanStarted = true;
 
     try {
       await _audioHandler.playAsset(
-        _shortAdhanAsset,
-        title: _text(
-          'الله أكبر مرتين',
-          'Takbeer twice',
-          'Takbir deux fois',
-        ),
+        _selectedAudioAsset,
+        title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
-      debugPrint('Mumin Pro: short Adhan playback failed: $error');
+      debugPrint('Mumin Pro: selected Adhan playback failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
 
-  Future<void> _continueWithFullAdhan() async {
-    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || !_fullAudioEnabled) return;
+  Future<void> _replaySelectedAdhan() async {
+    if (_fullAdhanStarted || _isClosing || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
 
     setState(() {
       _fullAdhanStarted = true;
@@ -159,12 +171,8 @@ class _MuminAdhanExperiencePageState
       if (!mounted || _isClosing) return;
 
       await _audioHandler.playAsset(
-        _fullAdhanAsset,
-        title: _text(
-          'الأذان الكامل',
-          'Complete Adhan',
-          'Adhan complet',
-        ),
+        _selectedAudioAsset,
+        title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
       debugPrint('Mumin Pro: full Adhan playback failed: $error');
@@ -180,9 +188,9 @@ class _MuminAdhanExperiencePageState
         SnackBar(
           content: Text(
             _text(
-              'تعذر تشغيل الأذان الكامل. تحقق من ملف التسجيل.',
-              'The complete Adhan could not be played. Check the audio file.',
-              'Impossible de lire l’Adhan complet. Vérifiez le fichier audio.',
+              'تعذر تشغيل التسجيل المختار. تحقق من ملف الصوت.',
+              'The selected recording could not be played. Check the audio file.',
+              'Impossible de lire l’enregistrement sélectionné. Vérifiez le fichier audio.',
             ),
           ),
         ),
@@ -222,7 +230,7 @@ class _MuminAdhanExperiencePageState
     setState(() => _dragDistance = nextDistance);
 
     if (nextDistance >= 110) {
-      unawaited(_continueWithFullAdhan());
+      unawaited(_replaySelectedAdhan());
     }
   }
 
@@ -419,50 +427,89 @@ class _MuminAdhanExperiencePageState
 
   Widget _buildWaterDropControl() {
     final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
+    final canContinue = !widget.previewMode && _selectedAudioAsset.isNotEmpty;
+
+    final instruction = widget.previewMode
+        ? _text(
+            'المعاينة صامتة. اختبر كل تسجيل من إعدادات الأذان.',
+            'Preview is silent. Test each recording in Adhan settings.',
+            'L’aperçu est silencieux. Testez les sons dans les réglages Adhan.',
+          )
+        : _fullAdhanStarted
+        ? _text(
+            'التسجيل المختار قيد التشغيل',
+            'Selected recording is playing',
+            'L’enregistrement sélectionné est en cours',
+          )
+        : !canContinue
+            ? _text(
+                'اسحب دائرة البصمة لإعادة تشغيل التسجيل المختار',
+                'Swipe the fingerprint circle to replay the selected recording',
+                'Faites glisser le cercle pour relancer le son sélectionné',
+              )
+            : _text(
+                'اسحب دائرة البصمة لإعادة تشغيل الأذان المختار',
+                'Swipe the fingerprint circle to replay the selected Adhan',
+                'Faites glisser le cercle pour relancer l’Adhan sélectionné',
+              );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onPanStart: _fullAudioEnabled ? _onDropPanStart : null,
-          onPanUpdate: _fullAudioEnabled ? _onDropPanUpdate : null,
-          onPanEnd: _fullAudioEnabled ? _onDropPanEnd : null,
+          onPanStart: canContinue ? _onDropPanStart : null,
+          onPanUpdate: canContinue ? _onDropPanUpdate : null,
+          onPanEnd: canContinue ? _onDropPanEnd : null,
           child: Semantics(
-            button: true,
-            label: _text(
-              'اسحب قطرة الماء لمواصلة الأذان الكامل',
-              'Swipe the water drop to continue the full Adhan',
-              'Faites glisser la goutte pour continuer l’Adhan complet',
-            ),
+            button: canContinue,
+            label: instruction,
             child: SizedBox(
-              width: 160,
-              height: 160,
-              child: Center(
-                child: CustomPaint(
-                  size: const Size(160, 160),
-                  painter: _WaterDropPainter(progress: progress),
-                ),
+              width: 164,
+              height: 164,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(164, 164),
+                    painter: _FingerprintRingPainter(progress: progress),
+                  ),
+                  Icon(
+                    Icons.fingerprint_rounded,
+                    size: 48,
+                    color: Colors.white.withValues(
+                      alpha: canContinue ? 0.94 : 0.42,
+                    ),
+                    shadows: const [
+                      Shadow(color: Colors.black54, blurRadius: 12),
+                    ],
+                  ),
+                  if (_fullAdhanStarted)
+                    const Positioned(
+                      bottom: 31,
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        size: 17,
+                        color: Color(0xFFD8B66A),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 8),
         AnimatedOpacity(
           opacity: _fullAdhanStarted ? 0.72 : 1,
           duration: const Duration(milliseconds: 180),
           child: Text(
-            _fullAdhanStarted
-                ? _text('الأذان الكامل قيد التشغيل', 'Complete Adhan is playing', 'L’Adhan complet est en cours')
-                : !_fullAudioEnabled
-                    ? _text('الأذان الكامل متوقف من الإعدادات', 'Full Adhan is disabled in settings', 'L’Adhan complet est désactivé dans les réglages')
-                    : _text('اسحب القطرة لمواصلة الأذان الكامل', 'Swipe the drop to continue the full Adhan', 'Glissez la goutte pour continuer l’Adhan complet'),
+            instruction,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _ivory.withValues(alpha: 0.9),
+              color: _ivory.withValues(alpha: 0.92),
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+              letterSpacing: 0.15,
               shadows: const [
                 Shadow(color: Colors.black87, blurRadius: 12),
               ],
@@ -474,109 +521,78 @@ class _MuminAdhanExperiencePageState
   }
 }
 
-class _WaterDropPainter extends CustomPainter {
-  const _WaterDropPainter({required this.progress});
+class _FingerprintRingPainter extends CustomPainter {
+  const _FingerprintRingPainter({required this.progress});
 
   final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = 25 + (progress * 5);
 
-    for (var ring = 2; ring >= 0; ring--) {
-      final ringRadius = radius + 12 + (ring * 10) + (progress * 13);
+    // Soft concentric water-glass ripples, similar to a phone fingerprint
+    // unlock target. All effects are vector-drawn and inexpensive to render.
+    for (var ring = 3; ring >= 0; ring--) {
+      final radius = 37 + ring * 10 + progress * 8;
       final ringPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = ring == 0 ? 1.4 : 0.8
+        ..strokeWidth = ring == 0 ? 1.8 : 0.85
         ..color = Colors.white.withValues(
-          alpha: (0.12 + (progress * 0.2)) * (1 - ring * 0.22),
+          alpha: (0.34 - ring * 0.055) + progress * 0.12,
         );
-      canvas.drawCircle(center, ringRadius, ringPaint);
+      canvas.drawCircle(center, radius, ringPaint);
     }
 
-    final drop = Path()
-      ..moveTo(center.dx, center.dy - 38)
-      ..cubicTo(
-        center.dx - 7,
-        center.dy - 23,
-        center.dx - 31,
-        center.dy + 1,
-        center.dx - 28,
-        center.dy + 18,
-      )
-      ..cubicTo(
-        center.dx - 25,
-        center.dy + 48,
-        center.dx + 25,
-        center.dy + 48,
-        center.dx + 28,
-        center.dy + 18,
-      )
-      ..cubicTo(
-        center.dx + 31,
-        center.dy + 1,
-        center.dx + 7,
-        center.dy - 23,
-        center.dx,
-        center.dy - 38,
-      )
-      ..close();
-
-    final fill = Paint()
+    final diskRect = Rect.fromCircle(center: center, radius: 37);
+    final diskPaint = Paint()
       ..shader = const RadialGradient(
-        center: Alignment(-0.35, -0.45),
-        radius: 1.2,
+        center: Alignment(-0.38, -0.48),
+        radius: 1.1,
         colors: [
           Color(0x66FFFFFF),
-          Color(0x22B9F4E7),
-          Color(0x0879DCC8),
-          Color(0x02FFFFFF),
+          Color(0x2AB8F0E2),
+          Color(0x1677CDBB),
+          Color(0x0877CDBB),
         ],
-        stops: [0, 0.38, 0.78, 1],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: 52),
-      );
-    canvas.drawPath(drop, fill);
+        stops: [0, 0.36, 0.76, 1],
+      ).createShader(diskRect);
+    canvas.drawCircle(center, 37, diskPaint);
 
-    final outline = Paint()
+    final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.35
+      ..strokeWidth = 1.45
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xDFFFFFFF),
-          Color(0x66B9F4E7),
-          Color(0x99D8B66A),
+          Color(0xF2FFFFFF),
+          Color(0x77B9F4E7),
+          Color(0xC8D8B66A),
         ],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: 54),
-      );
-    canvas.drawPath(drop, outline);
+      ).createShader(diskRect);
+    canvas.drawCircle(center, 37, borderPaint);
 
     final highlight = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.2
-      ..color = Colors.white.withValues(alpha: 0.68);
-    final highlightPath = Path()
-      ..moveTo(center.dx - 12, center.dy + 5)
-      ..quadraticBezierTo(
-        center.dx - 15,
-        center.dy - 7,
-        center.dx - 5,
-        center.dy - 22,
-      );
-    canvas.drawPath(highlightPath, highlight);
+      ..strokeWidth = 2.1
+      ..color = Colors.white.withValues(alpha: 0.78);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: 31),
+      -math.pi * 0.88,
+      math.pi * 0.55,
+      false,
+      highlight,
+    );
 
     if (progress > 0) {
       final progressPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0xBBD8B66A);
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 2.4
+        ..color = const Color(0xFFE8CE91);
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: 43),
+        Rect.fromCircle(center: center, radius: 49),
         -math.pi / 2,
         math.pi * 2 * progress,
         false,
@@ -586,6 +602,6 @@ class _WaterDropPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WaterDropPainter oldDelegate) =>
+  bool shouldRepaint(covariant _FingerprintRingPainter oldDelegate) =>
       oldDelegate.progress != progress;
 }
