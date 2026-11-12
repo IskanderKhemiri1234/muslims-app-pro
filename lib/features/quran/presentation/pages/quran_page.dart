@@ -171,6 +171,9 @@ class _QuranPageState extends State<QuranPage>
 
   int _currentPage = 1;
   int _completedKhatmas = 0;
+  int _lastReadSurah = 1;
+  int _lastReadAyah = 1;
+  bool _hasSavedReaderPosition = false;
 
   Set<int> _completedPages = <int>{};
   Set<int> _bookmarks = <int>{};
@@ -269,6 +272,11 @@ class _QuranPageState extends State<QuranPage>
       final preferences = await SharedPreferences.getInstance();
       final storedVerses =
           preferences.getStringList(_verseBookmarksKey) ?? [];
+      final savedSurah = preferences.getInt('quran_last_read_surah');
+      final savedAyah = preferences.getInt('quran_last_read_ayah');
+      final hasSavedReaderPosition = savedSurah != null &&
+          savedSurah >= 1 && savedSurah <= 114 &&
+          savedAyah != null && savedAyah >= 1;
 
       final validVerses = <Map<String, dynamic>>[];
 
@@ -318,6 +326,11 @@ class _QuranPageState extends State<QuranPage>
             .toSet();
 
         _verseBookmarks = validVerses;
+        _hasSavedReaderPosition = hasSavedReaderPosition;
+        if (hasSavedReaderPosition) {
+          _lastReadSurah = savedSurah;
+          _lastReadAyah = savedAyah;
+        }
         _isLoading = false;
       });
     } catch (_) {
@@ -669,7 +682,24 @@ class _QuranPageState extends State<QuranPage>
     );
   }
 
-  Future<void> _saveTrilingualVerseBookmark(
+  bool _isVerseBookmarked(int surah, int ayah) {
+    return _verseBookmarks.any(
+      (item) => item['sura'] == surah && item['aya'] == ayah,
+    );
+  }
+
+  void _handleReaderPositionChanged(int surah, int ayah) {
+    if (!mounted || surah < 1 || surah > 114 || ayah < 1) return;
+    if (_lastReadSurah == surah && _lastReadAyah == ayah &&
+        _hasSavedReaderPosition) return;
+    setState(() {
+      _lastReadSurah = surah;
+      _lastReadAyah = ayah;
+      _hasSavedReaderPosition = true;
+    });
+  }
+
+  Future<bool> _saveTrilingualVerseBookmark(
     QuranTrilingualAyah verse,
     String surahName,
   ) async {
@@ -680,7 +710,7 @@ class _QuranPageState extends State<QuranPage>
       _showMessage(
         QuranPageLocalization.text(context, 'quran_invalid_ayah_data'),
       );
-      return;
+      return false;
     }
 
     final entry = <String, dynamic>{
@@ -696,6 +726,7 @@ class _QuranPageState extends State<QuranPage>
       'layout': 'trilingual',
     };
 
+    var savedSuccessfully = false;
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
@@ -713,6 +744,7 @@ class _QuranPageState extends State<QuranPage>
               QuranPageLocalization.text(context, 'quran_ayah_already_saved'),
             );
           }
+          savedSuccessfully = true;
           return;
         }
 
@@ -726,31 +758,32 @@ class _QuranPageState extends State<QuranPage>
         }
         if (!mounted) return;
         setState(() => _verseBookmarks.add(entry));
+        savedSuccessfully = true;
         _showMessage(
           QuranPageLocalization.text(context, 'quran_ayah_saved'),
         );
       });
+      return savedSuccessfully;
     } catch (_) {
       _showMessage(
         QuranPageLocalization.text(context, 'quran_ayah_save_error'),
       );
+      return false;
     }
   }
 
-  Future<void> _removeVerseBookmark(
+  Future<bool> _removeVerseBookmark(
     Map<String, dynamic> verse,
   ) async {
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
-
         final entries =
             preferences.getStringList(_verseBookmarksKey) ?? [];
 
         entries.removeWhere((entry) {
           try {
             final decoded = jsonDecode(entry);
-
             return decoded is Map &&
                 decoded['sura'] == verse['sura'] &&
                 decoded['aya'] == verse['aya'];
@@ -759,13 +792,15 @@ class _QuranPageState extends State<QuranPage>
           }
         });
 
-        await preferences.setStringList(
+        final saved = await preferences.setStringList(
           _verseBookmarksKey,
           entries,
         );
+        if (!saved) {
+          throw StateError('Verse bookmark removal could not be saved');
+        }
 
         if (!mounted) return;
-
         setState(() {
           _verseBookmarks.removeWhere(
             (item) =>
@@ -783,24 +818,25 @@ class _QuranPageState extends State<QuranPage>
           ),
         );
       }
+      return true;
     } catch (_) {
       _showMessage(
-          QuranPageLocalization.text(
-            context,
-            'quran_ayah_bookmark_remove_error',
-          ),
-        );
+        QuranPageLocalization.text(
+          context,
+          'quran_ayah_bookmark_remove_error',
+        ),
+      );
+      return false;
     }
   }
 
-  
   Future<void> _openVerseBookmarks() async {
     if (!mounted) return;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final verses = List<Map<String, dynamic>>.from(_verseBookmarks);
 
-    final selectedPage = await showModalBottomSheet<int>(
+    final selectedVerse = await showModalBottomSheet<Map<String, int>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -864,8 +900,14 @@ class _QuranPageState extends State<QuranPage>
                           ),
                         ],
                       ),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, page),
+                      onTap: () => Navigator.pop(
+                        sheetContext,
+                        <String, int>{
+                          'sura': verse['sura'] as int,
+                          'aya': aya,
+                          'page': page,
+                        },
+                      ),
                       trailing: IconButton(
                         tooltip: QuranPageLocalization.text(
                           context,
@@ -894,10 +936,11 @@ class _QuranPageState extends State<QuranPage>
       },
     );
 
-    if (selectedPage != null && mounted) {
-      _selectPage(
-        selectedPage,
-        saveImmediately: true,
+    if (selectedVerse != null && mounted) {
+      _selectPage(selectedVerse['page']!, saveImmediately: true);
+      await _openFullReader(
+        initialSurah: selectedVerse['sura']!,
+        initialAyah: selectedVerse['aya']!,
       );
     }
   }
@@ -1071,11 +1114,26 @@ class _QuranPageState extends State<QuranPage>
 
     if (selectedPage != null && mounted) {
       _selectPage(selectedPage, saveImmediately: true);
+      await _openFullReader(
+        initialSurah: _surahForPage(selectedPage),
+        initialAyah: 1,
+      );
     }
   }
-  
-  
-Future<int?> _goToPage() async {
+
+  int _surahForPage(int page) {
+    var selected = 1;
+    for (var index = 0; index < _surahs.length; index++) {
+      if (_surahs[index].page <= page) {
+        selected = index + 1;
+      } else {
+        break;
+      }
+    }
+    return selected;
+  }
+
+  Future<int?> _goToPage() async {
     if (_isLoading || !mounted) return null;
 
     final controller = TextEditingController(
@@ -1313,7 +1371,10 @@ Future<int?> _goToPage() async {
     return selectedPage;
   }
 
-  Future<void> _openFullReader({required int initialSurah}) async {
+  Future<void> _openFullReader({
+    required int initialSurah,
+    int initialAyah = 1,
+  }) async {
     if (_isLoading || !mounted || initialSurah < 1 || initialSurah > 114) {
       return;
     }
@@ -1322,15 +1383,24 @@ Future<int?> _goToPage() async {
       MaterialPageRoute<void>(
         builder: (readerContext) => QuranTrilingualReader(
           initialSurah: initialSurah,
-          initialAyah: 1,
+          initialAyah: initialAyah,
           surahNames: QuranPageLocalization.surahNames(context),
           surahStartPages: _surahs.map((item) => item.page).toList(growable: false),
           onClose: () => Navigator.of(readerContext).pop(),
           onVerseBookmark: _saveTrilingualVerseBookmark,
+          onRemoveVerseBookmark: (verse) => _removeVerseBookmark(
+            <String, dynamic>{
+              'sura': verse.surahNumber,
+              'aya': verse.ayahNumber,
+            },
+          ),
+          isVerseBookmarked: _isVerseBookmarked,
+          onPositionChanged: _handleReaderPositionChanged,
           onPageChanged: (page) => _selectPage(page, saveImmediately: true),
           onTogglePageBookmark: _toggleBookmark,
           onMarkPageRead: _markCurrentPageRead,
           onUndoPageRead: _undoCurrentPageRead,
+          isCurrentPageCompleted: () => _completedPages.contains(_currentPage),
           onOpenIndex: _openIndex,
           onGoToPage: _goToPage,
         ),
@@ -1340,6 +1410,14 @@ Future<int?> _goToPage() async {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _resumeLastReading() async {
+    if (_isLoading || !_hasSavedReaderPosition) return;
+    await _openFullReader(
+      initialSurah: _lastReadSurah,
+      initialAyah: _lastReadAyah,
+    );
   }
 
   void _openSurahFromNavigation(int surahNumber) {
@@ -1427,7 +1505,7 @@ Widget build(BuildContext context) {
                     16,
                     28,
                   ),
-                  itemCount: _surahs.length + 1,
+                  itemCount: _surahs.length + (_hasSavedReaderPosition ? 2 : 1),
                   itemBuilder: (itemContext, listIndex) {
                     if (listIndex == 0) {
                       return _QuranIndexHeader(
@@ -1439,7 +1517,22 @@ Widget build(BuildContext context) {
                       );
                     }
 
-                    final index = listIndex - 1;
+                    if (_hasSavedReaderPosition && listIndex == 1) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _ContinueReadingCard(
+                          isDark: isDark,
+                          surahName: QuranPageLocalization.surahName(
+                            context,
+                            _lastReadSurah,
+                          ),
+                          ayah: _lastReadAyah,
+                          onTap: _resumeLastReading,
+                        ),
+                      );
+                    }
+
+                    final index = listIndex - (_hasSavedReaderPosition ? 2 : 1);
                     final number = index + 1;
                     final arabicName = _surahs[index].name;
                     final englishName =
@@ -1466,6 +1559,114 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
+
+class _ContinueReadingCard extends StatelessWidget {
+  const _ContinueReadingCard({
+    required this.isDark,
+    required this.surahName,
+    required this.ayah,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final String surahName;
+  final int ayah;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = isDark
+        ? const Color(0xFFF4F0E6)
+        : const Color(0xFF123A2D);
+    final muted = isDark
+        ? const Color(0xFFC4D4C9)
+        : const Color(0xFF63776C);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(19),
+        child: Ink(
+          padding: const EdgeInsetsDirectional.fromSTEB(15, 13, 13, 13),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: isDark
+                  ? const [Color(0xFF174B3A), Color(0xFF0B3025)]
+                  : const [Color(0xFFE7F0E5), Color(0xFFF7F3E8)],
+            ),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(
+              color: const Color(0xFFD8B66A).withValues(alpha: 0.72),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD8B66A).withValues(alpha: 0.09),
+                blurRadius: 18,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD8B66A).withValues(alpha: 0.18),
+                  border: Border.all(
+                    color: const Color(0xFFD8B66A).withValues(alpha: 0.72),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_stories_rounded,
+                  color: Color(0xFFD8B66A),
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      QuranPageLocalization.text(context, 'quran_continue_reading'),
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$surahName  •  ${QuranPageLocalization.text(context, 'quran_ayah_number')} $ayah',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.play_circle_fill_rounded,
+                color: Color(0xFFD8B66A),
+                size: 29,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _QuranIndexHeader extends StatelessWidget {

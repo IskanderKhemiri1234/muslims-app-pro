@@ -18,11 +18,15 @@ class QuranTrilingualReader extends StatefulWidget {
     required this.surahNames,
     required this.onClose,
     required this.onVerseBookmark,
+    required this.onRemoveVerseBookmark,
+    required this.isVerseBookmarked,
+    required this.onPositionChanged,
     required this.surahStartPages,
     required this.onPageChanged,
     required this.onTogglePageBookmark,
     required this.onMarkPageRead,
     required this.onUndoPageRead,
+    required this.isCurrentPageCompleted,
     required this.onOpenIndex,
     required this.onGoToPage,
   });
@@ -31,13 +35,18 @@ class QuranTrilingualReader extends StatefulWidget {
   final int initialAyah;
   final List<String> surahNames;
   final VoidCallback onClose;
-  final Future<void> Function(QuranTrilingualAyah verse, String surahName)
+  final Future<bool> Function(QuranTrilingualAyah verse, String surahName)
       onVerseBookmark;
+  final Future<bool> Function(QuranTrilingualAyah verse)
+      onRemoveVerseBookmark;
+  final bool Function(int surah, int ayah) isVerseBookmarked;
+  final void Function(int surah, int ayah) onPositionChanged;
   final List<int> surahStartPages;
   final ValueChanged<int> onPageChanged;
   final Future<void> Function() onTogglePageBookmark;
   final Future<void> Function() onMarkPageRead;
   final Future<void> Function() onUndoPageRead;
+  final bool Function() isCurrentPageCompleted;
   final Future<int?> Function() onOpenIndex;
   final Future<int?> Function() onGoToPage;
 
@@ -53,6 +62,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   final QuranTrilingualDataSource _source = QuranTrilingualDataSource();
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _verseKeys = <int, GlobalKey>{};
+  final Map<int, bool> _bookmarkStates = <int, bool>{};
 
   _TrilingualTheme _theme = _TrilingualTheme.day;
   QuranTrilingualSurah? _surah;
@@ -105,20 +115,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedTheme = preferences.getString(_themeKey);
-      final savedSurah = preferences.getInt(_lastSurahKey);
-      final savedAyah = preferences.getInt(_lastAyahKey);
       if (savedTheme != null) {
         _theme = _TrilingualTheme.values.firstWhere(
           (item) => item.name == savedTheme,
           orElse: () => _TrilingualTheme.day,
         );
-      }
-      // The caller's selected surah is authoritative. Restore the saved
-      // ayah only when it belongs to that same surah; otherwise a previous
-      // reading position would override a surah explicitly chosen from the
-      // opening index.
-      if (savedSurah == _surahNumber && savedAyah != null && savedAyah > 0) {
-        _currentAyah = savedAyah;
       }
     } catch (_) {
       // Keep the supplied initial reading position.
@@ -139,6 +140,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
       _surahNumber = number;
       _currentAyah = targetAyah;
       _verseKeys.clear();
+      _bookmarkStates.clear();
     });
 
     try {
@@ -169,8 +171,10 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   Future<void> _savePosition(int surah, int ayah) async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setInt(_lastSurahKey, surah);
-      await preferences.setInt(_lastAyahKey, ayah);
+      final surahSaved = await preferences.setInt(_lastSurahKey, surah);
+      final ayahSaved = await preferences.setInt(_lastAyahKey, ayah);
+      if (!surahSaved || !ayahSaved) return;
+      widget.onPositionChanged(surah, ayah);
     } catch (_) {
       // Reading remains available for this session.
     }
@@ -241,8 +245,20 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     return widget.surahNames[number - 1];
   }
 
+  bool _isVerseSaved(QuranTrilingualAyah verse) {
+    return _bookmarkStates[verse.ayahNumber] ??
+        widget.isVerseBookmarked(_surahNumber, verse.ayahNumber);
+  }
+
   Future<void> _bookmark(QuranTrilingualAyah verse) async {
-    await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+    final wasSaved = _isVerseSaved(verse);
+    final persisted = wasSaved
+        ? await widget.onRemoveVerseBookmark(verse)
+        : await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+    if (!mounted || !persisted) return;
+    setState(() {
+      _bookmarkStates[verse.ayahNumber] = !wasSaved;
+    });
   }
 
   int _surahForPage(int page) {
@@ -264,9 +280,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
         return;
       case 'mark_read':
         await widget.onMarkPageRead();
+        if (mounted) setState(() {});
         return;
       case 'undo_read':
         await widget.onUndoPageRead();
+        if (mounted) setState(() {});
         return;
       case 'index':
         final page = await widget.onOpenIndex();
@@ -373,10 +391,20 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
               ),
               const Spacer(),
               IconButton(
-                tooltip: _text('quran_reader_bookmark_verse'),
+                tooltip: _text(
+                  _isVerseSaved(verse)
+                      ? 'quran_reader_remove_verse_bookmark'
+                      : 'quran_reader_bookmark_verse',
+                ),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _bookmark(verse),
-                icon: Icon(Icons.bookmark_add_outlined, color: _accent, size: 21),
+                icon: Icon(
+                  _isVerseSaved(verse)
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_add_outlined,
+                  color: _isVerseSaved(verse) ? _accent : _secondaryText,
+                  size: 21,
+                ),
               ),
               IconButton(
                 tooltip: _text('quran_reader_copy_verse'),
@@ -587,12 +615,34 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                       ),
                       PopupMenuItem(
                         value: 'mark_read',
-                        child: Text(_text('quran_mark_read')),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.isCurrentPageCompleted()
+                                  ? Icons.check_circle_rounded
+                                  : Icons.task_alt_rounded,
+                              color: widget.isCurrentPageCompleted()
+                                  ? const Color(0xFFD8B66A)
+                                  : _secondaryText,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 9),
+                            Text(
+                              _text(
+                                widget.isCurrentPageCompleted()
+                                    ? 'quran_page_read_completed'
+                                    : 'quran_mark_read',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      PopupMenuItem(
-                        value: 'undo_read',
-                        child: Text(_text('quran_undo')),
-                      ),
+                      if (widget.isCurrentPageCompleted())
+                        PopupMenuItem(
+                          value: 'undo_read',
+                          child: Text(_text('quran_undo')),
+                        ),
                       PopupMenuItem(
                         value: 'index',
                         child: Text(_text('quran_index_title')),
