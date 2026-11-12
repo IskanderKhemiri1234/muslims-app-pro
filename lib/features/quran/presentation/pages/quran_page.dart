@@ -830,23 +830,6 @@ class _QuranPageState extends State<QuranPage>
     }
   }
 
-  bool _isVerseBookmarked(int surah, int ayah) {
-    return _verseBookmarks.any(
-      (item) => item['sura'] == surah && item['aya'] == ayah,
-    );
-  }
-
-  void _handleReaderPositionChanged(int surah, int ayah) {
-    if (!mounted || surah < 1 || surah > 114 || ayah < 1) return;
-    if (_lastReadSurah == surah && _lastReadAyah == ayah &&
-        _hasSavedReaderPosition) return;
-    setState(() {
-      _lastReadSurah = surah;
-      _lastReadAyah = ayah;
-      _hasSavedReaderPosition = true;
-    });
-  }
-
   Future<void> _openVerseBookmarks() async {
     if (!mounted) return;
 
