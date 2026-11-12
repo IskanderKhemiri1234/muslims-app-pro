@@ -36,6 +36,7 @@ class _AdhanNotificationSettingsPageState
   bool _preferExact = false;
   bool _countdownEnabled = false;
   bool _requestingFullScreenPermission = false;
+  bool _testingAdhan = false;
 
   bool get _allPrayersEnabled =>
       _enabledPrayers.length == MuminAdhanNotificationService.supportedPrayers.length;
@@ -146,6 +147,80 @@ class _AdhanNotificationSettingsPageState
       if (mounted) {
         setState(() => _requestingFullScreenPermission = false);
       }
+    }
+  }
+
+  Future<void> _scheduleTestAdhan() async {
+    if (_saving || _testingAdhan) return;
+
+    setState(() {
+      _testingAdhan = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (!_prayerController.hasUsableSchedule ||
+          _prayerController.timezoneLocation == null) {
+        throw StateError(
+          _t(
+            'مواقيت الصلاة والمنطقة الزمنية غير جاهزتين. حدّث الموقع أولاً.',
+            'Prayer times and timezone are not ready. Refresh your location first.',
+            'Les horaires et le fuseau horaire ne sont pas prêts. Actualisez votre position.',
+          ),
+        );
+      }
+
+      if (!await _service.areNotificationsEnabled()) {
+        final granted = await _service.requestNotificationPermission();
+        if (!granted || !await _service.areNotificationsEnabled()) {
+          throw StateError(
+            _t(
+              'يجب السماح بإشعارات Mumin Pro لاختبار الأذان.',
+              'Allow Mumin Pro notifications before testing the Adhan.',
+              'Autorisez les notifications de Mumin Pro avant de tester l’Adhan.',
+            ),
+          );
+        }
+      }
+
+      final prayer = _prayerController.nextPrayer == Prayer.none
+          ? Prayer.fajr
+          : _prayerController.nextPrayer;
+      final prayerTime = _prayerController.globalSchedule
+          ?.timeForPrayer(prayer);
+
+      await _service.scheduleTestAlert(
+        prayer: prayer,
+        timezone: _prayerController.timezoneLocation!,
+        prayerTime: prayerTime,
+        prayerName: _prayerName(prayer),
+        notificationBody: _t(
+          'هذا اختبار لمسار إشعار الأذان وواجهة التشغيل.',
+          'This is a test of the Adhan notification and playback experience.',
+          'Ceci est un test de la notification et de l’expérience audio de l’Adhan.',
+        ),
+      );
+
+      if (!mounted) return;
+      _showMessage(
+        _t(
+          'تم إعداد الاختبار. سيصل التنبيه خلال نحو 20 ثانية؛ جرّب الشاشة مفتوحة ثم مقفلة.',
+          'Test scheduled. The alert should arrive in about 20 seconds; try once with the screen on and once locked.',
+          'Test programmé. L’alerte devrait arriver dans environ 20 secondes ; essayez écran allumé puis verrouillé.',
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _errorMessage = error.toString());
+      _showMessage(
+        _t(
+          'تعذر إعداد اختبار الأذان. راجع الإذن والتشخيص.',
+          'Could not schedule the Adhan test. Check permissions and diagnostics.',
+          'Impossible de programmer le test. Vérifiez les autorisations et le diagnostic.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _testingAdhan = false);
     }
   }
 
@@ -753,6 +828,52 @@ class _AdhanNotificationSettingsPageState
                                 _t('تفعيل', 'Enable', 'Activer'),
                               ),
                             ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _saving || _testingAdhan
+                          ? null
+                          : _scheduleTestAdhan,
+                      icon: _testingAdhan
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.play_circle_outline_rounded),
+                      label: Text(
+                        _t(
+                          'اختبار الأذان فوراً (بعد 20 ثانية)',
+                          'Test Adhan now (in 20 seconds)',
+                          'Tester l’Adhan (dans 20 secondes)',
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF075B46),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+                  Text(
+                    _t(
+                      'يستخدم الاختبار قناة التنبيه نفسها والتسجيل والصورة المحددين، ولا يغيّر جدول الصلوات أو إعداداتها.',
+                      'The test uses the same alert channel, selected recording and image. It does not change prayer schedules or preferences.',
+                      'Le test utilise le même canal, l’enregistrement et l’image sélectionnés. Il ne modifie ni les horaires ni les préférences.',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
                     ),
                   ),
 
