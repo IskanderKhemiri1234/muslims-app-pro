@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 import '../../data/services/mumin_adhan_notification_coordinator.dart';
 import '../../data/services/mumin_prayer_countdown_notification_service.dart';
+import '../../data/services/mumin_adhan_notification_service.dart';
 
 class PrayerCountdownDiagnosticsPage extends StatefulWidget {
   const PrayerCountdownDiagnosticsPage({super.key});
@@ -62,6 +63,11 @@ class _PrayerCountdownDiagnosticsPageState
       }
       if (!mounted) return;
 
+      final adhanSchedule = await context
+          .read<MuminAdhanNotificationService>()
+          .getScheduleDiagnostics();
+      if (!mounted) return;
+
       final controller = context.read<PrayerController>();
       final local = <String, Object?>{
         'syncStatus': preferences.getString(
@@ -101,6 +107,7 @@ class _PrayerCountdownDiagnosticsPageState
         _report = <String, Object?>{
           'dart': local,
           'android': android,
+          'adhan': adhanSchedule,
         };
         _loading = false;
       });
@@ -222,6 +229,8 @@ class _PrayerCountdownDiagnosticsPageState
         <String, Object?>{};
     final android = (_report['android'] as Map?)?.cast<String, Object?>() ??
         <String, Object?>{};
+    final adhan = (_report['adhan'] as Map?)?.cast<String, Object?>() ??
+        <String, Object?>{};
     final status = dart['syncStatus']?.toString() ?? 'not_started';
     final statusLabel = switch (status) {
       'synchronized' => _t('تمت المزامنة', 'Synchronized', 'Synchronisé'),
@@ -265,6 +274,44 @@ class _PrayerCountdownDiagnosticsPageState
                       _value(_t('الصلاة القادمة', 'Next prayer', 'Prochaine prière'), dart['dartNextPrayer']),
                       _value(_t('وقت الصلاة القادمة', 'Next prayer time', 'Heure de la prochaine prière'), _formatTimestamp(dart['dartNextPrayerTimeMillis'])),
                       _value(_t('آخر محاولة', 'Last attempt', 'Dernière tentative'), dart['lastSyncAt']),
+                    ],
+                  ),
+                  _section(
+                    _t(
+                      'جدولة الأذان الفعلية',
+                      'Actual Adhan schedule',
+                      'Planification réelle de l’Adhan',
+                    ),
+                    [
+                      _value(
+                        _t('المواعيد المحفوظة', 'Saved alerts', 'Alertes enregistrées'),
+                        adhan['savedScheduleCount'],
+                      ),
+                      _value(
+                        _t('التنبيهات الموجودة فعلياً', 'Alerts pending in Android', 'Alertes réellement en attente'),
+                        adhan['pendingScheduleCount'],
+                      ),
+                      _value(
+                        _t('تنبيهات مفقودة', 'Missing alerts', 'Alertes manquantes'),
+                        adhan['missingScheduleCount'],
+                      ),
+                      _value(
+                        _t('اختبار الأذان معلّق', 'Test alert pending', 'Test en attente'),
+                        _yesNo(adhan['testAlertPending']),
+                      ),
+                      if (adhan['missingScheduleIds'] is List &&
+                          (adhan['missingScheduleIds'] as List).isNotEmpty)
+                        _value(
+                          _t('معرّفات التنبيهات المفقودة', 'Missing notification IDs', 'Identifiants manquants'),
+                          (adhan['missingScheduleIds'] as List).join(', '),
+                        ),
+                      if (adhan['pendingEntries'] is List)
+                        for (final entry in adhan['pendingEntries'] as List)
+                          if (entry is Map)
+                            _value(
+                              '${entry['prayer'] ?? entry['title'] ?? 'Adhan'} · ${entry['id']}',
+                              entry['body'] ?? entry['payload'],
+                            ),
                     ],
                   ),
                   _section(
