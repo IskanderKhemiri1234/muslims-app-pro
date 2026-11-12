@@ -438,8 +438,12 @@ class MuminAdhanNotificationService {
         .where((id) => !actualIds.contains(id))
         .toList(growable: false);
     final testPending = pendingRequests.any((request) => request.id == 73106);
+    final notificationsEnabled = await areNotificationsEnabled();
+    final exactAlarmAvailable = await canScheduleExactNotifications();
 
     return <String, Object?>{
+      'notificationsEnabled': notificationsEnabled,
+      'exactAlarmAvailable': exactAlarmAvailable,
       'savedScheduleCount': state.ids.length,
       'pendingScheduleCount': actualRequests.length,
       'missingScheduleCount': missingIds.length,
