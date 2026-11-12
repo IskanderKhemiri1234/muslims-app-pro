@@ -196,6 +196,7 @@ class _MuminAdhanExperiencePageState
     _selectedAdhanStarted = true;
     await _introPositionSubscription?.cancel();
     _introPositionSubscription = null;
+    if (!mounted || _isClosing) return;
 
     try {
       // Clear any earlier media source before observing this recording's
@@ -290,6 +291,7 @@ class _MuminAdhanExperiencePageState
 
     await _introPositionSubscription?.cancel();
     _introPositionSubscription = null;
+    if (!mounted || _isClosing) return;
 
     setState(() {
       _fullAdhanStarted = true;
