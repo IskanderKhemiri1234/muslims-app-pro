@@ -1,11 +1,15 @@
 name: Muslims Pro - Android CI
 
 on:
+  pull_request:
+    branches:
+      - main
+
   workflow_dispatch:
 
   push:
     branches:
-      - main
+      - '**'
     paths:
       - "lib/**"
       - "android/**"
@@ -26,6 +30,7 @@ concurrency:
 jobs:
   build:
     name: Build Muslims Pro Android
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

@@ -357,6 +357,116 @@ class MuminAdhanNotificationService {
     }
   }
 
+  /// Schedules a one-off verification alert through the same Android
+  /// channel and full-screen notification path used by real prayer alerts.
+  /// It never changes prayer notification preferences or the regular schedule.
+  Future<void> scheduleTestAlert({
+    required Prayer prayer,
+    required tz.Location timezone,
+    required DateTime? prayerTime,
+    required String prayerName,
+    required String notificationBody,
+  }) async {
+    await initialize();
+    _validatePrayer(prayer);
+
+    if (!await areNotificationsEnabled()) {
+      throw StateError('Android notifications are not enabled for Mumin Pro.');
+    }
+    if (notificationBody.trim().isEmpty) {
+      throw ArgumentError.value(
+        notificationBody,
+        'notificationBody',
+        'Test notification body cannot be empty.',
+      );
+    }
+
+    // A one-off test should be as prompt as Android currently permits.
+    // This reads the OS grant only; it does not alter the user's saved setting.
+    final exactAllowed = await canScheduleExactNotifications();
+    final scheduleMode = exactAllowed
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+
+    final trigger = tz.TZDateTime.now(timezone).add(
+      const Duration(seconds: 20),
+    );
+    final clock = prayerTime ?? trigger;
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        channelName,
+        channelDescription:
+            'Prayer time notifications calculated for your location.',
+        importance: Importance.max,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.alarm,
+        playSound: true,
+        enableVibration: true,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: true,
+      ),
+    );
+
+    await _plugin.zonedSchedule(
+      id: 73107,
+      title: prayerName,
+      body: notificationBody,
+      scheduledDate: trigger,
+      notificationDetails: details,
+      androidScheduleMode: scheduleMode,
+      payload: 'mumin_adhan:${prayer.name}:'
+          '${clock.hour}:${clock.minute}',
+    );
+  }
+
+  /// Reports the IDs saved by the scheduler against Android's actual
+  /// pending-notification queue. This is intentionally separate from the
+  /// persistent countdown diagnostics.
+  Future<Map<String, Object?>> getScheduleDiagnostics() async {
+    await initialize();
+
+    final state = await _readScheduleState();
+    final pendingRequests = await _plugin.pendingNotificationRequests();
+    final activeIds = state.ids.toSet();
+    final actualRequests = pendingRequests
+        .where((request) => activeIds.contains(request.id))
+        .toList(growable: false);
+    final actualIds = actualRequests.map((request) => request.id).toSet();
+    final missingIds = state.ids
+        .where((id) => !actualIds.contains(id))
+        .toList(growable: false);
+    final testPending = pendingRequests.any((request) => request.id == 73107);
+    final notificationsEnabled = await areNotificationsEnabled();
+    final exactAlarmAvailable = await canScheduleExactNotifications();
+
+    return <String, Object?>{
+      'notificationsEnabled': notificationsEnabled,
+      'exactAlarmAvailable': exactAlarmAvailable,
+      'savedScheduleCount': state.ids.length,
+      'pendingScheduleCount': actualRequests.length,
+      'missingScheduleCount': missingIds.length,
+      'missingScheduleIds': missingIds,
+      'testAlertPending': testPending,
+      'pendingEntries': actualRequests.map((request) {
+        final alert = MuminPrayerAlert.fromPayload(request.payload);
+        return <String, Object?>{
+          'id': request.id,
+          'title': request.title,
+          'body': request.body,
+          'prayer': alert?.prayer.name,
+          'payload': request.payload,
+        };
+      }).toList(growable: false),
+    };
+  }
+
+  Future<void> cancelTestAlert() async {
+    await initialize();
+    await _plugin.cancel(id: 73107);
+  }
+
   Future<void> cancelPreviouslyScheduled() async {
     await initialize();
     await _cancelPreviouslyScheduled();
