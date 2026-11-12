@@ -5,27 +5,27 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Monochrome status-bar adaptation of the current Mumin Pro brand mark.
-         evenOdd preserves the negative-space cutout on Android's white glyph. -->
+    <!-- Compact monochrome Mumin / Pro wordmark for Android status-bar notifications.
+         Android applies the notification tint; transparent space remains unpainted. -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M12,5.333
-            A6.667,6.667 0,1 0,12 18.667
-            A6.667,6.667 0,1 0,12 5.333 Z
-            M15.333,4
-            A6.444,6.444 0,1 0,15.333 16.889
-            A6.444,6.444 0,1 0,15.333 4 Z" />
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.25"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="
+            M1.5,11.5 L1.5,5.5 L3.4,8.1 L5.3,5.5 L5.3,11.5
+            M6.5,7.5 L6.5,10 Q6.5,11.5 8,11.5 L8.6,11.5 Q10.1,11.5 10.1,10 L10.1,7.5
+            M11.2,11.5 L11.2,7.5 Q12.2,6.5 13.2,7.5 L14.1,8.4 L14.1,11.5
+            M14.1,8.4 Q15.1,6.5 16.1,7.5 L17,8.4 L17,11.5
+            M18.2,7.5 L18.2,11.5
+            M18.2,8.5 Q18.2,7.2 19.6,7.2 L20.3,7.2 Q22,7.2 22,8.8 L22,11.5
+            M7,15.2 L7,21
+            M7,15.2 L9.4,15.2 Q11.1,15.2 11.1,16.9 Q11.1,18.5 9.4,18.5 L7,18.5
+            M13,21 L13,16.5 Q13,15.2 14.2,15.2 L15.2,15.2
+            M17,17 Q17,15.2 18.8,15.2 L19.8,15.2 Q21.6,15.2 21.6,17 L21.6,19.2 Q21.6,21 19.8,21 L18.8,21 Q17,21 17,19.2 Z" />
 
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M17.333,14.667
-            L18.222,16.667
-            L20.444,17.333
-            L18.222,18
-            L17.333,20
-            L16.667,18
-            L14.444,17.333
-            L16.667,16.667
-            Z" />
+        android:pathData="M18.2,5.5 A0.65,0.65 0,1 0,18.2 6.8 A0.65,0.65 0,1 0,18.2 5.5 Z" />
 </vector>
