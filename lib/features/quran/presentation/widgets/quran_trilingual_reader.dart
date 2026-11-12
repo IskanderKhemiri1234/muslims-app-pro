@@ -35,9 +35,9 @@ class QuranTrilingualReader extends StatefulWidget {
   final int initialAyah;
   final List<String> surahNames;
   final VoidCallback onClose;
-  final Future<void> Function(QuranTrilingualAyah verse, String surahName)
+  final Future<bool> Function(QuranTrilingualAyah verse, String surahName)
       onVerseBookmark;
-  final Future<void> Function(QuranTrilingualAyah verse)
+  final Future<bool> Function(QuranTrilingualAyah verse)
       onRemoveVerseBookmark;
   final bool Function(int surah, int ayah) isVerseBookmarked;
   final void Function(int surah, int ayah) onPositionChanged;
@@ -251,12 +251,10 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
 
   Future<void> _bookmark(QuranTrilingualAyah verse) async {
     final wasSaved = _isVerseSaved(verse);
-    if (wasSaved) {
-      await widget.onRemoveVerseBookmark(verse);
-    } else {
-      await widget.onVerseBookmark(verse, _surahName(_surahNumber));
-    }
-    if (!mounted) return;
+    final persisted = wasSaved
+        ? await widget.onRemoveVerseBookmark(verse)
+        : await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+    if (!mounted || !persisted) return;
     setState(() {
       _bookmarkStates[verse.ayahNumber] = !wasSaved;
     });
