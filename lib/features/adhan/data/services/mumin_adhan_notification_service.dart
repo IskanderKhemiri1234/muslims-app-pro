@@ -381,11 +381,9 @@ class MuminAdhanNotificationService {
       );
     }
 
-    final preferences = await SharedPreferences.getInstance();
-    final preferExact =
-        preferences.getBool('mumin_adhan_exact_preference') ?? false;
-    final exactAllowed =
-        preferExact && await canScheduleExactNotifications();
+    // A one-off test should be as prompt as Android currently permits.
+    // This reads the OS grant only; it does not alter the user's saved setting.
+    final exactAllowed = await canScheduleExactNotifications();
     final scheduleMode = exactAllowed
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
