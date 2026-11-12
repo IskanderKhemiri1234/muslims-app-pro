@@ -58,6 +58,7 @@ class _MuminAdhanExperiencePageState
   String _selectedAudioTitle = 'Adhan recording 1';
   bool _selectedAdhanStarted = false;
   bool _preferencesLoadScheduled = false;
+  bool _mediaPreferencesLoaded = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
   bool _audioMuted = false;
@@ -102,6 +103,7 @@ class _MuminAdhanExperiencePageState
       _selectedBackgroundPath = widget.backgroundImageOverride ??
           preferences.getString('mumin_adhan_selected_mosque_image_v1');
 
+      _mediaPreferencesLoaded = true;
       if (mounted) setState(() {});
       // The preview is deliberately silent. Each recording has its own
       // dedicated test action in Adhan settings.
@@ -116,6 +118,7 @@ class _MuminAdhanExperiencePageState
       // Safe fallback: play only the first complete Adhan recording.
       _selectedAudioAsset = _shortAdhanAsset;
       _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
+      _mediaPreferencesLoaded = true;
       if (mounted) setState(() {});
       if (!widget.previewMode && mounted) {
         unawaited(_startSelectedAdhan());
@@ -184,6 +187,7 @@ class _MuminAdhanExperiencePageState
   Future<void> _startSelectedAdhan() async {
     if (!mounted ||
         !_audioHandlerReady ||
+        !_mediaPreferencesLoaded ||
         _selectedAdhanStarted ||
         _audioMuted) {
       return;
@@ -485,7 +489,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _toggleAdhanAudio() async {
-    if (_isClosing || !_audioHandlerReady) return;
+    if (_isClosing || !_audioHandlerReady || !_mediaPreferencesLoaded) return;
 
     final shouldMute = !_audioMuted;
     setState(() => _audioMuted = shouldMute);
@@ -521,7 +525,7 @@ class _MuminAdhanExperiencePageState
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: _toggleAdhanAudio,
+          onTap: _mediaPreferencesLoaded ? _toggleAdhanAudio : null,
           child: Container(
             width: 46,
             height: 46,
@@ -655,7 +659,9 @@ class _MuminAdhanExperiencePageState
 
   Widget _buildWaterDropControl() {
     final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
-    final canContinue = !widget.previewMode && _selectedAudioAsset.isNotEmpty;
+    final canContinue = !widget.previewMode &&
+        _mediaPreferencesLoaded &&
+        _selectedAudioAsset.isNotEmpty;
 
     final instruction = widget.previewMode
         ? _text(
@@ -707,6 +713,32 @@ class _MuminAdhanExperiencePageState
                   CustomPaint(
                     size: const Size(164, 164),
                     painter: _FingerprintRingPainter(progress: progress),
+                  ),
+                  Container(
+                    width: 98,
+                    height: 98,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0.22),
+                          _gold.withValues(alpha: 0.10),
+                          Colors.white.withValues(alpha: 0.025),
+                        ],
+                        stops: const [0, 0.62, 1],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.46),
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold.withValues(alpha: 0.14),
+                          blurRadius: 22,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
                   ),
                   Icon(
                     Icons.fingerprint_rounded,
