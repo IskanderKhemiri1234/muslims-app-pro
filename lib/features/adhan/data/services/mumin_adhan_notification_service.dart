@@ -410,7 +410,7 @@ class MuminAdhanNotificationService {
     );
 
     await _plugin.zonedSchedule(
-      id: 73106,
+      id: 73107,
       title: prayerName,
       body: notificationBody,
       scheduledDate: trigger,
@@ -437,7 +437,7 @@ class MuminAdhanNotificationService {
     final missingIds = state.ids
         .where((id) => !actualIds.contains(id))
         .toList(growable: false);
-    final testPending = pendingRequests.any((request) => request.id == 73106);
+    final testPending = pendingRequests.any((request) => request.id == 73107);
     final notificationsEnabled = await areNotificationsEnabled();
     final exactAlarmAvailable = await canScheduleExactNotifications();
 
