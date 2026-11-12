@@ -195,8 +195,10 @@ class _MuminAdhanExperiencePageState
     // automatically; the player then pauses at the exact media position.
     _introPositionSubscription = _audioHandler.positionStream.listen(
       (position) {
-        if (position < const Duration(seconds: 10) ||
-            _fullAdhanStarted ||
+        if (!MuminAdhanIntroPolicy.shouldPauseAt(
+              position,
+              continuationStarted: _fullAdhanStarted,
+            ) ||
             _introPaused ||
             _isPausingIntro ||
             _isClosing ||
