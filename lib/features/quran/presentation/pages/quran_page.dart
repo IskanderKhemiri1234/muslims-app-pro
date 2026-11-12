@@ -1394,6 +1394,7 @@ class _QuranPageState extends State<QuranPage>
           onTogglePageBookmark: _toggleBookmark,
           onMarkPageRead: _markCurrentPageRead,
           onUndoPageRead: _undoCurrentPageRead,
+          isCurrentPageCompleted: () => _completedPages.contains(_currentPage),
           onOpenIndex: _openIndex,
           onGoToPage: _goToPage,
         ),
