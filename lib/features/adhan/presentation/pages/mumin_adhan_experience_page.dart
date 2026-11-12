@@ -10,14 +10,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/services/mumin_adhan_audio_handler.dart';
+import '../../domain/services/mumin_adhan_intro_policy.dart';
+import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
 ///
-/// Exactly one selected complete Adhan recording is played through the
-/// shared audio handler; a user can replay that same selection from the UI.
+/// The selected complete Adhan recording starts automatically. Its first
+/// ten seconds play, then the same track pauses until the user swipes to resume.
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
+    this.prayerTime,
     this.previewMode = false,
     this.audioHandlerOverride,
     this.backgroundImageOverride,
@@ -25,6 +28,7 @@ class MuminAdhanExperiencePage extends StatefulWidget {
   });
 
   final Prayer prayer;
+  final DateTime? prayerTime;
   final bool previewMode;
   final MuminAdhanAudioHandler? audioHandlerOverride;
   final String? backgroundImageOverride;
@@ -54,9 +58,13 @@ class _MuminAdhanExperiencePageState
   String _selectedAudioTitle = 'Adhan recording 1';
   bool _selectedAdhanStarted = false;
   bool _preferencesLoadScheduled = false;
+  bool _mediaPreferencesLoaded = false;
   bool _fullAdhanStarted = false;
   bool _isClosing = false;
   bool _audioMuted = false;
+  bool _introPaused = false;
+  bool _isPausingIntro = false;
+  StreamSubscription<Duration>? _introPositionSubscription;
   double _dragDistance = 0;
 
   @override
@@ -95,6 +103,7 @@ class _MuminAdhanExperiencePageState
       _selectedBackgroundPath = widget.backgroundImageOverride ??
           preferences.getString('mumin_adhan_selected_mosque_image_v1');
 
+      _mediaPreferencesLoaded = true;
       if (mounted) setState(() {});
       // The preview is deliberately silent. Each recording has its own
       // dedicated test action in Adhan settings.
@@ -109,6 +118,7 @@ class _MuminAdhanExperiencePageState
       // Safe fallback: play only the first complete Adhan recording.
       _selectedAudioAsset = _shortAdhanAsset;
       _selectedAudioTitle = _text('تسجيل الأذان الأول', 'Adhan recording 1', 'Enregistrement Adhan 1');
+      _mediaPreferencesLoaded = true;
       if (mounted) setState(() {});
       if (!widget.previewMode && mounted) {
         unawaited(_startSelectedAdhan());
@@ -129,6 +139,34 @@ class _MuminAdhanExperiencePageState
     }
   }
 
+  String? get _prayerTimeLabel {
+    DateTime? prayerTime = widget.prayerTime;
+
+    if (prayerTime == null) {
+      try {
+        prayerTime = context
+            .read<PrayerController>()
+            .globalSchedule
+            ?.timeForPrayer(widget.prayer);
+      } catch (_) {
+        prayerTime = null;
+      }
+    }
+
+    if (prayerTime == null) return null;
+
+    final timeOfDay = TimeOfDay(
+      hour: prayerTime.hour,
+      minute: prayerTime.minute,
+    );
+
+    return MaterialLocalizations.of(context).formatTimeOfDay(
+      timeOfDay,
+      alwaysUse24HourFormat:
+          MediaQuery.of(context).alwaysUse24HourFormat,
+    );
+  }
+
   String get _prayerName {
     switch (widget.prayer) {
       case Prayer.fajr:
@@ -147,39 +185,133 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _startSelectedAdhan() async {
-    if (!mounted || !_audioHandlerReady || _selectedAdhanStarted || _audioMuted) return;
+    if (!mounted ||
+        !_audioHandlerReady ||
+        !_mediaPreferencesLoaded ||
+        _selectedAdhanStarted ||
+        _audioMuted) {
+      return;
+    }
+
     _selectedAdhanStarted = true;
+    await _introPositionSubscription?.cancel();
+    _introPositionSubscription = null;
+    if (!mounted || _isClosing) return;
 
     try {
+      // Clear any earlier media source before observing this recording's
+      // position, so an old track cannot trigger the ten-second pause.
+      await _audioHandler.stop();
+      if (!mounted || _isClosing) return;
+
+      // Start the selected complete recording. The first ten seconds play
+      // automatically; the player then pauses at the exact media position.
+      _introPositionSubscription = _audioHandler.positionStream.listen(
+        (position) {
+          if (!MuminAdhanIntroPolicy.shouldPauseAt(
+                position,
+                continuationStarted: _fullAdhanStarted,
+              ) ||
+              _introPaused ||
+              _isPausingIntro ||
+              _isClosing ||
+              _audioMuted) {
+            return;
+          }
+
+          unawaited(_pauseInitialTenSeconds());
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint('Mumin Pro: Adhan intro position stream failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        },
+      );
+
       await _audioHandler.playAsset(
         _selectedAudioAsset,
         title: _selectedAudioTitle,
       );
     } catch (error, stackTrace) {
+      await _introPositionSubscription?.cancel();
+      _introPositionSubscription = null;
+      _selectedAdhanStarted = false;
       debugPrint('Mumin Pro: selected Adhan playback failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
 
-  Future<void> _replaySelectedAdhan() async {
-    if (_fullAdhanStarted || _isClosing || _audioMuted || !_audioHandlerReady || _selectedAudioAsset.isEmpty) return;
+  Future<void> _pauseInitialTenSeconds() async {
+    if (!mounted ||
+        _fullAdhanStarted ||
+        _introPaused ||
+        _isPausingIntro ||
+        _isClosing ||
+        _audioMuted) {
+      return;
+    }
+
+    _isPausingIntro = true;
+    try {
+      if (_audioHandler.isPlaying) {
+        await _audioHandler.pause();
+      }
+
+      if (!mounted || _isClosing) return;
+
+      // A swipe can arrive at the same instant as the ten-second pause.
+      // If the user has already continued, immediately resume instead of
+      // leaving the full recording paused behind the gesture.
+      if (_fullAdhanStarted) {
+        if (!_audioMuted && !_audioHandler.isPlaying) {
+          await _audioHandler.play();
+        }
+        return;
+      }
+
+      setState(() {
+        _introPaused = true;
+        _dragDistance = 0;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Mumin Pro: automatic Adhan intro pause failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _isPausingIntro = false;
+    }
+  }
+
+  Future<void> _continueSelectedAdhan() async {
+    if (_fullAdhanStarted ||
+        _isClosing ||
+        _audioMuted ||
+        !_audioHandlerReady ||
+        _selectedAudioAsset.isEmpty) {
+      return;
+    }
+
+    await _introPositionSubscription?.cancel();
+    _introPositionSubscription = null;
+    if (!mounted || _isClosing) return;
 
     setState(() {
       _fullAdhanStarted = true;
+      _introPaused = false;
       _dragDistance = 110;
     });
 
     try {
-      // Stop first, then load and play the complete recording from position 0.
-      await _audioHandler.stop();
-      if (!mounted || _isClosing) return;
-
-      await _audioHandler.playAsset(
-        _selectedAudioAsset,
-        title: _selectedAudioTitle,
-      );
+      if (_audioHandler.hasSource) {
+        // Resume from the ten-second pause, or let the already-playing
+        // recording continue if the user swiped before the pause.
+        if (!_audioHandler.isPlaying) {
+          await _audioHandler.play();
+        }
+      } else {
+        _selectedAdhanStarted = false;
+        await _startSelectedAdhan();
+      }
     } catch (error, stackTrace) {
-      debugPrint('Mumin Pro: full Adhan playback failed: $error');
+      debugPrint('Mumin Pro: continuing the selected Adhan failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
 
@@ -192,9 +324,9 @@ class _MuminAdhanExperiencePageState
         SnackBar(
           content: Text(
             _text(
-              'تعذر تشغيل التسجيل المختار. تحقق من ملف الصوت.',
-              'The selected recording could not be played. Check the audio file.',
-              'Impossible de lire l’enregistrement sélectionné. Vérifiez le fichier audio.',
+              'تعذر مواصلة الأذان. حاول مرة أخرى.',
+              'Could not continue the Adhan. Please try again.',
+              'Impossible de continuer l’Adhan. Réessayez.',
             ),
           ),
         ),
@@ -234,7 +366,7 @@ class _MuminAdhanExperiencePageState
     setState(() => _dragDistance = nextDistance);
 
     if (nextDistance >= 110) {
-      unawaited(_replaySelectedAdhan());
+      unawaited(_continueSelectedAdhan());
     }
   }
 
@@ -246,6 +378,8 @@ class _MuminAdhanExperiencePageState
 
   @override
   void dispose() {
+    unawaited(_introPositionSubscription?.cancel() ?? Future<void>.value());
+    _introPositionSubscription = null;
     if (_audioHandlerReady && !_isClosing) {
       unawaited(_audioHandler.stop());
     }
@@ -357,7 +491,7 @@ class _MuminAdhanExperiencePageState
   }
 
   Future<void> _toggleAdhanAudio() async {
-    if (_isClosing || !_audioHandlerReady) return;
+    if (_isClosing || !_audioHandlerReady || !_mediaPreferencesLoaded) return;
 
     final shouldMute = !_audioMuted;
     setState(() => _audioMuted = shouldMute);
@@ -365,6 +499,8 @@ class _MuminAdhanExperiencePageState
     try {
       if (shouldMute) {
         await _audioHandler.pause();
+      } else if (_introPaused && !_fullAdhanStarted) {
+        // The swipe is the explicit action that resumes the full recording.
       } else if (_audioHandler.hasSource) {
         await _audioHandler.play();
       } else {
@@ -391,7 +527,7 @@ class _MuminAdhanExperiencePageState
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: _toggleAdhanAudio,
+          onTap: _mediaPreferencesLoaded ? _toggleAdhanAudio : null,
           child: Container(
             width: 46,
             height: 46,
@@ -449,6 +585,8 @@ class _MuminAdhanExperiencePageState
   }
 
   Widget _buildPrayerHeading() {
+    final prayerTimeLabel = _prayerTimeLabel;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -477,6 +615,33 @@ class _MuminAdhanExperiencePageState
             ],
           ),
         ),
+        if (prayerTimeLabel != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            _text('وقت الصلاة', 'PRAYER TIME', 'HEURE DE PRIÈRE'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _gold.withValues(alpha: 0.94),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            prayerTimeLabel,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: _gold,
+              fontSize: 31,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              shadows: [
+                Shadow(color: Colors.black54, blurRadius: 16),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 15),
         Text(
           _text('الله أكبر • الله أكبر', 'Allahu Akbar • Allahu Akbar', 'Allahou Akbar • Allahou Akbar'),
@@ -496,7 +661,9 @@ class _MuminAdhanExperiencePageState
 
   Widget _buildWaterDropControl() {
     final progress = (_dragDistance / 110).clamp(0.0, 1.0).toDouble();
-    final canContinue = !widget.previewMode && _selectedAudioAsset.isNotEmpty;
+    final canContinue = !widget.previewMode &&
+        _mediaPreferencesLoaded &&
+        _selectedAudioAsset.isNotEmpty;
 
     final instruction = widget.previewMode
         ? _text(
@@ -505,22 +672,28 @@ class _MuminAdhanExperiencePageState
             'L’aperçu est silencieux. Testez les sons dans les réglages Adhan.',
           )
         : _fullAdhanStarted
-        ? _text(
-            'التسجيل المختار قيد التشغيل',
-            'Selected recording is playing',
-            'L’enregistrement sélectionné est en cours',
-          )
-        : !canContinue
             ? _text(
-                'اسحب دائرة البصمة لإعادة تشغيل التسجيل المختار',
-                'Swipe the fingerprint circle to replay the selected recording',
-                'Faites glisser le cercle pour relancer le son sélectionné',
+                'الأذان الكامل قيد التشغيل حتى النهاية',
+                'The full Adhan is playing to the end',
+                'L’Adhan complet est en cours jusqu’à la fin',
               )
-            : _text(
-                'اسحب دائرة البصمة لإعادة تشغيل الأذان المختار',
-                'Swipe the fingerprint circle to replay the selected Adhan',
-                'Faites glisser le cercle pour relancer l’Adhan sélectionné',
-              );
+            : _introPaused
+                ? _text(
+                    'انتهت التكبيرات الأولى. اسحب الدائرة الشفافة لمواصلة الأذان حتى النهاية',
+                    'Opening takbeers complete. Swipe the glass circle to continue the Adhan to the end',
+                    'Les premiers takbirs sont terminés. Faites glisser le cercle pour continuer l’Adhan jusqu’à la fin',
+                  )
+                : !canContinue
+                    ? _text(
+                        'اسحب الدائرة الشفافة لمواصلة التسجيل المختار',
+                        'Swipe the glass circle to continue the selected recording',
+                        'Faites glisser le cercle transparent pour continuer l’enregistrement',
+                      )
+                    : _text(
+                        'استمع إلى التكبيرات الأولى، ثم اسحب الدائرة الشفافة لمواصلة الأذان',
+                        'Listen to the opening takbeers, then swipe the glass circle to continue the Adhan',
+                        'Écoutez les premiers takbirs, puis faites glisser le cercle transparent pour continuer l’Adhan',
+                      );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -542,6 +715,32 @@ class _MuminAdhanExperiencePageState
                   CustomPaint(
                     size: const Size(164, 164),
                     painter: _FingerprintRingPainter(progress: progress),
+                  ),
+                  Container(
+                    width: 98,
+                    height: 98,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0.22),
+                          _gold.withValues(alpha: 0.10),
+                          Colors.white.withValues(alpha: 0.025),
+                        ],
+                        stops: const [0, 0.62, 1],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.46),
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold.withValues(alpha: 0.14),
+                          blurRadius: 22,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
                   ),
                   Icon(
                     Icons.fingerprint_rounded,

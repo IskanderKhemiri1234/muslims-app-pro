@@ -13,8 +13,8 @@ import '../../../prayer_times/domain/services/global_prayer_calculation_service.
 
 /// Schedules local notifications for the five daily prayers.
 ///
-/// This service only manages notifications. It does not start audio playback
-/// automatically and does not force the application to open over other apps.
+/// Schedules high-priority prayer notifications and forwards their launch
+/// payloads to the application so the selected Adhan experience can open.
 class MuminAdhanNotificationService {
   MuminAdhanNotificationService({
     FlutterLocalNotificationsPlugin? plugin,
@@ -23,25 +23,20 @@ class MuminAdhanNotificationService {
         _calculationService =
             calculationService ?? const GlobalPrayerCalculationService();
 
-  static final StreamController<Prayer> _prayerAlertController =
-      StreamController<Prayer>.broadcast();
+  static final StreamController<MuminPrayerAlert> _prayerAlertController =
+      StreamController<MuminPrayerAlert>.broadcast();
 
-  /// Emits a prayer when Android launches the app from its full-screen alert.
-  static Stream<Prayer> get prayerAlerts => _prayerAlertController.stream;
+  /// Emits the prayer and its scheduled local clock time when Android opens
+  /// the app through the full-screen notification or its notification action.
+  static Stream<MuminPrayerAlert> get prayerAlerts =>
+      _prayerAlertController.stream;
 
   static void _handleNotificationResponse(
     NotificationResponse response,
   ) {
-    const prefix = 'mumin_adhan:';
-    final payload = response.payload;
-    if (payload == null || !payload.startsWith(prefix)) return;
-
-    final prayerName = payload.substring(prefix.length);
-    for (final prayer in supportedPrayers) {
-      if (prayer.name == prayerName) {
-        _prayerAlertController.add(prayer);
-        return;
-      }
+    final alert = MuminPrayerAlert.fromPayload(response.payload);
+    if (alert != null) {
+      _prayerAlertController.add(alert);
     }
   }
 
@@ -311,7 +306,8 @@ class MuminAdhanNotificationService {
             scheduledDate: prayerTime,
             notificationDetails: details,
             androidScheduleMode: scheduleMode,
-            payload: 'mumin_adhan:${prayer.name}',
+            payload: 'mumin_adhan:${prayer.name}:'
+                '${prayerTime.hour}:${prayerTime.minute}',
           );
 
           stagedIds.add(id);
@@ -493,6 +489,56 @@ class MuminAdhanNotificationService {
         'Only the five daily prayers can have notifications.',
       );
     }
+  }
+}
+
+/// Details carried by a scheduled prayer notification.
+class MuminPrayerAlert {
+  const MuminPrayerAlert({
+    required this.prayer,
+    this.prayerTime,
+  });
+
+  final Prayer prayer;
+
+  /// A local clock-time carrier. Its calendar date is intentionally ignored.
+  final DateTime? prayerTime;
+
+  static MuminPrayerAlert? fromPayload(String? payload) {
+    const prefix = 'mumin_adhan:';
+    if (payload == null || !payload.startsWith(prefix)) return null;
+
+    final parts = payload.substring(prefix.length).split(':');
+    if (parts.isEmpty) return null;
+
+    Prayer? prayer;
+    for (final candidate in MuminAdhanNotificationService.supportedPrayers) {
+      if (candidate.name == parts.first) {
+        prayer = candidate;
+        break;
+      }
+    }
+
+    if (prayer == null) return null;
+
+    DateTime? prayerTime;
+    if (parts.length >= 3) {
+      final hour = int.tryParse(parts[1]);
+      final minute = int.tryParse(parts[2]);
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour <= 23 &&
+          minute >= 0 &&
+          minute <= 59) {
+        prayerTime = DateTime(2000, 1, 1, hour, minute);
+      }
+    }
+
+    return MuminPrayerAlert(
+      prayer: prayer,
+      prayerTime: prayerTime,
+    );
   }
 }
 

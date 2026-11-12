@@ -994,9 +994,9 @@ class _AdhanNotificationSettingsPageState
 
                   Text(
                     _t(
-                      'تُفتح واجهة الأذان عند وصول التنبيه إذا سمح Android بذلك؛ ويبدأ التكبير القصير ثم يمكنك سحب القطرة لمواصلة الأذان الكامل.',
-                      'The Adhan screen opens when Android allows the alert; the short takbeer starts first, and you can swipe the drop to continue the full Adhan.',
-                      'L’écran Adhan s’ouvre lorsque Android l’autorise ; le takbir court démarre d’abord, puis faites glisser la goutte pour continuer l’Adhan complet.',
+                      'عند وقت الصلاة تبدأ التكبيرات الأولى من التسجيل المختار لمدة 10 ثوانٍ، ثم يتوقف الصوت عند موضعه. اسحب الدائرة الشفافة لمواصلة الأذان حتى النهاية. تظل طريقة فتح الشاشة خاضعة لأذونات Android.',
+                      'At prayer time, the opening takbeers from your selected recording play for 10 seconds, then pause at that position. Swipe the translucent circle to continue the Adhan to the end. Screen launching remains subject to Android permissions.',
+                      'À l’heure de la prière, les premiers takbirs de l’enregistrement choisi jouent pendant 10 secondes, puis la lecture se met en pause à cet endroit. Faites glisser le cercle translucide pour poursuivre l’Adhan jusqu’à la fin. L’ouverture de l’écran reste soumise aux autorisations Android.',
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       height: 1.5,
