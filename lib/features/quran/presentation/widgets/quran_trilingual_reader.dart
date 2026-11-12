@@ -171,8 +171,9 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   Future<void> _savePosition(int surah, int ayah) async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setInt(_lastSurahKey, surah);
-      await preferences.setInt(_lastAyahKey, ayah);
+      final surahSaved = await preferences.setInt(_lastSurahKey, surah);
+      final ayahSaved = await preferences.setInt(_lastAyahKey, ayah);
+      if (!surahSaved || !ayahSaved) return;
       widget.onPositionChanged(surah, ayah);
     } catch (_) {
       // Reading remains available for this session.
