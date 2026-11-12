@@ -251,7 +251,17 @@ class _MuminAdhanExperiencePageState
         await _audioHandler.pause();
       }
 
-      if (!mounted || _fullAdhanStarted || _isClosing) return;
+      if (!mounted || _isClosing) return;
+
+      // A swipe can arrive at the same instant as the ten-second pause.
+      // If the user has already continued, immediately resume instead of
+      // leaving the full recording paused behind the gesture.
+      if (_fullAdhanStarted) {
+        if (!_audioMuted && !_audioHandler.isPlaying) {
+          await _audioHandler.play();
+        }
+        return;
+      }
 
       setState(() {
         _introPaused = true;
