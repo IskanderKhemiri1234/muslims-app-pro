@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/localization/mumin_language_controller.dart';
 import '../../data/services/mumin_adhan_audio_handler.dart';
+import '../../domain/services/mumin_adhan_intro_policy.dart';
 import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
