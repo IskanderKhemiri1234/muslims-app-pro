@@ -328,8 +328,8 @@ class _QuranPageState extends State<QuranPage>
         _verseBookmarks = validVerses;
         _hasSavedReaderPosition = hasSavedReaderPosition;
         if (hasSavedReaderPosition) {
-          _lastReadSurah = savedSurah!;
-          _lastReadAyah = savedAyah!;
+          _lastReadSurah = savedSurah;
+          _lastReadAyah = savedAyah;
         }
         _isLoading = false;
       });
