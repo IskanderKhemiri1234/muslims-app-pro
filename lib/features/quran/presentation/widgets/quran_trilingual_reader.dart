@@ -18,6 +18,9 @@ class QuranTrilingualReader extends StatefulWidget {
     required this.surahNames,
     required this.onClose,
     required this.onVerseBookmark,
+    required this.onRemoveVerseBookmark,
+    required this.isVerseBookmarked,
+    required this.onPositionChanged,
     required this.surahStartPages,
     required this.onPageChanged,
     required this.onTogglePageBookmark,
@@ -33,6 +36,10 @@ class QuranTrilingualReader extends StatefulWidget {
   final VoidCallback onClose;
   final Future<void> Function(QuranTrilingualAyah verse, String surahName)
       onVerseBookmark;
+  final Future<void> Function(QuranTrilingualAyah verse)
+      onRemoveVerseBookmark;
+  final bool Function(int surah, int ayah) isVerseBookmarked;
+  final ValueChanged<(int surah, int ayah)> onPositionChanged;
   final List<int> surahStartPages;
   final ValueChanged<int> onPageChanged;
   final Future<void> Function() onTogglePageBookmark;
@@ -53,6 +60,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
   final QuranTrilingualDataSource _source = QuranTrilingualDataSource();
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _verseKeys = <int, GlobalKey>{};
+  final Map<int, bool> _bookmarkStates = <int, bool>{};
 
   _TrilingualTheme _theme = _TrilingualTheme.day;
   QuranTrilingualSurah? _surah;
@@ -105,20 +113,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedTheme = preferences.getString(_themeKey);
-      final savedSurah = preferences.getInt(_lastSurahKey);
-      final savedAyah = preferences.getInt(_lastAyahKey);
       if (savedTheme != null) {
         _theme = _TrilingualTheme.values.firstWhere(
           (item) => item.name == savedTheme,
           orElse: () => _TrilingualTheme.day,
         );
-      }
-      // The caller's selected surah is authoritative. Restore the saved
-      // ayah only when it belongs to that same surah; otherwise a previous
-      // reading position would override a surah explicitly chosen from the
-      // opening index.
-      if (savedSurah == _surahNumber && savedAyah != null && savedAyah > 0) {
-        _currentAyah = savedAyah;
       }
     } catch (_) {
       // Keep the supplied initial reading position.
@@ -171,6 +170,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setInt(_lastSurahKey, surah);
       await preferences.setInt(_lastAyahKey, ayah);
+      widget.onPositionChanged((surah, ayah));
     } catch (_) {
       // Reading remains available for this session.
     }
@@ -241,8 +241,22 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
     return widget.surahNames[number - 1];
   }
 
+  bool _isVerseSaved(QuranTrilingualAyah verse) {
+    return _bookmarkStates[verse.ayahNumber] ??
+        widget.isVerseBookmarked(_surahNumber, verse.ayahNumber);
+  }
+
   Future<void> _bookmark(QuranTrilingualAyah verse) async {
-    await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+    final wasSaved = _isVerseSaved(verse);
+    if (wasSaved) {
+      await widget.onRemoveVerseBookmark(verse);
+    } else {
+      await widget.onVerseBookmark(verse, _surahName(_surahNumber));
+    }
+    if (!mounted) return;
+    setState(() {
+      _bookmarkStates[verse.ayahNumber] = !wasSaved;
+    });
   }
 
   int _surahForPage(int page) {
@@ -373,10 +387,20 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
               ),
               const Spacer(),
               IconButton(
-                tooltip: _text('quran_reader_bookmark_verse'),
+                tooltip: _text(
+                  _isVerseSaved(verse)
+                      ? 'quran_reader_remove_verse_bookmark'
+                      : 'quran_reader_bookmark_verse',
+                ),
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _bookmark(verse),
-                icon: Icon(Icons.bookmark_add_outlined, color: _accent, size: 21),
+                icon: Icon(
+                  _isVerseSaved(verse)
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_add_outlined,
+                  color: _isVerseSaved(verse) ? _accent : _secondaryText,
+                  size: 21,
+                ),
               ),
               IconButton(
                 tooltip: _text('quran_reader_copy_verse'),
