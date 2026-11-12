@@ -5,8 +5,7 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Compact monochrome Mumin / Pro wordmark for Android status-bar notifications.
-         Android applies the notification tint; transparent space remains unpainted. -->
+    <!-- Stacked Mumin / Pro wordmark, rendered as a monochrome glyph. -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
