@@ -39,7 +39,7 @@ class QuranTrilingualReader extends StatefulWidget {
   final Future<void> Function(QuranTrilingualAyah verse)
       onRemoveVerseBookmark;
   final bool Function(int surah, int ayah) isVerseBookmarked;
-  final ValueChanged<(int surah, int ayah)> onPositionChanged;
+  final void Function(int surah, int ayah) onPositionChanged;
   final List<int> surahStartPages;
   final ValueChanged<int> onPageChanged;
   final Future<void> Function() onTogglePageBookmark;
@@ -170,7 +170,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setInt(_lastSurahKey, surah);
       await preferences.setInt(_lastAyahKey, ayah);
-      widget.onPositionChanged((surah, ayah));
+      widget.onPositionChanged(surah, ayah);
     } catch (_) {
       // Reading remains available for this session.
     }
