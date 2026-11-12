@@ -464,7 +464,7 @@ class MuminAdhanNotificationService {
 
   Future<void> cancelTestAlert() async {
     await initialize();
-    await _plugin.cancel(id: 73106);
+    await _plugin.cancel(id: 73107);
   }
 
   Future<void> cancelPreviouslyScheduled() async {
