@@ -15,8 +15,8 @@ import '../../../prayer_times/presentation/controllers/prayer_controller.dart';
 
 /// Full-screen prayer-time experience launched by an Android Adhan alert.
 ///
-/// Exactly one selected complete Adhan recording is played through the
-/// shared audio handler; a user can replay that same selection from the UI.
+/// The selected complete Adhan recording starts automatically. Its first
+/// ten seconds play, then the same track pauses until the user swipes to resume.
 class MuminAdhanExperiencePage extends StatefulWidget {
   const MuminAdhanExperiencePage({
     required this.prayer,
