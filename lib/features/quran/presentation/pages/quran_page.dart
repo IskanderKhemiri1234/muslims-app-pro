@@ -699,7 +699,7 @@ class _QuranPageState extends State<QuranPage>
     });
   }
 
-  Future<void> _saveTrilingualVerseBookmark(
+  Future<bool> _saveTrilingualVerseBookmark(
     QuranTrilingualAyah verse,
     String surahName,
   ) async {
@@ -710,7 +710,7 @@ class _QuranPageState extends State<QuranPage>
       _showMessage(
         QuranPageLocalization.text(context, 'quran_invalid_ayah_data'),
       );
-      return;
+      return false;
     }
 
     final entry = <String, dynamic>{
@@ -726,6 +726,7 @@ class _QuranPageState extends State<QuranPage>
       'layout': 'trilingual',
     };
 
+    var savedSuccessfully = false;
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
@@ -743,6 +744,7 @@ class _QuranPageState extends State<QuranPage>
               QuranPageLocalization.text(context, 'quran_ayah_already_saved'),
             );
           }
+          savedSuccessfully = true;
           return;
         }
 
@@ -756,31 +758,32 @@ class _QuranPageState extends State<QuranPage>
         }
         if (!mounted) return;
         setState(() => _verseBookmarks.add(entry));
+        savedSuccessfully = true;
         _showMessage(
           QuranPageLocalization.text(context, 'quran_ayah_saved'),
         );
       });
+      return savedSuccessfully;
     } catch (_) {
       _showMessage(
         QuranPageLocalization.text(context, 'quran_ayah_save_error'),
       );
+      return false;
     }
   }
 
-  Future<void> _removeVerseBookmark(
+  Future<bool> _removeVerseBookmark(
     Map<String, dynamic> verse,
   ) async {
     try {
       await _queueWrite(() async {
         final preferences = await SharedPreferences.getInstance();
-
         final entries =
             preferences.getStringList(_verseBookmarksKey) ?? [];
 
         entries.removeWhere((entry) {
           try {
             final decoded = jsonDecode(entry);
-
             return decoded is Map &&
                 decoded['sura'] == verse['sura'] &&
                 decoded['aya'] == verse['aya'];
@@ -789,13 +792,15 @@ class _QuranPageState extends State<QuranPage>
           }
         });
 
-        await preferences.setStringList(
+        final saved = await preferences.setStringList(
           _verseBookmarksKey,
           entries,
         );
+        if (!saved) {
+          throw StateError('Verse bookmark removal could not be saved');
+        }
 
         if (!mounted) return;
-
         setState(() {
           _verseBookmarks.removeWhere(
             (item) =>
@@ -813,17 +818,35 @@ class _QuranPageState extends State<QuranPage>
           ),
         );
       }
+      return true;
     } catch (_) {
       _showMessage(
-          QuranPageLocalization.text(
-            context,
-            'quran_ayah_bookmark_remove_error',
-          ),
-        );
+        QuranPageLocalization.text(
+          context,
+          'quran_ayah_bookmark_remove_error',
+        ),
+      );
+      return false;
     }
   }
 
-  
+  bool _isVerseBookmarked(int surah, int ayah) {
+    return _verseBookmarks.any(
+      (item) => item['sura'] == surah && item['aya'] == ayah,
+    );
+  }
+
+  void _handleReaderPositionChanged(int surah, int ayah) {
+    if (!mounted || surah < 1 || surah > 114 || ayah < 1) return;
+    if (_lastReadSurah == surah && _lastReadAyah == ayah &&
+        _hasSavedReaderPosition) return;
+    setState(() {
+      _lastReadSurah = surah;
+      _lastReadAyah = ayah;
+      _hasSavedReaderPosition = true;
+    });
+  }
+
   Future<void> _openVerseBookmarks() async {
     if (!mounted) return;
 
