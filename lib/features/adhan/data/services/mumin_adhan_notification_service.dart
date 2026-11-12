@@ -81,7 +81,7 @@ class MuminAdhanNotificationService {
 
   Future<void> _initializePlugin() async {
     const settings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('@drawable/ic_mumin_notification'),
     );
 
     await _plugin.initialize(
