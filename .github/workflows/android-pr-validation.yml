@@ -82,7 +82,9 @@ jobs:
           PY
 
       - name: Analyze Dart code
-        run: flutter analyze
+        # Flutter 3.50 reports upstream library deprecations as info-level diagnostics.
+        # Keep warnings and errors fatal while allowing those informational notices.
+        run: flutter analyze --no-fatal-infos
 
       - name: Run Flutter tests
         run: flutter test
