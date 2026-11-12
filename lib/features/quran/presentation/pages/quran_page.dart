@@ -171,6 +171,9 @@ class _QuranPageState extends State<QuranPage>
 
   int _currentPage = 1;
   int _completedKhatmas = 0;
+  int _lastReadSurah = 1;
+  int _lastReadAyah = 1;
+  bool _hasSavedReaderPosition = false;
 
   Set<int> _completedPages = <int>{};
   Set<int> _bookmarks = <int>{};
@@ -269,6 +272,11 @@ class _QuranPageState extends State<QuranPage>
       final preferences = await SharedPreferences.getInstance();
       final storedVerses =
           preferences.getStringList(_verseBookmarksKey) ?? [];
+      final savedSurah = preferences.getInt('quran_last_read_surah');
+      final savedAyah = preferences.getInt('quran_last_read_ayah');
+      final hasSavedReaderPosition = savedSurah != null &&
+          savedSurah >= 1 && savedSurah <= 114 &&
+          savedAyah != null && savedAyah >= 1;
 
       final validVerses = <Map<String, dynamic>>[];
 
@@ -318,6 +326,11 @@ class _QuranPageState extends State<QuranPage>
             .toSet();
 
         _verseBookmarks = validVerses;
+        _hasSavedReaderPosition = hasSavedReaderPosition;
+        if (hasSavedReaderPosition) {
+          _lastReadSurah = savedSurah!;
+          _lastReadAyah = savedAyah!;
+        }
         _isLoading = false;
       });
     } catch (_) {
@@ -669,6 +682,23 @@ class _QuranPageState extends State<QuranPage>
     );
   }
 
+  bool _isVerseBookmarked(int surah, int ayah) {
+    return _verseBookmarks.any(
+      (item) => item['sura'] == surah && item['aya'] == ayah,
+    );
+  }
+
+  void _handleReaderPositionChanged(int surah, int ayah) {
+    if (!mounted || surah < 1 || surah > 114 || ayah < 1) return;
+    if (_lastReadSurah == surah && _lastReadAyah == ayah &&
+        _hasSavedReaderPosition) return;
+    setState(() {
+      _lastReadSurah = surah;
+      _lastReadAyah = ayah;
+      _hasSavedReaderPosition = true;
+    });
+  }
+
   Future<void> _saveTrilingualVerseBookmark(
     QuranTrilingualAyah verse,
     String surahName,
@@ -800,7 +830,7 @@ class _QuranPageState extends State<QuranPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final verses = List<Map<String, dynamic>>.from(_verseBookmarks);
 
-    final selectedPage = await showModalBottomSheet<int>(
+    final selectedVerse = await showModalBottomSheet<Map<String, int>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -864,8 +894,14 @@ class _QuranPageState extends State<QuranPage>
                           ),
                         ],
                       ),
-                      onTap: () =>
-                          Navigator.pop(sheetContext, page),
+                      onTap: () => Navigator.pop(
+                        sheetContext,
+                        <String, int>{
+                          'sura': verse['sura'] as int,
+                          'aya': aya,
+                          'page': page,
+                        },
+                      ),
                       trailing: IconButton(
                         tooltip: QuranPageLocalization.text(
                           context,
@@ -894,10 +930,11 @@ class _QuranPageState extends State<QuranPage>
       },
     );
 
-    if (selectedPage != null && mounted) {
-      _selectPage(
-        selectedPage,
-        saveImmediately: true,
+    if (selectedVerse != null && mounted) {
+      _selectPage(selectedVerse['page']!, saveImmediately: true);
+      await _openFullReader(
+        initialSurah: selectedVerse['sura']!,
+        initialAyah: selectedVerse['aya']!,
       );
     }
   }
@@ -1313,7 +1350,10 @@ Future<int?> _goToPage() async {
     return selectedPage;
   }
 
-  Future<void> _openFullReader({required int initialSurah}) async {
+  Future<void> _openFullReader({
+    required int initialSurah,
+    int initialAyah = 1,
+  }) async {
     if (_isLoading || !mounted || initialSurah < 1 || initialSurah > 114) {
       return;
     }
@@ -1322,11 +1362,14 @@ Future<int?> _goToPage() async {
       MaterialPageRoute<void>(
         builder: (readerContext) => QuranTrilingualReader(
           initialSurah: initialSurah,
-          initialAyah: 1,
+          initialAyah: initialAyah,
           surahNames: QuranPageLocalization.surahNames(context),
           surahStartPages: _surahs.map((item) => item.page).toList(growable: false),
           onClose: () => Navigator.of(readerContext).pop(),
           onVerseBookmark: _saveTrilingualVerseBookmark,
+          onRemoveVerseBookmark: _removeVerseBookmark,
+          isVerseBookmarked: _isVerseBookmarked,
+          onPositionChanged: _handleReaderPositionChanged,
           onPageChanged: (page) => _selectPage(page, saveImmediately: true),
           onTogglePageBookmark: _toggleBookmark,
           onMarkPageRead: _markCurrentPageRead,
@@ -1340,6 +1383,14 @@ Future<int?> _goToPage() async {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _resumeLastReading() async {
+    if (_isLoading || !_hasSavedReaderPosition) return;
+    await _openFullReader(
+      initialSurah: _lastReadSurah,
+      initialAyah: _lastReadAyah,
+    );
   }
 
   void _openSurahFromNavigation(int surahNumber) {
@@ -1427,7 +1478,7 @@ Widget build(BuildContext context) {
                     16,
                     28,
                   ),
-                  itemCount: _surahs.length + 1,
+                  itemCount: _surahs.length + (_hasSavedReaderPosition ? 2 : 1),
                   itemBuilder: (itemContext, listIndex) {
                     if (listIndex == 0) {
                       return _QuranIndexHeader(
@@ -1439,7 +1490,22 @@ Widget build(BuildContext context) {
                       );
                     }
 
-                    final index = listIndex - 1;
+                    if (_hasSavedReaderPosition && listIndex == 1) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _ContinueReadingCard(
+                          isDark: isDark,
+                          surahName: QuranPageLocalization.surahName(
+                            context,
+                            _lastReadSurah,
+                          ),
+                          ayah: _lastReadAyah,
+                          onTap: _resumeLastReading,
+                        ),
+                      );
+                    }
+
+                    final index = listIndex - (_hasSavedReaderPosition ? 2 : 1);
                     final number = index + 1;
                     final arabicName = _surahs[index].name;
                     final englishName =
