@@ -191,31 +191,37 @@ class _MuminAdhanExperiencePageState
 
     _selectedAdhanStarted = true;
     await _introPositionSubscription?.cancel();
-
-    // Start the selected complete recording. The first ten seconds play
-    // automatically; the player then pauses at the exact media position.
-    _introPositionSubscription = _audioHandler.positionStream.listen(
-      (position) {
-        if (!MuminAdhanIntroPolicy.shouldPauseAt(
-              position,
-              continuationStarted: _fullAdhanStarted,
-            ) ||
-            _introPaused ||
-            _isPausingIntro ||
-            _isClosing ||
-            _audioMuted) {
-          return;
-        }
-
-        unawaited(_pauseInitialTenSeconds());
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        debugPrint('Mumin Pro: Adhan intro position stream failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      },
-    );
+    _introPositionSubscription = null;
 
     try {
+      // Clear any earlier media source before observing this recording's
+      // position, so an old track cannot trigger the ten-second pause.
+      await _audioHandler.stop();
+      if (!mounted || _isClosing) return;
+
+      // Start the selected complete recording. The first ten seconds play
+      // automatically; the player then pauses at the exact media position.
+      _introPositionSubscription = _audioHandler.positionStream.listen(
+        (position) {
+          if (!MuminAdhanIntroPolicy.shouldPauseAt(
+                position,
+                continuationStarted: _fullAdhanStarted,
+              ) ||
+              _introPaused ||
+              _isPausingIntro ||
+              _isClosing ||
+              _audioMuted) {
+            return;
+          }
+
+          unawaited(_pauseInitialTenSeconds());
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          debugPrint('Mumin Pro: Adhan intro position stream failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        },
+      );
+
       await _audioHandler.playAsset(
         _selectedAudioAsset,
         title: _selectedAudioTitle,
