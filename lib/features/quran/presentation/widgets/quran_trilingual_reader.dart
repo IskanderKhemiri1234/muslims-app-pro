@@ -26,6 +26,7 @@ class QuranTrilingualReader extends StatefulWidget {
     required this.onTogglePageBookmark,
     required this.onMarkPageRead,
     required this.onUndoPageRead,
+    required this.isCurrentPageCompleted,
     required this.onOpenIndex,
     required this.onGoToPage,
   });
@@ -45,6 +46,7 @@ class QuranTrilingualReader extends StatefulWidget {
   final Future<void> Function() onTogglePageBookmark;
   final Future<void> Function() onMarkPageRead;
   final Future<void> Function() onUndoPageRead;
+  final bool Function() isCurrentPageCompleted;
   final Future<int?> Function() onOpenIndex;
   final Future<int?> Function() onGoToPage;
 
@@ -138,6 +140,7 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
       _surahNumber = number;
       _currentAyah = targetAyah;
       _verseKeys.clear();
+      _bookmarkStates.clear();
     });
 
     try {
@@ -278,9 +281,11 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
         return;
       case 'mark_read':
         await widget.onMarkPageRead();
+        if (mounted) setState(() {});
         return;
       case 'undo_read':
         await widget.onUndoPageRead();
+        if (mounted) setState(() {});
         return;
       case 'index':
         final page = await widget.onOpenIndex();
@@ -611,12 +616,34 @@ class _QuranTrilingualReaderState extends State<QuranTrilingualReader> {
                       ),
                       PopupMenuItem(
                         value: 'mark_read',
-                        child: Text(_text('quran_mark_read')),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.isCurrentPageCompleted()
+                                  ? Icons.check_circle_rounded
+                                  : Icons.task_alt_rounded,
+                              color: widget.isCurrentPageCompleted()
+                                  ? const Color(0xFFD8B66A)
+                                  : _secondaryText,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 9),
+                            Text(
+                              _text(
+                                widget.isCurrentPageCompleted()
+                                    ? 'quran_page_read_completed'
+                                    : 'quran_mark_read',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      PopupMenuItem(
-                        value: 'undo_read',
-                        child: Text(_text('quran_undo')),
-                      ),
+                      if (widget.isCurrentPageCompleted())
+                        PopupMenuItem(
+                          value: 'undo_read',
+                          child: Text(_text('quran_undo')),
+                        ),
                       PopupMenuItem(
                         value: 'index',
                         child: Text(_text('quran_index_title')),
