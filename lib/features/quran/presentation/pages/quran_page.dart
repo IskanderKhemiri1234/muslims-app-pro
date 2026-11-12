@@ -1108,11 +1108,26 @@ class _QuranPageState extends State<QuranPage>
 
     if (selectedPage != null && mounted) {
       _selectPage(selectedPage, saveImmediately: true);
+      await _openFullReader(
+        initialSurah: _surahForPage(selectedPage),
+        initialAyah: 1,
+      );
     }
   }
-  
-  
-Future<int?> _goToPage() async {
+
+  int _surahForPage(int page) {
+    var selected = 1;
+    for (var index = 0; index < _surahs.length; index++) {
+      if (_surahs[index].page <= page) {
+        selected = index + 1;
+      } else {
+        break;
+      }
+    }
+    return selected;
+  }
+
+  Future<int?> _goToPage() async {
     if (_isLoading || !mounted) return null;
 
     final controller = TextEditingController(
@@ -1367,7 +1382,12 @@ Future<int?> _goToPage() async {
           surahStartPages: _surahs.map((item) => item.page).toList(growable: false),
           onClose: () => Navigator.of(readerContext).pop(),
           onVerseBookmark: _saveTrilingualVerseBookmark,
-          onRemoveVerseBookmark: _removeVerseBookmark,
+          onRemoveVerseBookmark: (verse) => _removeVerseBookmark(
+            <String, dynamic>{
+              'sura': verse.surahNumber,
+              'aya': verse.ayahNumber,
+            },
+          ),
           isVerseBookmarked: _isVerseBookmarked,
           onPositionChanged: _handleReaderPositionChanged,
           onPageChanged: (page) => _selectPage(page, saveImmediately: true),
@@ -1532,6 +1552,114 @@ Widget build(BuildContext context) {
     ),
   );
 }
+}
+
+class _ContinueReadingCard extends StatelessWidget {
+  const _ContinueReadingCard({
+    required this.isDark,
+    required this.surahName,
+    required this.ayah,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final String surahName;
+  final int ayah;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = isDark
+        ? const Color(0xFFF4F0E6)
+        : const Color(0xFF123A2D);
+    final muted = isDark
+        ? const Color(0xFFC4D4C9)
+        : const Color(0xFF63776C);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(19),
+        child: Ink(
+          padding: const EdgeInsetsDirectional.fromSTEB(15, 13, 13, 13),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: isDark
+                  ? const [Color(0xFF174B3A), Color(0xFF0B3025)]
+                  : const [Color(0xFFE7F0E5), Color(0xFFF7F3E8)],
+            ),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(
+              color: const Color(0xFFD8B66A).withValues(alpha: 0.72),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD8B66A).withValues(alpha: 0.09),
+                blurRadius: 18,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD8B66A).withValues(alpha: 0.18),
+                  border: Border.all(
+                    color: const Color(0xFFD8B66A).withValues(alpha: 0.72),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.auto_stories_rounded,
+                  color: Color(0xFFD8B66A),
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      QuranPageLocalization.text(context, 'quran_continue_reading'),
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$surahName  •  ${QuranPageLocalization.text(context, 'quran_ayah_number')} $ayah',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.play_circle_fill_rounded,
+                color: Color(0xFFD8B66A),
+                size: 29,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _QuranIndexHeader extends StatelessWidget {
