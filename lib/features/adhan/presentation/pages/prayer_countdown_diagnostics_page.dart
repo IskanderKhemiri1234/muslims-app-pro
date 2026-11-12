@@ -284,6 +284,14 @@ class _PrayerCountdownDiagnosticsPageState
                     ),
                     [
                       _value(
+                        _t('إذن الإشعارات', 'Notifications allowed', 'Notifications autorisées'),
+                        _yesNo(adhan['notificationsEnabled']),
+                      ),
+                      _value(
+                        _t('إذن المنبهات الدقيقة متاح', 'Exact alarms available', 'Alarmes exactes disponibles'),
+                        _yesNo(adhan['exactAlarmAvailable']),
+                      ),
+                      _value(
                         _t('المواعيد المحفوظة', 'Saved alerts', 'Alertes enregistrées'),
                         adhan['savedScheduleCount'],
                       ),
